@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 280" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Pink to Violet Gradient -->
+    <linearGradient id="wavePinkPurple" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E93B81" />
+      <stop offset="45%" stop-color="#9B3CE8" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <!-- Cyan to Blue Gradient -->
+    <linearGradient id="waveCyanBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9ED9EC" stop-opacity="0.8" />
+      <stop offset="40%" stop-color="#6366F1" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+
+    <!-- Gold / Peach Gradient -->
+    <linearGradient id="waveGold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#A5C8D8" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#E2D4B7" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#F6CE92" stop-opacity="0.85" />
+    </linearGradient>
+
+    <!-- Purple X Gradient -->
+    <linearGradient id="xGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Waves Container -->
+  <g transform="translate(0, 10)">
+    <!-- Bottom Gold/Sand Ribbon -->
+    <path d="M 75 95 C 105 45, 140 145, 185 145 C 230 145, 260 55, 305 75 C 330 85, 335 125, 315 138 C 290 155, 240 100, 185 160 C 140 160, 105 75, 75 95 Z" 
+          fill="url(#waveGold)" />
+
+    <!-- Middle Cyan/Blue Ribbon -->
+    <path d="M 68 85 C 95 40, 135 125, 175 125 C 220 125, 245 45, 290 60 C 315 70, 330 105, 310 118 C 280 135, 235 85, 175 140 C 130 140, 95 65, 68 85 Z" 
+          fill="url(#waveCyanBlue)" opacity="0.65" />
+
+    <!-- Top Vibrant Pink-Purple-Blue Ribbon -->
+    <path d="M 65 75 C 90 30, 130 115, 170 115 C 215 115, 240 35, 285 50 C 315 60, 325 80, 315 95 C 300 115, 275 80, 235 68 C 190 55, 160 135, 120 125 C 95 120, 80 100, 65 75 Z" 
+          fill="url(#wavePinkPurple)" />
+  </g>
+
+  <!-- WellX989 Text Branding -->
+  <g transform="translate(200, 195)" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Poppins', 'Inter', -apple-system, sans-serif">
+    <text y="0" font-size="44" font-weight="700" fill="#232733" letter-spacing="-1">
+      well<tspan fill="url(#xGradient)" font-weight="800">X</tspan>989
+    </text>
+    <text y="28" font-size="11" font-weight="600" fill="#8E95A5" letter-spacing="7">
+      GO. TRACK. EARN.
+    </text>
+  </g>
+</svg>

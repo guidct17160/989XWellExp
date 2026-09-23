@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: wellx989_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-wellx989_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-wellx989_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wellx-network
+
+  # 2. Backend Node.js API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wellx989_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-wellx989_db}
+      JWT_SECRET: ${JWT_SECRET:-wellx989_jwt_secret_key_production_2026}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-wellx989_jwt_refresh_secret_production_2026}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173,http://localhost:8081,http://localhost:19006}
+    ports:
+      - "5000:5000"
+    networks:
+      - wellx-network
+
+  # 3. Frontend Web Admin Service (Vite + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wellx989_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - wellx-network
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  wellx-network:
+    driver: bridge

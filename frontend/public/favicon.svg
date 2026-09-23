@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="favWave1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E93B81" />
+      <stop offset="50%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    <linearGradient id="favWave2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9ED9EC" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#FCD34D" stop-opacity="0.9" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="#FFFFFF" />
+  <!-- Under wave -->
+  <path d="M 12 56 C 25 35, 42 75, 58 75 C 74 75, 82 42, 90 50" 
+        stroke="url(#favWave2)" stroke-width="11" stroke-linecap="round" fill="none" opacity="0.85" />
+  <!-- Main wave -->
+  <path d="M 12 46 C 25 25, 42 65, 58 65 C 74 65, 82 32, 90 40" 
+        stroke="url(#favWave1)" stroke-width="11" stroke-linecap="round" fill="none" />
+</svg>
