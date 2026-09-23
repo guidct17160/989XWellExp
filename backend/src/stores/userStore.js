@@ -8,7 +8,7 @@ module.exports = function createUserStore(storeRef) {
       if (db.isPgConnected()) {
         try {
           const res = await db.query('SELECT * FROM employees ORDER BY created_at DESC');
-          if (res.rows) {
+          if (res.rows && res.rows.length > 0) {
             return res.rows.map((r) => {
               const firstName = r.first_name || (r.name ? r.name.split(' ')[0] : '');
               const lastName = r.last_name || (r.name ? r.name.split(' ').slice(1).join(' ') : '');

@@ -24,7 +24,38 @@ import { authService } from '../services/authService';
 
 export default function ManagerApprovalScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'leave' | 'ot' | 'time-correction'
+  const [approvalMode, setApprovalMode] = useState('pending'); // 'pending' | 'history'
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [approvalHistory, setApprovalHistory] = useState([
+    {
+      id: 'HIST-001',
+      requestType: 'leave',
+      employeeName: 'กานดา วงศ์สุวรรณ',
+      employeeCode: 'EMP-002',
+      department: 'ฝ่ายทรัพยากรบุคคล (HR)',
+      leaveType: 'ลาพักร้อน (Annual Leave)',
+      days: 2,
+      startDate: '2026-08-10',
+      endDate: '2026-08-11',
+      reason: 'ไปพักผ่อนต่างจังหวัดกับครอบครัว',
+      status: 'อนุมัติแล้ว',
+      actionTime: '10 ส.ค. 2026 09:30 น.',
+      approverName: 'ผู้จัดการ',
+    },
+    {
+      id: 'HIST-002',
+      requestType: 'ot',
+      employeeName: 'วรพจน์ จิตเที่ยง',
+      employeeCode: 'EMP-003',
+      department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
+      hours: 3,
+      date: '2026-08-12',
+      reason: 'Deploy ระบบ Server และอัปเกรดความปลอดภัย',
+      status: 'อนุมัติแล้ว',
+      actionTime: '12 ส.ค. 2026 18:45 น.',
+      approverName: 'ผู้จัดการ',
+    },
+  ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const currentUser = authService.getUser();
@@ -95,6 +126,16 @@ export default function ManagerApprovalScreen({ navigation }) {
               }
 
               Alert.alert('อนุมัติสำเร็จ', `ทำการอนุมัติคำขอเรียบร้อยแล้ว`);
+              const nowStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' น.';
+              setApprovalHistory((prev) => [
+                {
+                  ...item,
+                  status: 'อนุมัติแล้ว',
+                  actionTime: nowStr,
+                  approverName: currentUser?.name || 'ผู้จัดการ',
+                },
+                ...prev,
+              ]);
               setPendingRequests((prev) => prev.filter((r) => r.id !== item.id));
               fetchPendingApprovals();
             } catch (e) {
@@ -124,6 +165,17 @@ export default function ManagerApprovalScreen({ navigation }) {
       });
 
       Alert.alert('ปฏิเสธคำขอสำเร็จ', 'บันทึกการไม่อนุมัติคำขอเรียบร้อยแล้ว');
+      const nowStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' น.';
+      setApprovalHistory((prev) => [
+        {
+          ...item,
+          status: 'ไม่อนุมัติ',
+          rejectReason: remarkText,
+          actionTime: nowStr,
+          approverName: currentUser?.name || 'ผู้จัดการ',
+        },
+        ...prev,
+      ]);
       setPendingRequests((prev) => prev.filter((r) => r.id !== item.id));
       setRejectModal({ visible: false, request: null, remark: '' });
       fetchPendingApprovals();
@@ -133,6 +185,15 @@ export default function ManagerApprovalScreen({ navigation }) {
   };
 
   const filteredRequests = pendingRequests.filter((item) => {
+    const type = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+    if (activeTab === 'all') return true;
+    if (activeTab === 'leave') return type === 'leave';
+    if (activeTab === 'ot') return type === 'ot';
+    if (activeTab === 'time-correction') return type === 'time-correction';
+    return true;
+  });
+
+  const filteredHistory = approvalHistory.filter((item) => {
     const type = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
     if (activeTab === 'all') return true;
     if (activeTab === 'leave') return type === 'leave';
@@ -157,8 +218,29 @@ export default function ManagerApprovalScreen({ navigation }) {
       />
 
       <View style={styles.container}>
-        
-        
+        {/* Mode Toggle: รออนุมัติ vs ประวัติที่อนุมัติแล้ว */}
+        <View style={styles.modeToggleContainer}>
+          <TouchableOpacity
+            testID="tab-approval-mode-pending"
+            style={[styles.modeToggleBtn, approvalMode === 'pending' && styles.modeToggleBtnActive]}
+            onPress={() => setApprovalMode('pending')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.modeToggleText, approvalMode === 'pending' && styles.modeToggleTextActive]}>
+              ⏳ รออนุมัติ ({pendingRequests.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="tab-approval-mode-history"
+            style={[styles.modeToggleBtn, approvalMode === 'history' && styles.modeToggleBtnActive]}
+            onPress={() => setApprovalMode('history')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.modeToggleText, approvalMode === 'history' && styles.modeToggleTextActive]}>
+              📜 ประวัติที่อนุมัติแล้ว ({approvalHistory.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Category Tabs */}
         <View style={styles.tabsRow}>
@@ -194,22 +276,136 @@ export default function ManagerApprovalScreen({ navigation }) {
             />
           }
         >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>กำลังโหลดรายการรออนุมัติ...</Text>
-            </View>
-          ) : filteredRequests.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <Ionicons name="checkmark-done-circle-outline" size={48} color="#10B981" />
+          {approvalMode === 'pending' ? (
+            loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>กำลังโหลดรายการรออนุมัติ...</Text>
               </View>
-              <Text style={styles.emptyTitle}>ไม่มีรายการรออนุมัติ</Text>
-              <Text style={styles.emptySubtitle}>คำขอทั้งหมดได้รับการดำเนินการเรียบร้อยแล้ว</Text>
+            ) : filteredRequests.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconBg}>
+                  <Ionicons name="checkmark-done-circle-outline" size={48} color="#10B981" />
+                </View>
+                <Text style={styles.emptyTitle}>ไม่มีรายการรออนุมัติ</Text>
+                <Text style={styles.emptySubtitle}>คำขอทั้งหมดได้รับการดำเนินการเรียบร้อยแล้ว</Text>
+              </View>
+            ) : (
+              filteredRequests.map((item, index) => {
+                const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+                let typeBadge = { label: 'คำร้อง', bg: '#EFF6FF', text: '#3B82F6', icon: 'document-text-outline' };
+                if (reqType === 'leave') {
+                  typeBadge = { label: item.leaveType || 'ขอลางาน', bg: '#FEF3C7', text: '#D97706', icon: 'umbrella-outline' };
+                } else if (reqType === 'ot') {
+                  typeBadge = { label: `ขอ OT (${item.hours || 2} ชม.)`, bg: '#F3E8FF', text: '#9333EA', icon: 'time-outline' };
+                } else if (reqType === 'time-correction') {
+                  typeBadge = { label: 'ปรับปรุงเวลา', bg: '#E0F2FE', text: '#0284C7', icon: 'sync-outline' };
+                }
+
+                return (
+                  <View key={item.id || index} style={styles.requestCard}>
+                    {/* Card Header */}
+                    <View style={styles.cardHeader}>
+                      <View style={styles.userInfo}>
+                        <View style={styles.avatarCircle}>
+                          <Text style={styles.avatarText}>
+                            {(item.employeeName || 'EM')[0]}
+                          </Text>
+                        </View>
+                        <View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.userName}>{item.employeeName || 'พนักงานในแผนก'}</Text>
+                            {(item.requesterRole === 'Boss' || item.role === 'Boss' || item.requesterRole === 'Manager') && (
+                              <View style={{ backgroundColor: '#F3E8FF', borderColor: '#C084FC', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                                <Text style={{ color: '#7E22CE', fontSize: 10, fontWeight: '700' }}>👔 Role Boss</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.userDept}>{item.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'}</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.typeTag, { backgroundColor: typeBadge.bg }]}>
+                        <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
+                        <Text style={[styles.typeTagText, { color: typeBadge.text }]}>{typeBadge.label}</Text>
+                      </View>
+                    </View>
+
+                    {/* Card Details */}
+                    <View style={styles.cardBody}>
+                      {reqType === 'leave' && (
+                        <View style={styles.detailRow}>
+                          <Ionicons name="calendar-outline" size={16} color="#64748B" />
+                          <Text style={styles.detailText}>
+                            วันที่: <Text style={styles.boldText}>{item.startDate} – {item.endDate}</Text> ({item.totalDays || 1} วัน)
+                          </Text>
+                        </View>
+                      )}
+
+                      {reqType === 'ot' && (
+                        <View style={styles.detailRow}>
+                          <Ionicons name="alarm-outline" size={16} color="#64748B" />
+                          <Text style={styles.detailText}>
+                            วันที่: <Text style={styles.boldText}>{item.dateIso}</Text> เวลา <Text style={styles.boldText}>{item.startTime} - {item.endTime} น.</Text>
+                          </Text>
+                        </View>
+                      )}
+
+                      {reqType === 'time-correction' && (
+                        <View style={styles.detailRow}>
+                          <Ionicons name="time-outline" size={16} color="#64748B" />
+                          <Text style={styles.detailText}>
+                            เวลาเดิม: {item.oldCheckIn || '--:--'} - {item.oldCheckOut || '--:--'} ➔ ขอปรับเป็น: <Text style={styles.boldText}>{item.newCheckIn || '08:00 น.'} - {item.newCheckOut || '17:00 น.'}</Text>
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.reasonBox}>
+                        <Text style={styles.reasonLabel}>เหตุผล / รายละเอียดงาน:</Text>
+                        <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ขออนุมัติตามขั้นตอนบริษัท'}</Text>
+                      </View>
+
+                      {item.attachmentUrl && (
+                        <View style={styles.attachmentChip}>
+                          <Ionicons name="attach" size={14} color="#0EA5E9" />
+                          <Text style={styles.attachmentText}>แนบเอกสาร: {item.attachmentUrl}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        onPress={() => setRejectModal({ visible: true, request: item, remark: '' })}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginRight: 4 }} />
+                        <Text style={styles.rejectBtnText}>ไม่อนุมัติ</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.approveBtn}
+                        onPress={() => handleApprove(item)}
+                      >
+                        <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.approveBtnText}>อนุมัติคำขอ</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )
+          ) : filteredHistory.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIconBg, { backgroundColor: '#F1F5F9' }]}>
+                <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
+              </View>
+              <Text style={styles.emptyTitle}>ไม่มีประวัติการอนุมัติ</Text>
+              <Text style={styles.emptySubtitle}>รายการที่อนุมัติหรือปฏิเสธแล้วจะแสดงที่นี่</Text>
             </View>
           ) : (
-            filteredRequests.map((item, index) => {
+            filteredHistory.map((item, index) => {
               const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+              const isApproved = item.status === 'อนุมัติแล้ว' || item.status === 'approved';
               let typeBadge = { label: 'คำร้อง', bg: '#EFF6FF', text: '#3B82F6', icon: 'document-text-outline' };
               if (reqType === 'leave') {
                 typeBadge = { label: item.leaveType || 'ขอลางาน', bg: '#FEF3C7', text: '#D97706', icon: 'umbrella-outline' };
@@ -220,40 +416,55 @@ export default function ManagerApprovalScreen({ navigation }) {
               }
 
               return (
-                <View key={item.id || index} style={styles.requestCard}>
-                  {/* Card Header */}
+                <View key={item.id || `hist-${index}`} style={styles.requestCard}>
+                  {/* History Card Header */}
                   <View style={styles.cardHeader}>
                     <View style={styles.userInfo}>
-                      <View style={styles.avatarCircle}>
+                      <View style={[styles.avatarCircle, { backgroundColor: '#64748B' }]}>
                         <Text style={styles.avatarText}>
                           {(item.employeeName || 'EM')[0]}
                         </Text>
                       </View>
                       <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.userName}>{item.employeeName || 'พนักงานในแผนก'}</Text>
-                          {(item.requesterRole === 'Boss' || item.role === 'Boss' || item.requesterRole === 'Manager') && (
-                            <View style={{ backgroundColor: '#F3E8FF', borderColor: '#C084FC', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
-                              <Text style={{ color: '#7E22CE', fontSize: 10, fontWeight: '700' }}>👔 Role Boss</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.userDept}>{item.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'}</Text>
+                        <Text style={styles.userName}>{item.employeeName || 'พนักงาน'}</Text>
+                        <Text style={styles.userDept}>{item.department || item.employeeCode || 'ฝ่ายงาน'}</Text>
                       </View>
                     </View>
-                    <View style={[styles.typeTag, { backgroundColor: typeBadge.bg }]}>
-                      <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
-                      <Text style={[styles.typeTagText, { color: typeBadge.text }]}>{typeBadge.label}</Text>
+                    <View
+                      style={[
+                        styles.historyBadge,
+                        isApproved ? styles.historyBadgeSuccess : styles.historyBadgeDanger,
+                      ]}
+                    >
+                      <Ionicons
+                        name={isApproved ? 'checkmark-circle' : 'close-circle'}
+                        size={14}
+                        color={isApproved ? '#16A34A' : '#DC2626'}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text
+                        style={[
+                          styles.historyBadgeText,
+                          isApproved ? styles.historyBadgeTextSuccess : styles.historyBadgeTextDanger,
+                        ]}
+                      >
+                        {item.status || (isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ')}
+                      </Text>
                     </View>
                   </View>
 
-                  {/* Card Details */}
+                  {/* History Card Details */}
                   <View style={styles.cardBody}>
+                    <View style={[styles.typeTag, { backgroundColor: typeBadge.bg, marginBottom: 8, alignSelf: 'flex-start' }]}>
+                      <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
+                      <Text style={[styles.typeTagText, { color: typeBadge.text }]}>{typeBadge.label}</Text>
+                    </View>
+
                     {reqType === 'leave' && (
                       <View style={styles.detailRow}>
                         <Ionicons name="calendar-outline" size={16} color="#64748B" />
                         <Text style={styles.detailText}>
-                          วันที่: <Text style={styles.boldText}>{item.startDate} – {item.endDate}</Text> ({item.totalDays || 1} วัน)
+                          วันที่: <Text style={styles.boldText}>{item.startDate} – {item.endDate}</Text> ({item.days || item.totalDays || 1} วัน)
                         </Text>
                       </View>
                     )}
@@ -262,7 +473,7 @@ export default function ManagerApprovalScreen({ navigation }) {
                       <View style={styles.detailRow}>
                         <Ionicons name="alarm-outline" size={16} color="#64748B" />
                         <Text style={styles.detailText}>
-                          วันที่: <Text style={styles.boldText}>{item.dateIso}</Text> เวลา <Text style={styles.boldText}>{item.startTime} - {item.endTime} น.</Text>
+                          วันที่: <Text style={styles.boldText}>{item.date || item.dateIso}</Text> ({item.hours || 1} ชม.)
                         </Text>
                       </View>
                     )}
@@ -271,41 +482,35 @@ export default function ManagerApprovalScreen({ navigation }) {
                       <View style={styles.detailRow}>
                         <Ionicons name="time-outline" size={16} color="#64748B" />
                         <Text style={styles.detailText}>
-                          เวลาเดิม: {item.oldCheckIn || '--:--'} - {item.oldCheckOut || '--:--'} ➔ ขอปรับเป็น: <Text style={styles.boldText}>{item.newCheckIn || '08:00 น.'} - {item.newCheckOut || '17:00 น.'}</Text>
+                          เวลาเดิม: {item.oldCheckIn || '--:--'} ➔ ปรับเป็น: <Text style={styles.boldText}>{item.newCheckIn || '08:00 น.'} - {item.newCheckOut || '17:00 น.'}</Text>
                         </Text>
                       </View>
                     )}
 
                     <View style={styles.reasonBox}>
-                      <Text style={styles.reasonLabel}>เหตุผล / รายละเอียดงาน:</Text>
-                      <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ขออนุมัติตามขั้นตอนบริษัท'}</Text>
+                      <Text style={styles.reasonLabel}>เหตุผลคำขอ:</Text>
+                      <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ไม่มีระบุ'}</Text>
                     </View>
 
-                    {item.attachmentUrl && (
-                      <View style={styles.attachmentChip}>
-                        <Ionicons name="attach" size={14} color="#0EA5E9" />
-                        <Text style={styles.attachmentText}>แนบเอกสาร: {item.attachmentUrl}</Text>
+                    {item.rejectReason && (
+                      <View style={[styles.reasonBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, marginTop: 6 }]}>
+                        <Text style={[styles.reasonLabel, { color: '#DC2626' }]}>เหตุผลการไม่อนุมัติ:</Text>
+                        <Text style={[styles.reasonText, { color: '#B91C1C' }]}>{item.rejectReason}</Text>
                       </View>
                     )}
                   </View>
 
-                  {/* Action Buttons */}
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      style={styles.rejectBtn}
-                      onPress={() => setRejectModal({ visible: true, request: item, remark: '' })}
-                    >
-                      <Ionicons name="close-circle" size={18} color="#EF4444" style={{ marginRight: 4 }} />
-                      <Text style={styles.rejectBtnText}>ไม่อนุมัติ</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.approveBtn}
-                      onPress={() => handleApprove(item)}
-                    >
-                      <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
-                      <Text style={styles.approveBtnText}>อนุมัติคำขอ</Text>
-                    </TouchableOpacity>
+                  {/* History Footer */}
+                  <View style={styles.historyFooter}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="person-circle-outline" size={16} color="#64748B" style={{ marginRight: 4 }} />
+                      <Text style={styles.historyApproverText}>
+                        ผู้อนุมัติ: {item.approverName || 'ผู้จัดการ'}
+                      </Text>
+                    </View>
+                    <Text style={styles.historyTimeText}>
+                      {item.actionTime || 'ดำเนินการแล้ว'}
+                    </Text>
                   </View>
                 </View>
               );
@@ -364,32 +569,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  headerBanner: {
+  modeToggleContainer: {
+    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#E2E8F0',
   },
-  headerBannerTitle: {
-    fontSize: 16,
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  modeToggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  modeToggleText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#64748B',
   },
-  badgeCount: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  modeToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  historyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
   },
-  badgeCountText: {
+  historyBadgeSuccess: {
+    backgroundColor: '#DCFCE7',
+  },
+  historyBadgeDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  historyBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#D97706',
   },
-  headerBannerSubtitle: {
+  historyBadgeTextSuccess: {
+    color: '#16A34A',
+  },
+  historyBadgeTextDanger: {
+    color: '#DC2626',
+  },
+  historyFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  historyApproverText: {
     fontSize: 12,
     color: '#64748B',
+    fontWeight: '600',
+  },
+  historyTimeText: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
   tabsRow: {
     flexDirection: 'row',

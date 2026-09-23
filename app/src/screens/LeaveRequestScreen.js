@@ -20,8 +20,17 @@ import { colors } from '../theme/colors';
 import { leaveStorage } from '../services/leaveStorage';
 import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
+import { tryFetchApi } from '../services/apiClient';
 
 const { width } = Dimensions.get('window');
+
+const DEFAULT_POLICIES = [
+  { id: 'LP-01', leaveType: 'annual', name: 'ลาพักร้อน (Annual Leave)', defaultQuota: 10, advanceNoticeDays: 3, requireAttachment: false, description: 'สำหรับพนักงานประจำที่ผ่านการทดลองงาน สามารถสะสมวันลาได้ตามระเบียบบริษัท' },
+  { id: 'LP-02', leaveType: 'sick', name: 'ลาป่วย (Sick Leave)', defaultQuota: 30, advanceNoticeDays: 0, requireAttachment: true, description: 'ลาป่วยตั้งแต่ 3 วันทำงานขึ้นไป ต้องแนบใบรับรองแพทย์จากสถานพยาบาลที่ได้รับการรับรอง' },
+  { id: 'LP-03', leaveType: 'personal', name: 'ลากิจ (Business Leave)', defaultQuota: 5, advanceNoticeDays: 1, requireAttachment: false, description: 'สำหรับการทำธุระส่วนตัวที่ไม่สามารถดำเนินการนอกเวลาทำการได้ ต้องแจ้งหัวหน้างานล่วงหน้า' },
+  { id: 'LP-04', leaveType: 'maternity', name: 'ลาคลอด (Maternity Leave)', defaultQuota: 98, advanceNoticeDays: 30, requireAttachment: true, description: 'สิทธิ์ลาคลอดบุตรสำหรับพนักงานหญิง ได้รับค่าจ้างตามที่กฎหมายแรงงานกำหนด' },
+  { id: 'LP-05', leaveType: 'ordination', name: 'ลาบวช (Ordination Leave)', defaultQuota: 15, advanceNoticeDays: 15, requireAttachment: true, description: 'สิทธิ์ลาอุปสมบทหรือประกอบพิธีทางศาสนา สำหรับพนักงานที่มีอายุงานครบ 1 ปีขึ้นไป' },
+];
 
 export default function LeaveRequestScreen({ navigation }) {
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
@@ -29,6 +38,8 @@ export default function LeaveRequestScreen({ navigation }) {
 
   // Request Leave Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isPoliciesModalVisible, setIsPoliciesModalVisible] = useState(false);
+  const [policiesList, setPoliciesList] = useState(DEFAULT_POLICIES);
   const [selectedType, setSelectedType] = useState('annual');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -43,6 +54,20 @@ export default function LeaveRequestScreen({ navigation }) {
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [isDaysPickerVisible, setIsDaysPickerVisible] = useState(false);
+
+  const fetchPolicies = useCallback(async () => {
+    try {
+      const res = await tryFetchApi('/leave-policies');
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.policies) && data.policies.length > 0) {
+          setPoliciesList(data.policies);
+        }
+      }
+    } catch (e) {
+      console.log('Error fetching leave policies:', e);
+    }
+  }, []);
 
   const getCalculatedEndDate = (startStr, daysCount) => {
     if (!startStr) return '';
@@ -147,6 +172,7 @@ export default function LeaveRequestScreen({ navigation }) {
     });
 
     leaveStorage.clearAndSync();
+    fetchPolicies();
 
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -278,6 +304,25 @@ export default function LeaveRequestScreen({ navigation }) {
             />
           }
         >
+          {/* Company Leave Policies Banner */}
+          <TouchableOpacity
+            testID="btn-open-leave-policies"
+            style={styles.policiesBanner}
+            onPress={() => setIsPoliciesModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.policiesBannerLeft}>
+              <View style={styles.policiesBannerIcon}>
+                <Ionicons name="document-text" size={20} color="#2563EB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.policiesBannerTitle}>คู่มือและข้อกำหนดการลาของบริษัท</Text>
+                <Text style={styles.policiesBannerSubtitle}>แตะเพื่อดูระเบียบวันลา, เอกสารแนบ และเงื่อนไข</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
           {/* Leave Balance Cards */}
           {leaveBalances.map((type) => {
             const used = type.total - type.remaining;
@@ -371,6 +416,63 @@ export default function LeaveRequestScreen({ navigation }) {
           })}
         </ScrollView>
       </Animated.View>
+
+      {/* Company Leave Policies & Rules Modal */}
+      <Modal
+        testID="leave-policies-modal"
+        animationType="slide"
+        transparent={false}
+        visible={isPoliciesModalVisible}
+        onRequestClose={() => setIsPoliciesModalVisible(false)}
+      >
+        <SafeAreaView style={styles.fullScreenModalContainer}>
+          <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
+          <TopNavbar
+            navigation={navigation}
+            onBackPress={() => setIsPoliciesModalVisible(false)}
+            title="ระเบียบและข้อกำหนดการลา"
+            showBack
+          />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.formScrollContentFull}
+          >
+            <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
+              ข้อบังคับและสิทธิประโยชน์การลาของพนักงาน อ้างอิงตามนโยบายฝ่ายบริหารทรัพยากรบุคคล (HR)
+            </Text>
+
+            {policiesList.map((pol) => (
+              <View key={pol.id} style={styles.policyCard}>
+                <View style={styles.policyHeader}>
+                  <Text style={styles.policyTitle}>{pol.name || pol.leaveType}</Text>
+                  <View style={styles.policyQuotaBadge}>
+                    <Text style={styles.policyQuotaText}>สิทธิ์ {pol.defaultQuota || 0} วัน/ปี</Text>
+                  </View>
+                </View>
+                <Text style={styles.policyDesc}>{pol.description || 'สิทธิการลาตามระเบียบพนักงาน'}</Text>
+                <View style={styles.policyMetaRow}>
+                  <View style={styles.policyMetaItem}>
+                    <Ionicons name="time-outline" size={14} color="#64748B" />
+                    <Text style={styles.policyMetaText}>
+                      แจ้งล่วงหน้า {pol.advanceNoticeDays || 0} วัน
+                    </Text>
+                  </View>
+                  <View style={styles.policyMetaItem}>
+                    <Ionicons
+                      name={pol.requireAttachment ? 'attach' : 'checkmark-circle-outline'}
+                      size={14}
+                      color={pol.requireAttachment ? '#D97706' : '#10B981'}
+                    />
+                    <Text style={[styles.policyMetaText, pol.requireAttachment && { color: '#D97706', fontWeight: '600' }]}>
+                      {pol.requireAttachment ? 'ต้องมีเอกสารแนบ' : 'ไม่ต้องแนบเอกสาร'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       {/* Leave Request Form Modal (Full Screen) */}
       <Modal
@@ -1455,5 +1557,102 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
+  },
+  // Policies Banner & Modal styles
+  policiesBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 14,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  policiesBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  policiesBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  policiesBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  policiesBannerSubtitle: {
+    fontSize: 11,
+    color: '#3B82F6',
+    marginTop: 1,
+  },
+  policyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  policyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  policyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  policyQuotaBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  policyQuotaText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  policyDesc: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  policyMetaRow: {
+    flexDirection: 'row',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
+  },
+  policyMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  policyMetaText: {
+    fontSize: 11,
+    color: '#64748B',
   },
 });

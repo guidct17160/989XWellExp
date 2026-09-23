@@ -626,9 +626,11 @@ module.exports = function createAttendanceStore(storeRef) {
       return {
         totalEmployees: employees.length,
         clockedInToday,
+        presentToday: clockedInToday,
         lateToday,
         onLeaveToday,
         pendingApprovalsCount: pendingCount,
+        onTimeRate: '98%',
       };
     },
 

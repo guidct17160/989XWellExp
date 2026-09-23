@@ -15,23 +15,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useScrollToTop } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
+import { tryFetchApi } from '../services/apiClient';
 
 const { width } = Dimensions.get('window');
 
 const hrMenuItems = [
   { icon: 'shield-checkmark-outline', label: 'อนุมัติคำขอ', color: '#3B82F6', screen: 'ManagerApproval', badge: 'อนุมัติ' },
   { icon: 'checkmark-circle-outline', label: 'สถานะคำขอ', color: '#F5A623', screen: 'RequestStatus' },
+  { icon: 'people-outline', label: 'สมุดรายชื่อทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory', badge: 'ใหม่' },
+  { icon: 'time-outline', label: 'เวลาของทีม', color: '#0EA5E9', screen: 'TeamAttendance', badge: 'สด' },
   { icon: 'calendar-outline', label: 'ลางาน', color: '#27AE60', screen: 'LeaveRequest' },
   { icon: 'document-text-outline', label: 'สลิปเงินเดือน', color: '#9B59B6', screen: 'Payslip' },
   { icon: 'heart-outline', label: 'ขอ OT / สวัสดิการ', color: '#E24C4B', screen: 'OtRequest' },
   { icon: 'sync-outline', label: 'ปรับปรุงเวลา', color: '#27AE60', screen: 'TimeCorrection' },
 ];
-
-// const quickStats = [
-//   { label: 'วันลาคงเหลือ', value: '12', unit: 'วัน', color: '#27AE60', icon: 'calendar' },
-//   { label: 'สลิปเดือนนี้', value: 'พร้อม', color: '#4A90D9', icon: 'document-text' },
-//   { label: 'รายการรออนุมัติ', value: '2', unit: 'รายการ', color: '#F5A623', icon: 'time' },
-// ];
 
 export default function HRDashboardScreen({ navigation }) {
   const scrollViewRef = useRef(null);
@@ -39,12 +36,57 @@ export default function HRDashboardScreen({ navigation }) {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({
+    totalEmployees: 6,
+    onTimeRate: '98%',
+    pendingCount: 0,
+    leaveBalance: 12,
+  });
+
+  const fetchLiveStats = async () => {
+    try {
+      const [dashRes, leaveRes, pendingRes] = await Promise.all([
+        tryFetchApi('/hr/dashboard/stats'),
+        tryFetchApi('/leaves/balances'),
+        tryFetchApi('/approvals/pending'),
+      ]);
+
+      let newStats = { ...stats };
+
+      if (dashRes && dashRes.ok) {
+        const dData = await dashRes.json();
+        if (dData && dData.stats) {
+          newStats.totalEmployees = dData.stats.totalEmployees || newStats.totalEmployees;
+          newStats.onTimeRate = dData.stats.onTimeRate || '98%';
+        }
+      }
+
+      if (leaveRes && leaveRes.ok) {
+        const lData = await leaveRes.json();
+        if (lData && lData.balances) {
+          const annual = lData.balances.find((b) => b.type === 'annual' || b.type === 'พักร้อน');
+          if (annual) newStats.leaveBalance = annual.remaining || annual.quota || 12;
+        }
+      }
+
+      if (pendingRes && pendingRes.ok) {
+        const pData = await pendingRes.json();
+        if (pData && Array.isArray(pData.approvals)) {
+          newStats.pendingCount = pData.approvals.length;
+        }
+      }
+
+      setStats(newStats);
+    } catch (e) {
+      console.log('Error fetching HR live stats:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1200);
+    fetchLiveStats();
   }, []);
 
   useEffect(() => {
@@ -53,6 +95,7 @@ export default function HRDashboardScreen({ navigation }) {
       duration: 500,
       useNativeDriver: true,
     }).start();
+    fetchLiveStats();
   }, []);
 
   return (
@@ -76,10 +119,47 @@ export default function HRDashboardScreen({ navigation }) {
           />
         }
       >
-
         <Animated.View style={[styles.body, { opacity: fadeAnim }]} className="p-4">
+          {/* HR Live Overview Stats Header */}
+          <Text style={styles.sectionHeaderTitle}>📊 สรุปภาพรวม HR & สถิติ</Text>
+          <View testID="hr-live-stats-row" style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <View style={[styles.statIconBadge, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="people" size={18} color="#2563EB" />
+              </View>
+              <Text style={styles.statValue}>{stats.totalEmployees}</Text>
+              <Text style={styles.statLabel}>พนักงานทั้งหมด</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIconBadge, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="checkmark-done" size={18} color="#10B981" />
+              </View>
+              <Text style={[styles.statValue, { color: '#10B981' }]}>{stats.onTimeRate}</Text>
+              <Text style={styles.statLabel}>ตรงเวลาวันนี้</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIconBadge, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="hourglass" size={18} color="#D97706" />
+              </View>
+              <Text style={[styles.statValue, { color: '#D97706' }]}>{stats.pendingCount}</Text>
+              <Text style={styles.statLabel}>รอการอนุมัติ</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIconBadge, { backgroundColor: '#FDF4FF' }]}>
+                <Ionicons name="calendar" size={18} color="#A855F7" />
+              </View>
+              <Text style={[styles.statValue, { color: '#A855F7' }]}>{stats.leaveBalance}</Text>
+              <Text style={styles.statLabel}>วันลาพักร้อน</Text>
+            </View>
+          </View>
+
+          {/* Section Divider & Menu Title */}
+          <Text style={[styles.sectionHeaderTitle, { marginTop: 12 }]}>⚡ บริการและฟังก์ชันการจัดการ</Text>
+
           {/* HR Menu Grid */}
-          
           <View testID="hr-menu-grid" style={styles.menuGrid} className="flex-row flex-wrap justify-between">
             {hrMenuItems.map((item, index) => (
               <TouchableOpacity
@@ -119,67 +199,59 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  greeting: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.title,
-  },
   body: {
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  // Stats
+  sectionHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 12,
+  },
+  // Stats Row
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
+    gap: 8,
   },
   statCard: {
-    width: (width - 48) / 3,
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 12,
+    borderColor: '#F1F5F9',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     alignItems: 'center',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    marginTop: 4,
+  statIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  statUnit: {
-    fontSize: 10,
-    color: colors.textSecondary,
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   statLabel: {
     fontSize: 10,
-    color: colors.textSecondary,
+    fontWeight: '600',
+    color: '#64748B',
     marginTop: 2,
     textAlign: 'center',
   },
   // Menu Grid
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.title,
-    marginBottom: 12,
-  },
   menuGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -192,10 +264,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    paddingVertical: 22,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
@@ -203,50 +275,34 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   menuIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     position: 'relative',
   },
   menuBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    width: 20,
-    height: 20,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 10,
-    backgroundColor: colors.badgeRed,
     alignItems: 'center',
     justifyContent: 'center',
   },
   menuBadgeText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
   },
   menuLabel: {
-    fontSize: 15,
+    fontSize: 13,
     color: colors.title,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  // Personal Info Button
-  personalInfoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  personalInfoText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
   },
 });

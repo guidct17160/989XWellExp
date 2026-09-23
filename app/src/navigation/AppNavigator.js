@@ -28,6 +28,8 @@ import PointHistoryScreen from '../screens/PointHistoryScreen';
 import MissionsScreen from '../screens/MissionsScreen';
 import SetPasswordScreen from '../screens/SetPasswordScreen';
 import ManagerApprovalScreen from '../screens/ManagerApprovalScreen';
+import EmployeeDirectoryScreen from '../screens/EmployeeDirectoryScreen';
+import TeamAttendanceScreen from '../screens/TeamAttendanceScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -148,6 +150,8 @@ export default function AppNavigator() {
       <Stack.Screen name="Missions" component={MissionsScreen} />
       <Stack.Screen name="ManagerApproval" component={ManagerApprovalScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="EmployeeDirectory" component={EmployeeDirectoryScreen} />
+      <Stack.Screen name="TeamAttendance" component={TeamAttendanceScreen} />
     </Stack.Navigator>
   );
 }

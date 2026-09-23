@@ -69,7 +69,8 @@ const menuItems = [
   { icon: 'calendar-outline', label: 'ปฏิทิน', color: '#27AE60', screen: 'TimeAttendance' },
   { icon: 'calendar-outline', label: 'ลางาน', color: '#F5A623', screen: 'LeaveRequest' },
   { icon: 'document-text-outline', label: 'สลิปเงินเดือน', color: '#9B59B6', screen: 'Payslip' },
-  { icon: 'sync-outline', label: 'ปรับปรุงเวลา', color: '#00B8D4', screen: 'TimeCorrection' },
+  { icon: 'people-outline', label: 'ทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory' },
+  { icon: 'sync-outline', label: 'ปรับเวลา', color: '#00B8D4', screen: 'TimeCorrection' },
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -790,7 +791,7 @@ const styles = StyleSheet.create({
   menuItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '23%',
+    flex: 1,
     paddingVertical: 2,
   },
   menuIconBg: {
