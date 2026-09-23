@@ -13,7 +13,8 @@ const emailService = require('../services/emailService');
 // Strip sensitive fields before sending to client
 const stripSensitive = (user) => {
   if (!user) return user;
-  const { password, ...safe } = user;
+  const { password, pin_hash, pinHash, ...safe } = user;
+  safe.hasPin = Boolean(user.pin_hash || user.pinHash);
   return safe;
 };
 
@@ -67,6 +68,7 @@ exports.login = async (req, res) => {
         department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
         position: 'Mobile Developer',
         avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        hasPin: Boolean(require('../stores/memoryStore').demoPinHash),
       };
 
       const demoToken = signAccessToken({
@@ -465,6 +467,7 @@ exports.getProfile = async (req, res) => {
           department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
           position: 'Mobile Developer',
           avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+          hasPin: Boolean(require('../stores/memoryStore').demoPinHash),
         },
       });
     }
@@ -598,5 +601,382 @@ exports.forgotPassword = async (req, res) => {
       success: false,
       message: 'เกิดข้อผิดพลาดในการประมวลผลคำขอรีเซ็ตรหัสผ่าน',
     });
+  }
+};
+
+// -------------------------------------------------------------
+// PIN Authentication & Setup Endpoints (Mobile App PIN Feature)
+// -------------------------------------------------------------
+
+exports.setPin = async (req, res) => {
+  try {
+    const memoryStore = require('../stores/memoryStore');
+    const userId = req.user?.id || req.body.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'ไม่พบข้อมูลผู้ใช้ที่ได้รับสิทธิ์ กรุณาเข้าสู่ระบบก่อน',
+      });
+    }
+
+    const { pin, currentPin, currentPassword } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุรหัส PIN 6 หลัก',
+      });
+    }
+
+    const cleanPin = String(pin).trim();
+    if (!/^\d{6}$/.test(cleanPin)) {
+      return res.status(400).json({
+        success: false,
+        message: 'รหัส PIN ต้องเป็นตัวเลข 6 หลักเท่านั้น (0-9)',
+      });
+    }
+
+    const isDemo = String(userId).toLowerCase().includes('demo');
+    let user = null;
+    let userType = 'employee';
+
+    if (!isDemo) {
+      const [employees, admins] = await Promise.all([
+        dbStore.getEmployees(),
+        dbStore.getAdmins(),
+      ]);
+
+      user = employees.find((e) => e.id === userId || e.code === userId || e.username === userId);
+      if (!user) {
+        user = admins.find((a) => a.id === userId || a.code === userId || a.username === userId);
+        userType = 'admin';
+      }
+    }
+
+    // If user already had a PIN set, require verification of currentPin or currentPassword
+    const existingPinHash = isDemo ? memoryStore.demoPinHash : (user?.pinHash || user?.pin_hash);
+    if (existingPinHash) {
+      let isVerified = false;
+      if (currentPin) {
+        const pinCheck = await comparePassword(String(currentPin).trim(), existingPinHash);
+        if (pinCheck.valid) isVerified = true;
+      }
+      if (!isVerified && currentPassword && user?.password) {
+        const passCheck = await comparePassword(String(currentPassword).trim(), user.password);
+        if (passCheck.valid) isVerified = true;
+      }
+
+      if (!isVerified) {
+        return res.status(400).json({
+          success: false,
+          message: 'รหัส PIN เดิมหรือรหัสผ่านไม่ถูกต้อง ไม่สามารถเปลี่ยน PIN ได้',
+        });
+      }
+    }
+
+    // Hash the new 6-digit PIN with bcrypt
+    const hashedPin = await hashPassword(cleanPin);
+
+    if (isDemo) {
+      memoryStore.demoPinHash = hashedPin;
+    } else if (userType === 'employee' && user) {
+      await dbStore.updateEmployee(user.id, { pinHash: hashedPin });
+    } else if (userType === 'admin' && user) {
+      await dbStore.updateAdmin(user.id, { pinHash: hashedPin });
+    }
+
+    logAudit(req, {
+      action: 'SET_PIN_SUCCESS',
+      resourceType: userType,
+      resourceId: userId,
+      details: { hadPreviousPin: Boolean(existingPinHash) },
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: 'ตั้งรหัส PIN 6 หลักสำเร็จเรียบร้อยแล้ว',
+      hasPin: true,
+    });
+  } catch (error) {
+    console.error('Error in setPin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการตั้งรหัส PIN',
+    });
+  }
+};
+
+exports.verifyPin = async (req, res) => {
+  try {
+    const memoryStore = require('../stores/memoryStore');
+    const { pin, username } = req.body;
+    const targetUserId = req.user?.id || req.user?.code || username;
+
+    if (!pin) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณากรอกรหัส PIN 6 หลัก',
+      });
+    }
+
+    const cleanPin = String(pin).trim();
+    if (!/^\d{6}$/.test(cleanPin)) {
+      return res.status(400).json({
+        success: false,
+        message: 'รหัส PIN ต้องเป็นตัวเลข 6 หลัก',
+      });
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุบัญชีผู้ใช้หรือส่ง Token เพื่อตรวจสอบ PIN',
+      });
+    }
+
+    const cleanTarget = String(targetUserId).trim().toLowerCase();
+
+    // Support Demo Account PIN Verification
+    if (cleanTarget === 'demo' || cleanTarget.includes('demo')) {
+      const demoPin = memoryStore.demoPinHash;
+      let valid = false;
+      if (demoPin) {
+        const check = await comparePassword(cleanPin, demoPin);
+        valid = check.valid;
+      } else {
+        // Default demo PIN: '123456'
+        valid = cleanPin === '123456';
+      }
+
+      if (!valid) {
+        return res.status(401).json({
+          success: false,
+          message: 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง',
+        });
+      }
+
+      const demoUser = {
+        id: 'EMP-DEMO',
+        code: 'EMP-DEMO',
+        username: 'demo',
+        name: 'พนักงานทดสอบ (Demo Account)',
+        email: 'demo@wellx989.com',
+        phone: '081-234-5678',
+        role: 'Employee',
+        department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
+        position: 'Mobile Developer',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        hasPin: true,
+      };
+
+      const demoToken = signAccessToken({
+        id: demoUser.id,
+        code: demoUser.code,
+        username: demoUser.username,
+        role: demoUser.role,
+        portal: 'app',
+      }, '1d');
+
+      return res.status(200).json({
+        success: true,
+        message: 'ยืนยันรหัส PIN สำเร็จ (Demo)',
+        token: demoToken,
+        accessToken: demoToken,
+        user: demoUser,
+      });
+    }
+
+    const [employees, admins] = await Promise.all([
+      dbStore.getEmployees(),
+      dbStore.getAdmins(),
+    ]);
+
+    const all = [...employees, ...admins];
+    const found = all.find(
+      (u) =>
+        (u.id && String(u.id).toLowerCase() === cleanTarget) ||
+        (u.code && String(u.code).toLowerCase() === cleanTarget) ||
+        (u.username && String(u.username).toLowerCase() === cleanTarget) ||
+        (u.email && String(u.email).toLowerCase() === cleanTarget)
+    );
+
+    if (!found) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบบัญชีผู้ใช้งานในระบบ',
+      });
+    }
+
+    const storedPinHash = found.pinHash || found.pin_hash;
+    if (!storedPinHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'บัญชีนี้ยังไม่ได้ตั้งรหัส PIN กรุณาเข้าสู่ระบบด้วยรหัสผ่านก่อน',
+        hasPin: false,
+      });
+    }
+
+    const check = await comparePassword(cleanPin, storedPinHash);
+    if (!check.valid) {
+      logAudit(req, {
+        action: 'VERIFY_PIN_FAILED',
+        resourceType: 'auth',
+        resourceId: found.id,
+        details: { reason: 'Invalid PIN' },
+      }).catch(() => {});
+
+      return res.status(401).json({
+        success: false,
+        message: 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง',
+      });
+    }
+
+    // PIN is valid! Issue fresh JWT token for seamless session
+    const accessToken = signAccessToken({
+      id: found.id,
+      code: found.code,
+      username: found.username,
+      role: found.role || 'Employee',
+      portal: found.role === 'Admin' || found.role === 'Super Admin' ? 'web' : 'app',
+    }, '15m');
+
+    const refreshToken = signRefreshToken({
+      id: found.id,
+      role: found.role || 'Employee',
+    }, '30d');
+
+    logAudit(req, {
+      action: 'VERIFY_PIN_SUCCESS',
+      resourceType: 'auth',
+      resourceId: found.id,
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: 'ยืนยันรหัส PIN ถูกต้อง',
+      token: accessToken,
+      accessToken,
+      refreshToken,
+      user: stripSensitive(found),
+    });
+  } catch (error) {
+    console.error('Error in verifyPin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการตรวจสอบรหัส PIN',
+    });
+  }
+};
+
+exports.removePin = async (req, res) => {
+  try {
+    const memoryStore = require('../stores/memoryStore');
+    const userId = req.user?.id;
+    const { password } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'กรุณาเข้าสู่ระบบก่อน',
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุรหัสผ่านบัญชีเพื่อยืนยันการยกเลิก PIN',
+      });
+    }
+
+    if (String(userId).toLowerCase().includes('demo')) {
+      delete memoryStore.demoPinHash;
+      return res.status(200).json({
+        success: true,
+        message: 'ยกเลิกการใช้งานรหัส PIN เรียบร้อยแล้ว',
+        hasPin: false,
+      });
+    }
+
+    const [employees, admins] = await Promise.all([
+      dbStore.getEmployees(),
+      dbStore.getAdmins(),
+    ]);
+
+    let user = employees.find((e) => e.id === userId || e.code === userId);
+    let userType = 'employee';
+    if (!user) {
+      user = admins.find((a) => a.id === userId || a.code === userId);
+      userType = 'admin';
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'ไม่พบบัญชีผู้ใช้' });
+    }
+
+    const passCheck = await comparePassword(String(password).trim(), user.password);
+    if (!passCheck.valid) {
+      return res.status(401).json({
+        success: false,
+        message: 'รหัสผ่านไม่ถูกต้อง ไม่สามารถยกเลิก PIN ได้',
+      });
+    }
+
+    if (userType === 'employee') {
+      await dbStore.updateEmployee(user.id, { pinHash: null });
+    } else {
+      await dbStore.updateAdmin(user.id, { pinHash: null });
+    }
+
+    logAudit(req, {
+      action: 'REMOVE_PIN_SUCCESS',
+      resourceType: userType,
+      resourceId: user.id,
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: 'ยกเลิกการใช้งานรหัส PIN เรียบร้อยแล้ว',
+      hasPin: false,
+    });
+  } catch (error) {
+    console.error('Error in removePin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการยกเลิก PIN',
+    });
+  }
+};
+
+exports.getPinStatus = async (req, res) => {
+  try {
+    const memoryStore = require('../stores/memoryStore');
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'กรุณาเข้าสู่ระบบก่อน' });
+    }
+
+    if (String(userId).toLowerCase().includes('demo')) {
+      return res.status(200).json({
+        success: true,
+        hasPin: Boolean(memoryStore.demoPinHash),
+      });
+    }
+
+    const [employees, admins] = await Promise.all([
+      dbStore.getEmployees(),
+      dbStore.getAdmins(),
+    ]);
+
+    const user = [...employees, ...admins].find(
+      (u) => u.id === userId || u.code === userId || u.username === userId
+    );
+
+    const hasPin = Boolean(user && (user.pinHash || user.pin_hash));
+    return res.status(200).json({
+      success: true,
+      hasPin,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -44,6 +44,11 @@ router.post('/auth/forgot-password', authController.forgotPassword);
 router.post('/forgot-password', authController.forgotPassword);
 // MED-7 FIX: Server-side refresh token endpoint
 router.post('/auth/refresh', authController.refreshToken);
+// PIN Feature Routes (6-digit PIN Authentication & Setup)
+router.post('/auth/set-pin', requireAuth, authController.setPin);
+router.post('/auth/verify-pin', authController.verifyPin);
+router.post('/auth/remove-pin', requireAuth, authController.removePin);
+router.get('/auth/pin-status', requireAuth, authController.getPinStatus);
 
 // -------------------------------------------------------------
 // 3. Admin Routes (requireAdmin = requireAuth + role check)

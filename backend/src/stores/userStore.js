@@ -30,6 +30,7 @@ module.exports = function createUserStore(storeRef) {
                 salary: Number(r.salary),
                 avatarUrl: r.avatar_url,
                 gender: r.gender || 'Male',
+                pinHash: r.pin_hash || null,
               };
             });
           }
@@ -66,6 +67,7 @@ module.exports = function createUserStore(storeRef) {
               salary: Number(r.salary),
               avatarUrl: r.avatar_url,
               gender: r.gender || 'Male',
+              pinHash: r.pin_hash || null,
             };
           }
         } catch (e) { }
@@ -98,11 +100,9 @@ module.exports = function createUserStore(storeRef) {
       memoryStore.memoryNotifications = memoryStore.memoryNotifications.filter((n) => n.employeeId !== inputEmail && n.employeeId !== finalCode && n.employeeId !== newId);
       delete memoryStore.memoryPointHistory[inputEmail];
       delete memoryStore.memoryUserMissions[inputEmail];
-      delete memoryStore.memoryPushTokens[inputEmail];
 
       const newEmp = {
         id: newId,
-        guid: newGuid,
         code: finalCode,
         username: finalUsername,
         password: finalPassword,
@@ -111,20 +111,25 @@ module.exports = function createUserStore(storeRef) {
         lastName: inputLastName,
         email: inputEmail,
         phone: empData.phone || '-',
-        department: empData.department || '-',
+        department: empData.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
         role: empData.role || 'Employee',
-        status: empData.status || 'Pending',
+        status: empData.status || 'Pending Password',
         startDate: empData.startDate || new Date().toISOString().split('T')[0],
         salary: Number(empData.salary) || 30000,
-        avatarUrl: empData.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        avatarUrl:
+          empData.avatarUrl ||
+          (finalGender === 'Female'
+            ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
+            : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'),
         gender: finalGender,
+        pinHash: empData.pinHash || null,
       };
 
       if (db.isPgConnected()) {
         try {
           await db.query(
-            `INSERT INTO employees (id, code, username, password, name, first_name, last_name, email, phone, department, role, status, start_date, salary, avatar_url, gender)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+            `INSERT INTO employees (id, code, username, password, name, first_name, last_name, email, phone, department, role, status, start_date, salary, avatar_url, gender, pin_hash)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
             [
               newEmp.id,
               newEmp.code,
@@ -142,6 +147,7 @@ module.exports = function createUserStore(storeRef) {
               newEmp.salary,
               newEmp.avatarUrl,
               newEmp.gender,
+              newEmp.pinHash,
             ]
           );
         } catch (e) {
@@ -179,6 +185,7 @@ module.exports = function createUserStore(storeRef) {
               salary: Number(r.salary),
               avatarUrl: r.avatar_url,
               gender: r.gender || 'Male',
+              pinHash: r.pin_hash || null,
             };
             const updated = { ...existing, ...updateData };
             if (updateData.firstName || updateData.lastName) {
@@ -188,8 +195,8 @@ module.exports = function createUserStore(storeRef) {
             }
             await db.query(
               `UPDATE employees 
-               SET name=$1, first_name=$2, last_name=$3, email=$4, phone=$5, department=$6, role=$7, status=$8, password=$9, username=$10, avatar_url=$11, gender=$12 
-               WHERE id=$13 OR code=$13 OR email=$13 OR username=$13`,
+               SET name=$1, first_name=$2, last_name=$3, email=$4, phone=$5, department=$6, role=$7, status=$8, password=$9, username=$10, avatar_url=$11, gender=$12, pin_hash=$13 
+               WHERE id=$14 OR code=$14 OR email=$14 OR username=$14`,
               [
                 updated.name,
                 updated.firstName,
@@ -203,6 +210,7 @@ module.exports = function createUserStore(storeRef) {
                 updated.username,
                 updated.avatarUrl,
                 updated.gender || 'Male',
+                updated.pinHash !== undefined ? updated.pinHash : existing.pinHash,
                 id,
               ]
             );
@@ -525,6 +533,7 @@ module.exports = function createUserStore(storeRef) {
               status: r.status,
               startDate: r.start_date,
               avatarUrl: r.avatar_url,
+              pinHash: r.pin_hash || null,
             }));
           }
         } catch (e) {
@@ -553,6 +562,7 @@ module.exports = function createUserStore(storeRef) {
               status: r.status,
               startDate: r.start_date,
               avatarUrl: r.avatar_url,
+              pinHash: r.pin_hash || null,
             };
           }
         } catch (e) { }
@@ -663,8 +673,9 @@ module.exports = function createUserStore(storeRef) {
                phone = COALESCE($5, phone),
                department = COALESCE($6, department),
                role = COALESCE($7, role),
-               status = COALESCE($8, status)
-             WHERE id = $9`,
+               status = COALESCE($8, status),
+               pin_hash = COALESCE($9, pin_hash)
+             WHERE id = $10`,
             [
               updateData.username,
               updateData.password,
@@ -674,6 +685,7 @@ module.exports = function createUserStore(storeRef) {
               updateData.department,
               updateData.role,
               updateData.status,
+              updateData.pinHash !== undefined ? updateData.pinHash : null,
               id,
             ]
           );

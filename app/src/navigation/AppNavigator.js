@@ -27,6 +27,8 @@ import RequestStatusScreen from '../screens/RequestStatusScreen';
 import PointHistoryScreen from '../screens/PointHistoryScreen';
 import MissionsScreen from '../screens/MissionsScreen';
 import SetPasswordScreen from '../screens/SetPasswordScreen';
+import SetPinScreen from '../screens/SetPinScreen';
+import PinLockScreen from '../screens/PinLockScreen';
 import ManagerApprovalScreen from '../screens/ManagerApprovalScreen';
 import EmployeeDirectoryScreen from '../screens/EmployeeDirectoryScreen';
 import TeamAttendanceScreen from '../screens/TeamAttendanceScreen';
@@ -131,6 +133,12 @@ export default function AppNavigator() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="SetPassword" component={SetPasswordScreen} />
+      <Stack.Screen
+        name="PinLock"
+        component={PinLockScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen name="SetPin" component={SetPinScreen} />
       <Stack.Screen
         name="MainTabs"
         component={MainTabs}

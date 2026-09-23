@@ -50,6 +50,7 @@ const initPostgresSchema = async () => {
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS gender VARCHAR(20) DEFAULT 'Male';
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS pin_hash VARCHAR(255);
       ALTER TABLE employees DROP COLUMN IF EXISTS position;
       ALTER TABLE employees DROP COLUMN IF EXISTS section;
       ALTER TABLE employees DROP COLUMN IF EXISTS "group";
@@ -109,6 +110,7 @@ const initPostgresSchema = async () => {
       ALTER TABLE admins ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
       ALTER TABLE admins ADD COLUMN IF NOT EXISTS start_date VARCHAR(50);
       ALTER TABLE admins ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+      ALTER TABLE admins ADD COLUMN IF NOT EXISTS pin_hash VARCHAR(255);
 
       CREATE TABLE IF NOT EXISTS system_settings (
         key VARCHAR(100) PRIMARY KEY,

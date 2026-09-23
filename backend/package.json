@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node tests/security_and_auth.test.js && node tests/integration_auth.test.js && node tests/full_system_live.test.js && node tests/domain_stores.test.js && node tests/verify_mobile.js && node tests/audit_and_resilience.test.js && node tests/verify_approval_and_audit_live.js && node tests/qa_full_matrix_audit.test.js && node tests/verify_mission_flow_live.js && node tests/verify_mobile_web_parity.test.js",
+    "test": "node tests/security_and_auth.test.js && node tests/integration_auth.test.js && node tests/full_system_live.test.js && node tests/domain_stores.test.js && node tests/verify_mobile.js && node tests/audit_and_resilience.test.js && node tests/verify_approval_and_audit_live.js && node tests/qa_full_matrix_audit.test.js && node tests/verify_mission_flow_live.js && node tests/verify_mobile_web_parity.test.js && node tests/pin_auth.test.js",
     "migrate:indexes": "node src/scripts/add_performance_indexes.js",
     "migrate:passwords": "node src/scripts/migrate_passwords_to_bcrypt.js",
     "backup": "node src/scripts/backup_database.js"

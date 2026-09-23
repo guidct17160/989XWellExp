@@ -151,6 +151,18 @@ export const authService = {
     return this.isLoggedIn() ? currentUser : null;
   },
 
+  hasPin() {
+    if (!loggedIn || !currentUser) return false;
+    if (currentUser.hasPin !== undefined) return Boolean(currentUser.hasPin);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const id = currentUser.id || currentUser.code || currentUser.username || 'current';
+        return window.localStorage.getItem(`wellx989_pin_enabled_${id}`) === 'true';
+      }
+    } catch (e) {}
+    return false;
+  },
+
   logout() {
     // 1. Save all current storage states to user-scoped localStorage keys before clearing session
     try {

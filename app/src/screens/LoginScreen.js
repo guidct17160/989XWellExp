@@ -83,12 +83,33 @@ export default function LoginScreen({ navigation }) {
     try {
       const res = await authService.login(cleanUser, cleanPass);
       setLoading(false);
-      Alert.alert('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser} (${res.user?.role || 'User'})`, [
-        {
-          text: 'เข้าสู่แอปพลิเคชัน',
-          onPress: () => navigation?.replace('MainTabs'),
-        },
-      ]);
+
+      const hasPin = res.user?.hasPin || authService.hasPin();
+
+      if (!hasPin) {
+        Alert.alert(
+          'เข้าสู่ระบบสำเร็จ',
+          `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser}\n\nคุณต้องการตั้งรหัส PIN 6 หลักเพื่อเข้าใช้งานอย่างสะดวกรวดเร็วในครั้งถัดไปหรือไม่?`,
+          [
+            {
+              text: 'ไว้ภายหลัง',
+              style: 'cancel',
+              onPress: () => navigation?.replace('MainTabs'),
+            },
+            {
+              text: 'ตั้งค่า PIN ทันที',
+              onPress: () => navigation?.replace('SetPin', { fromSetupPrompt: true, mode: 'setup' }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser} (${res.user?.role || 'User'})`, [
+          {
+            text: 'เข้าสู่แอปพลิเคชัน',
+            onPress: () => navigation?.replace('MainTabs'),
+          },
+        ]);
+      }
     } catch (err) {
       setLoading(false);
       const msg = err.message || 'ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง';
@@ -289,6 +310,24 @@ export default function LoginScreen({ navigation }) {
                 style={{ marginRight: 8 }}
               />
               <Text style={styles.faceIdText} className="text-primary font-semibold text-base">Log in with Face ID</Text>
+            </TouchableOpacity>
+
+            {/* ปุ่มเข้าสู่ระบบด้วยรหัส PIN */}
+            <TouchableOpacity
+              testID="login-pin-btn"
+              style={[styles.faceIdButton, { borderColor: '#0074C4', backgroundColor: '#F0F9FF', marginBottom: 20 }]}
+              className="flex-row items-center justify-center border rounded-xl py-3.5"
+              onPress={() => navigation?.navigate('PinLock')}
+            >
+              <Ionicons
+                name="keypad-outline"
+                size={22}
+                color="#0074C4"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={[styles.faceIdText, { color: '#0074C4', fontWeight: '700' }]} className="font-bold text-base">
+                เข้าสู่ระบบด้วยรหัส PIN (6 หลัก)
+              </Text>
             </TouchableOpacity>
 
             

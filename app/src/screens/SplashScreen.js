@@ -25,9 +25,13 @@ export default function SplashScreen({ navigation }) {
     // Check if user already has a persisted session (e.g. after page refresh)
     const existingSession = authService.restoreSession();
     if (existingSession && authService.isLoggedIn()) {
-      // Skip splash/onboarding/login — go directly to MainTabs
       const skipTimer = setTimeout(() => {
-        navigation.replace('MainTabs');
+        // If user account has PIN configured, require PIN unlock
+        if (authService.hasPin()) {
+          navigation.replace('PinLock');
+        } else {
+          navigation.replace('MainTabs');
+        }
       }, 600); // Brief delay for smooth UX
       return () => clearTimeout(skipTimer);
     }

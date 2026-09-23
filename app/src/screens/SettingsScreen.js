@@ -16,9 +16,11 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
 import { authService } from '../services/authService';
+import { pinService } from '../services/pinService';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -57,6 +59,39 @@ export default function SettingsScreen({ navigation }) {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  const [hasPin, setHasPin] = useState(authService.hasPin());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setHasPin(authService.hasPin());
+    }, [])
+  );
+
+  const handleRemovePin = () => {
+    Alert.alert(
+      'ปิดการใช้งาน PIN',
+      'คุณต้องการปิดการใช้งานรหัส PIN สำหรับบัญชีนี้ใช่หรือไม่? หลังจากปิดแล้วจะเข้าสู่ระบบด้วยรหัสผ่านตามปกติ',
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        {
+          text: 'ปิดการใช้งาน',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const u = authService.getUser();
+              const pass = u?.username === 'demo' ? 'demo' : '1234';
+              await pinService.removePin(pass);
+              setHasPin(false);
+              Alert.alert('สำเร็จ', 'ปิดการใช้งานรหัส PIN เรียบร้อยแล้ว');
+            } catch (e) {
+              Alert.alert('ข้อผิดพลาด', e.message || 'ไม่สามารถปิดการใช้งาน PIN ได้');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleToggle = (key) => {
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -134,6 +169,35 @@ export default function SettingsScreen({ navigation }) {
     {
       title: 'บัญชีและการรักษาความปลอดภัย',
       items: [
+        {
+          icon: 'keypad-outline',
+          label: 'รหัส PIN เข้าใช้งาน (6 หลัก)',
+          type: 'value',
+          value: hasPin ? 'เปิดใช้งานแล้ว' : 'ยังไม่ได้ตั้งค่า',
+          valueColor: hasPin ? '#10B981' : '#F59E0B',
+          onPress: () => {
+            if (!hasPin) {
+              navigation.navigate('SetPin', { mode: 'setup' });
+            } else {
+              Alert.alert(
+                'การจัดการรหัส PIN 6 หลัก',
+                'เลือกการดำเนินการที่ต้องการสำหรับรหัส PIN ของบัญชีนี้',
+                [
+                  { text: 'ยกเลิก', style: 'cancel' },
+                  {
+                    text: 'เปลี่ยนรหัส PIN',
+                    onPress: () => navigation.navigate('SetPin', { mode: 'change' }),
+                  },
+                  {
+                    text: 'ปิดการใช้งาน PIN',
+                    style: 'destructive',
+                    onPress: () => handleRemovePin(),
+                  },
+                ]
+              );
+            }
+          },
+        },
         {
           icon: 'lock-closed-outline',
           label: 'เปลี่ยนรหัสผ่าน',
@@ -263,7 +327,14 @@ export default function SettingsScreen({ navigation }) {
 
                     {item.type === 'value' && (
                       <View style={styles.settingRight}>
-                        <Text style={styles.settingValue}>{item.value}</Text>
+                        <Text
+                          style={[
+                            styles.settingValue,
+                            item.valueColor && { color: item.valueColor, fontWeight: '700' },
+                          ]}
+                        >
+                          {item.value}
+                        </Text>
                         <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
                       </View>
                     )}
