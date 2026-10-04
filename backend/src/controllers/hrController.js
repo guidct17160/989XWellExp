@@ -16,12 +16,13 @@ exports.getDashboardStats = async (req, res) => {
 // GET /api/hr/reports/attendance
 exports.getAttendanceReport = async (req, res) => {
   try {
-    const month = req.query.month;
-    const report = await dbStore.getHrAttendanceReport(month);
+    const { month, date } = req.query;
+    const report = await dbStore.getHrAttendanceReport(month, date);
 
     return res.status(200).json({
       success: true,
       month: month || 'ปัจจุบัน',
+      date: date || null,
       totalRecords: report.length,
       report,
     });

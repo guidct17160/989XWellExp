@@ -13,16 +13,17 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  Platform,
+
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { tryFetchApi } from '../services/apiClient';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
 import { authService } from '../services/authService';
 import { pinService } from '../services/pinService';
 
-const API_BASE = 'http://localhost:5000/api';
+
 
 export default function SettingsScreen({ navigation }) {
   const [toggles, setToggles] = useState({
@@ -113,27 +114,27 @@ export default function SettingsScreen({ navigation }) {
 
     setPasswordLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
+      const res = await tryFetchApi('/auth/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           currentPassword: passwords.currentPassword,
           newPassword: passwords.newPassword,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        Alert.alert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
-        setShowPasswordModal(false);
-        setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      if (res) {
+        const data = await res.json();
+        if (data.success) {
+          Alert.alert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
+          setShowPasswordModal(false);
+          setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } else {
+          Alert.alert('ข้อผิดพลาด', data.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้');
+        }
       } else {
-        Alert.alert('ข้อผิดพลาด', data.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้');
+        Alert.alert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (err) {
-      // Fallback preview
-      Alert.alert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
-      setShowPasswordModal(false);
-      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      Alert.alert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน กรุณาลองใหม่อีกครั้ง');
     } finally {
       setPasswordLoading(false);
     }

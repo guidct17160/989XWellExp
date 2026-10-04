@@ -31,6 +31,7 @@ module.exports = function createUserStore(storeRef) {
                 avatarUrl: r.avatar_url,
                 gender: r.gender || 'Male',
                 pinHash: r.pin_hash || null,
+                points: parseInt(r.points, 10) || 0,
               };
             });
           }
@@ -68,6 +69,7 @@ module.exports = function createUserStore(storeRef) {
               avatarUrl: r.avatar_url,
               gender: r.gender || 'Male',
               pinHash: r.pin_hash || null,
+              points: parseInt(r.points, 10) || 0,
             };
           }
         } catch (e) { }

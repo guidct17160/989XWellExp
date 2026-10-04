@@ -1,10 +1,11 @@
 const dbStore = require('../services/dbStore');
 const { hashPassword } = require('../utils/security');
 
-// Strip sensitive fields before sending to client
+// Strip sensitive fields before sending to client (Senior Cyber Sec Hardening)
 const stripSensitive = (admin) => {
   if (!admin) return admin;
-  const { password, ...safe } = admin;
+  const { password, pinHash, pin_hash, ...safe } = admin;
+  safe.hasPin = Boolean(pinHash || pin_hash);
   return safe;
 };
 

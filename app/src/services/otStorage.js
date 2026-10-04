@@ -110,10 +110,11 @@ export const otStorage = {
     listeners.forEach((listener) => listener(globalState));
   },
 
-  clearAndSync() {
+  async clearAndSync() {
     loadLocalState();
     saveState();
     listeners.forEach((listener) => listener(globalState));
+    await syncWithBackend();
   },
 
   subscribe(listener) {
@@ -121,7 +122,7 @@ export const otStorage = {
     return () => listeners.delete(listener);
   },
 
-  addOtRequest(typeId, dateStr, hours, reason) {
+  async addOtRequest(typeId, dateStr, hours, reason) {
     const otType = globalState.otBalances.find((b) => b.id === typeId);
     if (!otType) throw new Error('ไม่พบประเภท OT ที่ระบุ');
 
@@ -172,7 +173,7 @@ export const otStorage = {
     });
 
     try {
-      tryFetchApi('/overtime', {
+      await tryFetchApi('/overtime', {
         method: 'POST',
         body: JSON.stringify({
           dateIso: dateStr,

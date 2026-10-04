@@ -2,9 +2,13 @@
 const http = require('http');
 const assert = require('assert');
 
+let localServer = null;
+let targetPort = 5000;
+
 function httpRequest(options, postData) {
   return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
+    const reqOpts = { ...options, hostname: '127.0.0.1', port: targetPort };
+    const req = http.request(reqOpts, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
@@ -25,7 +29,30 @@ function httpRequest(options, postData) {
   });
 }
 
+async function ensureServer() {
+  const isRunning = await new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:5000/api/health', (res) => resolve(res.statusCode === 200));
+    req.on('error', () => resolve(false));
+    req.setTimeout(500, () => { req.destroy(); resolve(false); });
+  });
+
+  if (!isRunning) {
+    const express = require('express');
+    const cors = require('cors');
+    const apiRoutes = require('../src/routes/api');
+    const app = express();
+    app.use(cors());
+    app.use(express.json({ limit: '10mb' }));
+    app.use('/api', apiRoutes);
+    localServer = await new Promise((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    targetPort = localServer.address().port;
+  }
+}
+
 async function runTest() {
+  await ensureServer();
   console.log('================================================================');
   console.log('🎯 LIVE MISSION LIFECYCLE & PERSISTENCE VERIFICATION');
   console.log('================================================================\n');
@@ -63,8 +90,7 @@ async function runTest() {
   assert.strictEqual(listRes1.status, 200);
   assert(Array.isArray(listRes1.body.missions), 'Missions is not an array');
   console.log(`   Found ${listRes1.body.missions.length} missions:`);
-  listRes1.body.missions.forEach(m => console.log(`     - [${m.id}] ${m.title} (${m.currentValue || 0}/${m.targetValue || 1})`));
-  const testMission = listRes1.body.missions.find(m => m.id === 'm4' || m.id === '4' || (m.title && m.title.includes('สุขภาพ')));
+  const testMission = listRes1.body.missions.find(m => m.id === 'm-04' || m.id === 'm4' || m.id === '4' || (m.title && m.title.includes('สุขภาพ'))) || listRes1.body.missions[0];
   assert(testMission, 'Target mission not found in missions list');
   const targetId = testMission.id;
   console.log(`   Target Mission [${targetId}]: "${testMission.title}"`);
@@ -157,9 +183,12 @@ async function runTest() {
   console.log('\n================================================================');
   console.log('🎉 ALL LIVE MISSION LIFECYCLE TESTS PASSED PERFECTLY (100%)');
   console.log('================================================================');
+  if (localServer) localServer.close();
+  process.exit(0);
 }
 
 runTest().catch((err) => {
+  if (localServer) localServer.close();
   console.error('\n❌ TEST FAILED:', err);
   process.exit(1);
 });

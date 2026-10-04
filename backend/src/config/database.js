@@ -51,6 +51,7 @@ const initPostgresSchema = async () => {
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS gender VARCHAR(20) DEFAULT 'Male';
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS pin_hash VARCHAR(255);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS points INT DEFAULT 0;
       ALTER TABLE employees DROP COLUMN IF EXISTS position;
       ALTER TABLE employees DROP COLUMN IF EXISTS section;
       ALTER TABLE employees DROP COLUMN IF EXISTS "group";
@@ -326,6 +327,29 @@ const initPostgresSchema = async () => {
       ALTER TABLE leave_policies ADD COLUMN IF NOT EXISTS allow_backdated BOOLEAN DEFAULT FALSE;
       ALTER TABLE leave_policies ADD COLUMN IF NOT EXISTS max_backdated_days INT DEFAULT 0;
       ALTER TABLE leave_policies ADD COLUMN IF NOT EXISTS require_attachment BOOLEAN DEFAULT FALSE;
+
+      CREATE TABLE IF NOT EXISTS kpi_evaluations (
+        id VARCHAR(50) PRIMARY KEY,
+        employee_id VARCHAR(50) NOT NULL,
+        evaluator VARCHAR(255) DEFAULT 'Super Admin',
+        kpi_score NUMERIC(5,2) NOT NULL,
+        grade VARCHAR(10) NOT NULL,
+        remark TEXT,
+        evaluation_date VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_kpi_employee ON kpi_evaluations(employee_id);
+
+      CREATE TABLE IF NOT EXISTS point_transactions (
+        id VARCHAR(50) PRIMARY KEY,
+        employee_id VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        points INT NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        category VARCHAR(100) DEFAULT 'ทั่วไป',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_point_tx_employee ON point_transactions(employee_id);
     `);
 
     // Seed default initial admins if admins table is empty

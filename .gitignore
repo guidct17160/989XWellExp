@@ -32,3 +32,10 @@ backend/backups/
 
 # Expo
 .expo/
+
+# Test reports & artifacts
+frontend/playwright-report/
+frontend/test-results/
+playwright-report/
+test-results/
+.parcel-cache/

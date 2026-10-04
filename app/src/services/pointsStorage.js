@@ -126,6 +126,7 @@ export const pointsStorage = {
     }
 
     globalTransactions = [newEntry, ...globalTransactions];
+    saveState();
 
     if (type === 'out') {
       try {

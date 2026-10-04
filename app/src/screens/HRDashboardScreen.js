@@ -51,13 +51,13 @@ export default function HRDashboardScreen({ navigation }) {
         tryFetchApi('/approvals/pending'),
       ]);
 
-      let newStats = { ...stats };
+      const updates = {};
 
       if (dashRes && dashRes.ok) {
         const dData = await dashRes.json();
         if (dData && dData.stats) {
-          newStats.totalEmployees = dData.stats.totalEmployees || newStats.totalEmployees;
-          newStats.onTimeRate = dData.stats.onTimeRate || '98%';
+          if (dData.stats.totalEmployees) updates.totalEmployees = dData.stats.totalEmployees;
+          if (dData.stats.onTimeRate) updates.onTimeRate = dData.stats.onTimeRate;
         }
       }
 
@@ -65,18 +65,20 @@ export default function HRDashboardScreen({ navigation }) {
         const lData = await leaveRes.json();
         if (lData && lData.balances) {
           const annual = lData.balances.find((b) => b.type === 'annual' || b.type === 'พักร้อน');
-          if (annual) newStats.leaveBalance = annual.remaining || annual.quota || 12;
+          if (annual) updates.leaveBalance = annual.remaining || annual.quota || 12;
         }
       }
 
       if (pendingRes && pendingRes.ok) {
         const pData = await pendingRes.json();
         if (pData && Array.isArray(pData.approvals)) {
-          newStats.pendingCount = pData.approvals.length;
+          updates.pendingCount = pData.approvals.length;
         }
       }
 
-      setStats(newStats);
+      if (Object.keys(updates).length > 0) {
+        setStats((prev) => ({ ...prev, ...updates }));
+      }
     } catch (e) {
       console.log('Error fetching HR live stats:', e);
     } finally {

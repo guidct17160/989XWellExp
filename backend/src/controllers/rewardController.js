@@ -65,7 +65,7 @@ exports.getMyCoupons = async (req, res) => {
 // GET /api/points/history
 exports.getPointHistory = async (req, res) => {
   try {
-    const empId = getEmpId(req);
+    const empId = req.query.employeeId || getEmpId(req);
     const data = await dbStore.getPointHistory(empId);
 
     return res.status(200).json({

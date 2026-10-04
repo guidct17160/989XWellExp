@@ -82,6 +82,20 @@ export default function ProfileScreen({ navigation }) {
             name: cleanName || u.name || current.name,
           };
           authService.setUser(merged);
+
+          // Calculate dynamic tenure from real start_date
+          let dynamicTenure = '1 ปี';
+          const empStartDate = merged.startDate || merged.start_date;
+          if (empStartDate) {
+            const start = new Date(empStartDate);
+            if (!isNaN(start.getTime())) {
+              const diffDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24)));
+              const years = Math.floor(diffDays / 365);
+              const months = Math.floor((diffDays % 365) / 30);
+              dynamicTenure = years > 0 ? `${years} ปี ${months} เดือน` : `${months || 1} เดือน`;
+            }
+          }
+
           setProfile((prev) => ({
             ...prev,
             code: merged.code || merged.id || prev.code,
@@ -92,7 +106,42 @@ export default function ProfileScreen({ navigation }) {
             phone: merged.phone || prev.phone,
             role: merged.role || 'Employee',
             avatarUrl: merged.avatarUrl || prev.avatarUrl,
+            startDate: empStartDate || prev.startDate,
+            tenure: dynamicTenure,
           }));
+
+          // Fetch dynamic live metrics from PostgreSQL
+          try {
+            const [attSummaryRes, kpiRes] = await Promise.all([
+              tryFetchApi('/attendance/summary'),
+              tryFetchApi('/kpi/evaluations'),
+            ]);
+
+            if (attSummaryRes && attSummaryRes.ok) {
+              const attJson = await attSummaryRes.json();
+              if (attJson.summary) {
+                setProfile((prev) => ({
+                  ...prev,
+                  attendanceRate: attJson.summary.rate || prev.attendanceRate,
+                  workHours: attJson.summary.totalHours || prev.workHours,
+                }));
+              }
+            }
+
+            if (kpiRes && kpiRes.ok) {
+              const kpiJson = await kpiRes.json();
+              if (Array.isArray(kpiJson.evaluations)) {
+                const myEval = kpiJson.evaluations.find(e => e.employeeId === targetId || e.employeeCode === targetId);
+                if (myEval && myEval.kpiScore) {
+                  const score5 = (Number(myEval.kpiScore) / 20).toFixed(1);
+                  setProfile((prev) => ({
+                    ...prev,
+                    kpiScore: score5,
+                  }));
+                }
+              }
+            }
+          } catch (e) {}
         }
       }
     } catch (e) {

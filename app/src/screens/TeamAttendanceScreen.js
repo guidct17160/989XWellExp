@@ -103,7 +103,8 @@ const MOCK_ATTENDANCE = [
 const STATUS_FILTERS = ['ทั้งหมด', 'เข้างานแล้ว', 'สาย', 'ลางาน', 'ยังไม่ลงเวลา'];
 
 export default function TeamAttendanceScreen({ navigation }) {
-  const [attendanceList, setAttendanceList] = useState(MOCK_ATTENDANCE);
+  const [attendanceList, setAttendanceList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('ทั้งหมด');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -119,30 +120,39 @@ export default function TeamAttendanceScreen({ navigation }) {
   }, []);
 
   const fetchTeamAttendance = async () => {
+    setLoading(true);
     try {
       const res = await tryFetchApi('/hr/reports/attendance');
       if (res && res.ok) {
         const data = await res.json();
-        if (data && data.success && Array.isArray(data.report) && data.report.length > 0) {
-          const mapped = data.report.map((item, idx) => ({
-            id: item.employeeId || `EMP-${idx}`,
-            code: item.employeeCode || `EMP-${idx}`,
-            name: item.employeeName || item.name || 'พนักงาน',
-            position: item.position || 'พนักงาน',
-            department: item.department || 'ทั่วไป',
-            clockInTime: item.clockIn || item.time || '-',
-            clockOutTime: item.clockOut || null,
-            status: item.isLate ? 'เข้างานสาย' : (item.clockIn ? 'ปกติ' : 'ยังไม่ลงเวลา'),
-            statusColor: item.isLate ? '#EF4444' : (item.clockIn ? '#10B981' : '#94A3B8'),
-            location: item.location || 'อาคารสำนักงานใหญ่ (HQ)',
-            avatarUrl: item.avatarUrl || MOCK_ATTENDANCE[idx % MOCK_ATTENDANCE.length]?.avatarUrl,
-          }));
-          setAttendanceList(mapped);
+        if (data && data.success && Array.isArray(data.report)) {
+          if (data.report.length > 0) {
+            const mapped = data.report.map((item, idx) => ({
+              id: item.employeeId || `EMP-${idx}`,
+              code: item.employeeCode || `EMP-${idx}`,
+              name: item.employeeName || item.name || 'พนักงาน',
+              position: item.position || 'พนักงาน',
+              department: item.department || 'ทั่วไป',
+              clockInTime: item.clockIn || item.time || '-',
+              clockOutTime: item.clockOut || null,
+              status: item.isLate ? 'เข้างานสาย' : (item.clockIn ? 'ปกติ' : 'ยังไม่ลงเวลา'),
+              statusColor: item.isLate ? '#EF4444' : (item.clockIn ? '#10B981' : '#94A3B8'),
+              location: item.location || 'อาคารสำนักงานใหญ่ (HQ)',
+              avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+            }));
+            setAttendanceList(mapped);
+          } else {
+            setAttendanceList([]);
+          }
         }
       }
     } catch (e) {
-      console.log('Error fetching team attendance:', e);
+      console.log('Error fetching team attendance from Real DB:', e);
+      if (attendanceList.length === 0) {
+        setAttendanceList(MOCK_ATTENDANCE);
+      }
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   };

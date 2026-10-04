@@ -117,47 +117,117 @@ export default function DashboardPage({ user, onLogout }) {
     resigned: 0,
     passedProbation: 0,
   });
+  const [employeesList, setEmployeesList] = useState([]);
 
   useEffect(() => {
-    // Fetch live employee total from backend API
+    // Fetch live employee total from backend API (100% Real DB Data)
     fetch(`${API_BASE}/employees`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.employees)) {
-          setStats((prev) => ({
-            ...prev,
-            totalEmployees: data.employees.length,
-          }));
+          setEmployeesList(data.employees);
+          const emps = data.employees;
+          const now = new Date();
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+
+          let newHires = 0;
+          let resigned = 0;
+          let passedProbation = 0;
+
+          emps.forEach((emp) => {
+            if (emp.status === 'Resigned' || emp.status === 'Inactive') {
+              resigned++;
+            }
+            if (emp.startDate) {
+              const d = new Date(emp.startDate);
+              if (!isNaN(d.getTime())) {
+                const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+                // New hire: joined within last 30 days or in current month
+                if (diffDays >= 0 && (diffDays <= 30 || (d.getMonth() === currentMonth && d.getFullYear() === currentYear))) {
+                  newHires++;
+                }
+                // Passed probation: active and tenure >= 120 days
+                if (diffDays >= 120 && emp.status === 'Active') {
+                  passedProbation++;
+                }
+              }
+            }
+          });
+
+          setStats({
+            totalEmployees: emps.length,
+            newHires,
+            resigned,
+            passedProbation,
+          });
         }
       })
       .catch((err) => console.log('Backend sync offline', err));
   }, [activeMenu]);
 
-  // Bar Chart Data (Jan - Dec)
-  const barData = [
-    { month: 'ม.ค.', newHires: 0, exits: 0 },
-    { month: 'ก.พ.', newHires: 0, exits: 0 },
-    { month: 'มี.ค.', newHires: 0, exits: 0 },
-    { month: 'เม.ย.', newHires: 0, exits: 0 },
-    { month: 'พ.ค.', newHires: 0, exits: 0 },
-    { month: 'มิ.ย.', newHires: 0, exits: 0 },
-    { month: 'ก.ค.', newHires: 0, exits: 0 },
-    { month: 'ส.ค.', newHires: stats.totalEmployees, exits: 0 },
-    { month: 'ก.ย.', newHires: 0, exits: 0 },
-    { month: 'ต.ค.', newHires: 0, exits: 0 },
-    { month: 'พ.ย.', newHires: 0, exits: 0 },
-    { month: 'ธ.ค.', newHires: 0, exits: 0 },
-  ];
+  // Bar Chart Data (Jan - Dec) dynamically computed from real employee startDate
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const barData = React.useMemo(() => {
+    const monthlyHires = new Array(12).fill(0);
+    const monthlyExits = new Array(12).fill(0);
 
-  // Tenure Donut Data
-  const tenureData = [
-    { label: 'อายุงานน้อยกว่า 120 วัน', count: stats.totalEmployees, color: '#F0A925' },
-    { label: 'อายุงาน 120 วัน - 1 ปี', count: 0, color: '#3AAAEB' },
-    { label: 'อายุงาน 1 ปี - 3 ปี', count: 0, color: '#1F4E9C' },
-    { label: 'อายุงาน 3 ปี - 6 ปี', count: 0, color: '#0284C7' },
-    { label: 'อายุงาน 6 ปี - 10 ปี', count: 0, color: '#818CF8' },
-    { label: 'อายุงาน 10 ปี ขึ้นไป', count: 0, color: '#F97316' },
-  ];
+    employeesList.forEach((emp) => {
+      if (emp.startDate) {
+        const d = new Date(emp.startDate);
+        if (!isNaN(d.getTime()) && d.getFullYear().toString() === selectedYear) {
+          const m = d.getMonth();
+          if (m >= 0 && m < 12) {
+            monthlyHires[m]++;
+          }
+        }
+      }
+      if (emp.status === 'Resigned') {
+        monthlyExits[new Date().getMonth()]++;
+      }
+    });
+
+    return months.map((month, idx) => ({
+      month,
+      newHires: monthlyHires[idx],
+      exits: monthlyExits[idx],
+    }));
+  }, [employeesList, selectedYear]);
+
+  // Tenure Donut Data dynamically computed from real employee tenure in DB
+  const tenureData = React.useMemo(() => {
+    const now = new Date();
+    let less120 = 0;
+    let b120To1y = 0;
+    let b1yTo3y = 0;
+    let b3yTo6y = 0;
+    let b6yTo10y = 0;
+    let over10y = 0;
+
+    employeesList.forEach((emp) => {
+      const d = emp.startDate ? new Date(emp.startDate) : null;
+      if (d && !isNaN(d.getTime())) {
+        const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+        if (diffDays < 120) less120++;
+        else if (diffDays < 365) b120To1y++;
+        else if (diffDays < 365 * 3) b1yTo3y++;
+        else if (diffDays < 365 * 6) b3yTo6y++;
+        else if (diffDays < 365 * 10) b6yTo10y++;
+        else over10y++;
+      } else {
+        less120++;
+      }
+    });
+
+    return [
+      { label: 'อายุงานน้อยกว่า 120 วัน', count: less120, color: '#F0A925' },
+      { label: 'อายุงาน 120 วัน - 1 ปี', count: b120To1y, color: '#3AAAEB' },
+      { label: 'อายุงาน 1 ปี - 3 ปี', count: b1yTo3y, color: '#1F4E9C' },
+      { label: 'อายุงาน 3 ปี - 6 ปี', count: b3yTo6y, color: '#0284C7' },
+      { label: 'อายุงาน 6 ปี - 10 ปี', count: b6yTo10y, color: '#818CF8' },
+      { label: 'อายุงาน 10 ปี ขึ้นไป', count: over10y, color: '#F97316' },
+    ];
+  }, [employeesList]);
 
   const renderNavLinks = () => (
     <nav className="flex flex-col gap-1.5 flex-1 overflow-y-auto pr-1">

@@ -1,6 +1,9 @@
 const http = require('http');
 const assert = require('assert');
 
+let localServer = null;
+let targetPort = 5000;
+
 function httpRequest({ method = 'GET', path, headers = {}, body = null }) {
   return new Promise((resolve, reject) => {
     const dataString = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
@@ -12,8 +15,8 @@ function httpRequest({ method = 'GET', path, headers = {}, body = null }) {
 
     const req = http.request(
       {
-        hostname: 'localhost',
-        port: 5000,
+        hostname: '127.0.0.1',
+        port: targetPort,
         path,
         method,
         headers: reqHeaders,
@@ -37,12 +40,35 @@ function httpRequest({ method = 'GET', path, headers = {}, body = null }) {
   });
 }
 
+async function ensureServer() {
+  const isRunning = await new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:5000/api/health', (res) => resolve(res.statusCode === 200));
+    req.on('error', () => resolve(false));
+    req.setTimeout(500, () => { req.destroy(); resolve(false); });
+  });
+
+  if (!isRunning) {
+    const express = require('express');
+    const cors = require('cors');
+    const apiRoutes = require('../src/routes/api');
+    const app = express();
+    app.use(cors());
+    app.use(express.json({ limit: '10mb' }));
+    app.use('/api', apiRoutes);
+    localServer = await new Promise((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    targetPort = localServer.address().port;
+  }
+}
+
 async function runLiveApprovalAndAuditTest() {
   console.log('\n======================================================');
   console.log('🧪 Live Testing Approval Workflow & Audit Trail Integration');
   console.log('======================================================\n');
 
   try {
+    await ensureServer();
     // 1. Web Admin Login to get token
     console.log('1. Authenticating as Admin to obtain JWT token...');
     const loginRes = await httpRequest({
@@ -135,8 +161,10 @@ async function runLiveApprovalAndAuditTest() {
     console.log('======================================================');
     console.log('🎉 ALL LIVE APPROVAL & AUDIT TRAIL TESTS PASSED!');
     console.log('======================================================\n');
+    if (localServer) localServer.close();
     process.exit(0);
   } catch (err) {
+    if (localServer) localServer.close();
     console.error('\n❌ Test Failure:', err.message);
     process.exit(1);
   }

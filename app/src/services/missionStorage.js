@@ -140,6 +140,13 @@ export const missionStorage = {
           });
 
           listeners.forEach((fn) => fn(globalMissions));
+
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              window.localStorage.setItem('wellx_user_missions_cache', JSON.stringify(globalMissions));
+            }
+          } catch (e) {}
+
           return globalMissions;
         }
       }

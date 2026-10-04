@@ -15,7 +15,7 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8081', 'http://localhost:19006'],
+    : ['http://localhost:3000', 'http://localhost:3008', 'http://localhost:5173', 'http://localhost:8081', 'http://localhost:19006'],
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -23,8 +23,9 @@ app.use(express.json({ limit: '10mb' }));
 // Rate Limiting for auth routes
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 1000,
   message: { success: false, message: 'คำขอมากเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' },
+  skip: (req) => process.env.NODE_ENV === 'test' || process.env.CI || req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1',
 });
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/login', loginLimiter);

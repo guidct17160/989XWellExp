@@ -28,13 +28,23 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const getHeaders = () => {
+    const token = localStorage.getItem('wellx989_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    headers['x-employee-id'] = 'ADM-001';
+    return headers;
+  };
+
   const fetchAttendanceData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/attendance/history?date=${selectedDate}`);
+      const res = await fetch(`${API_BASE}/hr/reports/attendance?date=${selectedDate}`, {
+        headers: getHeaders(),
+      });
       const json = await res.json();
-      if (json.success && json.history) {
-        setAttendanceLogs(json.history);
+      if (json.success && (json.report || json.history)) {
+        setAttendanceLogs(json.report || json.history || []);
       } else {
         setAttendanceLogs([]);
       }
@@ -52,14 +62,17 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
 
   const filteredLogs = attendanceLogs.filter((log) => {
     const matchSearch =
-      log.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.employeeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.department?.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.employeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.employeeCode || log.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.department || '').toLowerCase().includes(searchTerm.toLowerCase());
     
+    const isNormal = log.status === 'On Time' || log.status === 'ปกติ';
+    const isLate = log.status === 'Late' || log.status === 'สาย' || log.status === 'เข้างานสาย';
+
     const matchStatus =
       statusFilter === 'ALL' ||
-      (statusFilter === 'ON_TIME' && log.status === 'On Time') ||
-      (statusFilter === 'LATE' && log.status === 'Late');
+      (statusFilter === 'ON_TIME' && isNormal) ||
+      (statusFilter === 'LATE' && isLate);
 
     return matchSearch && matchStatus;
   });
@@ -93,7 +106,7 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
   };
 
   const onTimeCount = attendanceLogs.filter((l) => l.status === 'On Time' || l.status === 'ปกติ').length;
-  const lateCount = attendanceLogs.filter((l) => l.status === 'Late' || l.status === 'สาย').length;
+  const lateCount = attendanceLogs.filter((l) => l.status === 'Late' || l.status === 'สาย' || l.status === 'เข้างานสาย').length;
 
   return (
     <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
@@ -264,32 +277,39 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[#1A1D2C]/60 transition-colors">
-                    <td className="p-3.5">
-                      <div className="font-bold text-white">{log.employeeName}</div>
-                      <div className="text-[10px] font-mono text-red-400">{log.employeeCode}</div>
-                    </td>
-                    <td className="p-3.5 font-medium">{log.department}</td>
-                    <td className="p-3.5 font-mono font-bold text-emerald-400">{log.clockIn}</td>
-                    <td className="p-3.5 font-mono font-bold text-slate-300">{log.clockOut || '-'}</td>
-                    <td className="p-3.5">
-                      <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 border ${
-                          log.status === 'On Time'
-                            ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
-                            : 'bg-red-950/80 text-[#EF4444] border-red-800/50'
-                        }`}
-                      >
-                        {log.status === 'On Time' ? '● ตรงเวลา' : `● สาย (${log.lateMinutes} นาที)`}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-slate-400 flex items-center gap-1.5">
-                      <MapPin size={14} className="text-sky-400 shrink-0" />
-                      <span className="truncate max-w-[220px]">{log.location}</span>
-                    </td>
-                  </tr>
-                ))
+                filteredLogs.map((log) => {
+                  const inTime = log.checkIn || log.clockIn || '-';
+                  const outTime = log.checkOut || log.clockOut || '-';
+                  const loc = log.locationName || log.location || 'สำนักงานใหญ่ (HQ GPS)';
+                  const isNormal = log.status === 'On Time' || log.status === 'ปกติ';
+
+                  return (
+                    <tr key={log.id} className="hover:bg-[#1A1D2C]/60 transition-colors">
+                      <td className="p-3.5">
+                        <div className="font-bold text-white">{log.employeeName || '-'}</div>
+                        <div className="text-[10px] font-mono text-red-400">{log.employeeCode || log.employeeId || '-'}</div>
+                      </td>
+                      <td className="p-3.5 font-medium">{log.department || '-'}</td>
+                      <td className="p-3.5 font-mono font-bold text-emerald-400">{inTime}</td>
+                      <td className="p-3.5 font-mono font-bold text-slate-300">{outTime}</td>
+                      <td className="p-3.5">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 border ${
+                            isNormal
+                              ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50'
+                              : 'bg-red-950/80 text-[#EF4444] border-red-800/50'
+                          }`}
+                        >
+                          {isNormal ? '● ตรงเวลา' : `● ${log.status || 'เข้างานสาย'}`}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-slate-400 flex items-center gap-1.5">
+                        <MapPin size={14} className="text-sky-400 shrink-0" />
+                        <span className="truncate max-w-[220px]">{loc}</span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

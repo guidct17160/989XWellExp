@@ -19,6 +19,7 @@ const notificationController = require('../controllers/notificationController');
 const hrController = require('../controllers/hrController');
 const approvalController = require('../controllers/approvalController');
 const auditController = require('../controllers/auditController');
+const kpiController = require('../controllers/kpiController');
 const { authenticate, requireAuth, requireAdmin } = require('../middlewares/authMiddleware');
 
 // -------------------------------------------------------------
@@ -206,6 +207,12 @@ router.patch('/approvals/:requestType/:id', requireAuth, approvalController.proc
 // -------------------------------------------------------------
 router.get('/audit-logs', requireAdmin, auditController.getLogs);
 router.get('/admin/audit-logs', requireAdmin, auditController.getLogs);
+
+// -------------------------------------------------------------
+// 18. KPI & OKR Evaluation Engine (100% Real DB Data)
+// -------------------------------------------------------------
+router.get('/kpi/evaluations', requireAuth, kpiController.getEvaluations);
+router.post('/kpi/evaluations', requireAuth, kpiController.addEvaluation);
 
 module.exports = router;
 

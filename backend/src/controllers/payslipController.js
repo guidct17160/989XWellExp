@@ -4,8 +4,9 @@ const getEmpId = require('../helpers/getEmployeeId');
 // GET /api/payslips
 exports.getPayslips = async (req, res) => {
   try {
-    const empId = getEmpId(req);
-    const year = req.query.year || new Date().getFullYear();
+    const isHrOrAdmin = req.user?.role === 'Admin' || req.user?.role === 'Super Admin' || req.user?.role === 'HR Admin' || req.headers['x-employee-id']?.startsWith('ADM');
+    const empId = req.query.employeeId || (isHrOrAdmin ? null : getEmpId(req));
+    const year = req.query.year || null;
     const list = await dbStore.getPayslips(empId, year);
 
     return res.status(200).json({

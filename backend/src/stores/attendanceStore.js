@@ -634,14 +634,17 @@ module.exports = function createAttendanceStore(storeRef) {
       };
     },
 
-    getHrAttendanceReport: async (month) => {
+    getHrAttendanceReport: async (month, date) => {
       if (db.isPgConnected()) {
         try {
-          let query = `SELECT a.*, COALESCE(e.name, a.employee_id) as employee_name, e.department
+          let query = `SELECT a.*, COALESCE(e.name, a.employee_id) as employee_name, e.code as employee_code, e.department
                        FROM attendance a
                        LEFT JOIN employees e ON a.employee_id = e.id OR a.employee_id = e.code`;
           const params = [];
-          if (month) {
+          if (date) {
+            params.push(date);
+            query += ` WHERE a.date_iso = $1`;
+          } else if (month) {
             params.push(`${month}%`);
             query += ` WHERE a.date_iso LIKE $1`;
           }
@@ -651,6 +654,7 @@ module.exports = function createAttendanceStore(storeRef) {
             return res.rows.map((r) => ({
               id: r.id,
               employeeId: r.employee_id,
+              employeeCode: r.employee_code || r.employee_id,
               employeeName: r.employee_name,
               department: r.department,
               dateIso: r.date_iso,
@@ -665,6 +669,12 @@ module.exports = function createAttendanceStore(storeRef) {
         } catch (e) {
           console.error('PG query error in getHrAttendanceReport:', e);
         }
+      }
+      if (date) {
+        return memoryStore.memoryAttendance.filter((a) => a.dateIso === date);
+      }
+      if (month) {
+        return memoryStore.memoryAttendance.filter((a) => a.dateIso && a.dateIso.startsWith(month));
       }
       return memoryStore.memoryAttendance;
     },

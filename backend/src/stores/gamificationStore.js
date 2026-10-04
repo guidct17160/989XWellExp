@@ -256,30 +256,73 @@ module.exports = function createGamificationStore(storeRef) {
       };
     },
 
-    // POINTS HISTORY & BALANCES
+    // POINTS HISTORY & BALANCES (100% Real DB Data)
     getPointHistory: async (employeeId) => {
       const empId = employeeId || 'EMP-IT-DEV';
+      if (db.isPgConnected()) {
+        try {
+          const empRes = await db.query('SELECT points FROM employees WHERE id = $1 OR code = $1', [empId]);
+          let currentPoints = 0;
+          if (empRes.rows && empRes.rows.length > 0) {
+            currentPoints = parseInt(empRes.rows[0].points, 10) || 0;
+          }
+          const txRes = await db.query(
+            'SELECT * FROM point_transactions WHERE employee_id = $1 ORDER BY created_at DESC',
+            [empId]
+          );
+          const history = (txRes.rows || []).map((r) => ({
+            id: r.id,
+            title: r.title,
+            points: r.points,
+            type: r.type,
+            category: r.category,
+            date: r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          }));
+          return { currentPoints, history };
+        } catch (e) {
+          console.error('PG query error in getPointHistory:', e);
+        }
+      }
       if (memoryStore.memoryPointHistory[empId]) {
         return memoryStore.memoryPointHistory[empId];
       }
       return {
-        currentPoints: 320,
-        history: [
-          { id: `pt-${Date.now()}`, title: 'โบนัสคะแนนเริ่มต้น', points: 320, type: 'earn', date: new Date().toISOString().split('T')[0] }
-        ]
+        currentPoints: 0,
+        history: []
       };
     },
 
     addPointTransaction: async (employeeId, title, points, type = 'earn', category = 'ทั่วไป') => {
       const empId = employeeId || 'EMP-IT-DEV';
+      const diff = type === 'spend' ? -Math.abs(points) : Math.abs(points);
+      const txId = `pt-${Date.now()}`;
+      let newTotal = 0;
+
+      if (db.isPgConnected()) {
+        try {
+          await db.query(
+            'INSERT INTO point_transactions (id, employee_id, title, points, type, category) VALUES ($1, $2, $3, $4, $5, $6)',
+            [txId, empId, title || 'คะแนนสะสม', diff, type, category]
+          );
+          const updateRes = await db.query(
+            'UPDATE employees SET points = GREATEST(0, COALESCE(points, 0) + $1) WHERE id = $2 OR code = $2 RETURNING points',
+            [diff, empId]
+          );
+          if (updateRes.rows && updateRes.rows.length > 0) {
+            newTotal = parseInt(updateRes.rows[0].points, 10) || 0;
+          }
+        } catch (e) {
+          console.error('PG insert error in addPointTransaction:', e);
+        }
+      }
+
       if (!memoryStore.memoryPointHistory[empId]) {
-        memoryStore.memoryPointHistory[empId] = { currentPoints: 320, history: [] };
+        memoryStore.memoryPointHistory[empId] = { currentPoints: newTotal, history: [] };
       }
       const current = memoryStore.memoryPointHistory[empId];
-      const diff = type === 'spend' ? -Math.abs(points) : Math.abs(points);
-      current.currentPoints = Math.max(0, current.currentPoints + diff);
+      current.currentPoints = db.isPgConnected() ? newTotal : Math.max(0, current.currentPoints + diff);
       current.history.unshift({
-        id: `pt-${Date.now()}`,
+        id: txId,
         title: title || 'คะแนนสะสม',
         points: diff,
         type: type,

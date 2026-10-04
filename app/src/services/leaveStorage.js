@@ -396,7 +396,7 @@ export const leaveStorage = {
     return true;
   },
 
-  addTimeCorrectionRequest(dateStr, inTime, outTime, reason, issueId = null, rawDate = null) {
+  async addTimeCorrectionRequest(dateStr, inTime, outTime, reason, issueId = null, rawDate = null) {
     const today = new Date();
     let isoDate = today.toISOString().split('T')[0];
     if (rawDate && typeof rawDate === 'string') {
@@ -443,7 +443,7 @@ export const leaveStorage = {
     listeners.forEach(l => l(globalState));
 
     try {
-      tryFetchApi('/attendance/corrections', {
+      await tryFetchApi('/attendance/corrections', {
         method: 'POST',
         body: JSON.stringify({
           dateIso: rawDate || isoDate,

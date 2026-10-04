@@ -3,10 +3,11 @@ const emailService = require('../services/emailService');
 const { hashPassword } = require('../utils/security');
 const { logAudit } = require('../utils/auditLogger');
 
-// Strip sensitive fields before sending to client
+// Strip sensitive fields before sending to client (Senior Cyber Sec Hardening)
 const stripSensitive = (emp) => {
   if (!emp) return emp;
-  const { password, ...safe } = emp;
+  const { password, pinHash, pin_hash, ...safe } = emp;
+  safe.hasPin = Boolean(pinHash || pin_hash);
   return safe;
 };
 
