@@ -2,7 +2,6 @@ import { tryFetchApi } from './apiClient';
 import { authService } from './authService';
 
 const getPinStorageKey = (userId) => `wellx989_pin_enabled_${userId || 'current'}`;
-const getLocalPinHashKey = (userId) => `wellx989_local_pin_${userId || 'current'}`;
 
 export const pinService = {
   /**
@@ -34,8 +33,28 @@ export const pinService = {
           window.localStorage.setItem(getPinStorageKey(targetId), 'true');
         } else {
           window.localStorage.removeItem(getPinStorageKey(targetId));
-          window.localStorage.removeItem(getLocalPinHashKey(targetId));
         }
+      }
+    } catch (e) {}
+  },
+
+  /**
+   * Clear all PIN status and keys on logout
+   */
+  clearPin(userId) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        if (userId) {
+          window.localStorage.removeItem(getPinStorageKey(userId));
+        }
+        const keysToRemove = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith('wellx989_pin_enabled_')) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((k) => window.localStorage.removeItem(k));
       }
     } catch (e) {}
   },
@@ -75,27 +94,10 @@ export const pinService = {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'ไม่สามารถตั้งค่า PIN ได้');
       }
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกรหัส PIN ได้');
     } catch (err) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
-        throw err;
-      }
+      throw err;
     }
-
-    // Offline / Mock fallback
-    const user = authService.getUser();
-    if (user) {
-      const updated = { ...user, hasPin: true };
-      authService.setUser(updated);
-      const targetId = user.id || user.code || user.username;
-      this.setLocalPinStatus(targetId, true);
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(getLocalPinHashKey(targetId), cleanPin);
-        }
-      } catch (e) {}
-    }
-
-    return { success: true, message: 'ตั้งรหัส PIN 6 หลักสำเร็จ (โหมดใช้งานในเครื่อง)', hasPin: true };
   },
 
   /**
@@ -121,56 +123,29 @@ export const pinService = {
       if (response && response.ok) {
         const data = await response.json();
         if (data.user) {
-          authService.setUser(data.user, data.token || data.accessToken);
+          authService.setUser(data.user, data.token || data.accessToken, data.refreshToken);
         }
         return data;
       } else if (response) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'รหัส PIN ไม่ถูกต้อง');
       }
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบ PIN ได้');
     } catch (err) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
-        throw err;
-      }
+      throw err;
     }
-
-    // Offline / Local verification fallback
-    const targetId = targetUser || 'current';
-    let savedLocalPin = null;
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        savedLocalPin = window.localStorage.getItem(getLocalPinHashKey(targetId));
-      }
-    } catch (e) {}
-
-    // Support demo account fallback default PIN
-    if (targetId === 'demo' || (user && user.username === 'demo')) {
-      if (cleanPin === '123456' || (savedLocalPin && cleanPin === savedLocalPin)) {
-        return { success: true, message: 'ปลดล็อก PIN สำเร็จ (Demo)' };
-      }
-      throw new Error('รหัส PIN ไม่ถูกต้อง (Demo ค่าเริ่มต้นคือ 123456)');
-    }
-
-    if (savedLocalPin && cleanPin === savedLocalPin) {
-      return { success: true, message: 'ปลดล็อก PIN สำเร็จ' };
-    }
-
-    throw new Error('รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
   },
 
   /**
    * Remove / Disable PIN
-   * @param {string} password - account password
+   * @param {string} [password] - account password (optional for authenticated session)
    */
-  async removePin(password) {
-    if (!password) {
-      throw new Error('กรุณาระบุรหัสผ่านบัญชีเพื่อยกเลิก PIN');
-    }
-
+  async removePin(password = null) {
     try {
+      const payload = password ? { password: String(password).trim() } : {};
       const response = await tryFetchApi('/auth/remove-pin', {
         method: 'POST',
-        body: JSON.stringify({ password: String(password).trim() }),
+        body: JSON.stringify(payload),
       });
 
       if (response && response.ok) {
@@ -186,20 +161,10 @@ export const pinService = {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'ไม่สามารถยกเลิก PIN ได้');
       }
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อยกเลิก PIN ได้');
     } catch (err) {
-      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
-        throw err;
-      }
+      throw err;
     }
-
-    // Offline fallback
-    const user = authService.getUser();
-    if (user) {
-      const updated = { ...user, hasPin: false };
-      authService.setUser(updated);
-      this.setLocalPinStatus(user.id || user.code || user.username, false);
-    }
-    return { success: true, message: 'ยกเลิกการใช้งาน PIN สำเร็จ', hasPin: false };
   },
 
   /**

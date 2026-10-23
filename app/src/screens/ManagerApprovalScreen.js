@@ -21,41 +21,13 @@ import TopNavbar from '../components/TopNavbar';
 import { tryFetchApi } from '../services/apiClient';
 import { attendanceStorage } from '../services/attendanceStorage';
 import { authService } from '../services/authService';
+import { openLeaveAttachment } from '../services/attachmentService';
 
 export default function ManagerApprovalScreen({ navigation }) {
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'leave' | 'ot' | 'time-correction'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'leave' | 'time-correction'
   const [approvalMode, setApprovalMode] = useState('pending'); // 'pending' | 'history'
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [approvalHistory, setApprovalHistory] = useState([
-    {
-      id: 'HIST-001',
-      requestType: 'leave',
-      employeeName: 'กานดา วงศ์สุวรรณ',
-      employeeCode: 'EMP-002',
-      department: 'ฝ่ายทรัพยากรบุคคล (HR)',
-      leaveType: 'ลาพักร้อน (Annual Leave)',
-      days: 2,
-      startDate: '2026-08-10',
-      endDate: '2026-08-11',
-      reason: 'ไปพักผ่อนต่างจังหวัดกับครอบครัว',
-      status: 'อนุมัติแล้ว',
-      actionTime: '10 ส.ค. 2026 09:30 น.',
-      approverName: 'ผู้จัดการ',
-    },
-    {
-      id: 'HIST-002',
-      requestType: 'ot',
-      employeeName: 'วรพจน์ จิตเที่ยง',
-      employeeCode: 'EMP-003',
-      department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-      hours: 3,
-      date: '2026-08-12',
-      reason: 'Deploy ระบบ Server และอัปเกรดความปลอดภัย',
-      status: 'อนุมัติแล้ว',
-      actionTime: '12 ส.ค. 2026 18:45 น.',
-      approverName: 'ผู้จัดการ',
-    },
-  ]);
+  const [approvalHistory, setApprovalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const currentUser = authService.getUser();
@@ -84,20 +56,38 @@ export default function ManagerApprovalScreen({ navigation }) {
       }
     } catch (e) {
       console.log('Error fetching pending approvals:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
+  const fetchApprovalHistory = useCallback(async () => {
+    try {
+      const res = await tryFetchApi('/approvals/history');
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.history)) {
+          setApprovalHistory(data.history);
+        }
+      }
+    } catch (e) {
+      console.log('Error fetching approval history:', e);
+    }
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchPendingApprovals(), fetchApprovalHistory()]);
+    setLoading(false);
+    setRefreshing(false);
+  }, [fetchPendingApprovals, fetchApprovalHistory]);
+
   useEffect(() => {
-    fetchPendingApprovals();
-  }, [fetchPendingApprovals]);
+    loadAll();
+  }, [loadAll]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchPendingApprovals();
-  }, [fetchPendingApprovals]);
+    loadAll();
+  }, [loadAll]);
 
   const handleApprove = async (item) => {
     Alert.alert(
@@ -110,8 +100,8 @@ export default function ManagerApprovalScreen({ navigation }) {
           style: 'default',
           onPress: async () => {
             try {
-              const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
-              await tryFetchApi(`/approvals/${reqType}/${item.id}`, {
+              const reqType = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
+              const res = await tryFetchApi(`/approvals/${reqType}/${item.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
                   action: 'approved',
@@ -120,26 +110,14 @@ export default function ManagerApprovalScreen({ navigation }) {
                   remark: 'อนุมัติผ่านแอปพลิเคชัน',
                 }),
               });
-
-              if (item.requestType === 'time-correction' || item.oldCheckIn) {
-                attendanceStorage.approveCorrection(item.dateIso || item.date, item.newCheckIn || '08:00 น.', item.newCheckOut || '17:00 น.');
-              }
+              if (!res) throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+              const resData = await res.json().catch(() => ({}));
+              if (!res.ok || !resData.success) throw new Error(resData.message || 'เซิร์ฟเวอร์ไม่อนุญาตให้อนุมัติรายการนี้');
 
               Alert.alert('อนุมัติสำเร็จ', `ทำการอนุมัติคำขอเรียบร้อยแล้ว`);
-              const nowStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' น.';
-              setApprovalHistory((prev) => [
-                {
-                  ...item,
-                  status: 'อนุมัติแล้ว',
-                  actionTime: nowStr,
-                  approverName: currentUser?.name || 'ผู้จัดการ',
-                },
-                ...prev,
-              ]);
-              setPendingRequests((prev) => prev.filter((r) => r.id !== item.id));
-              fetchPendingApprovals();
+              loadAll();
             } catch (e) {
-              Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถอนุมัติรายการได้ กรุณาลองอีกครั้ง');
+              Alert.alert('เกิดข้อผิดพลาด', (e && e.message) || 'ไม่สามารถอนุมัติรายการได้ กรุณาลองอีกครั้ง');
             }
           },
         },
@@ -153,8 +131,8 @@ export default function ManagerApprovalScreen({ navigation }) {
     const remarkText = rejectModal.remark.trim() || 'ไม่อนุมัติคำขอ';
 
     try {
-      const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
-      await tryFetchApi(`/approvals/${reqType}/${item.id}`, {
+      const reqType = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
+      const res = await tryFetchApi(`/approvals/${reqType}/${item.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           action: 'rejected',
@@ -163,41 +141,30 @@ export default function ManagerApprovalScreen({ navigation }) {
           remark: remarkText,
         }),
       });
+      if (!res) throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok || !resData.success) throw new Error(resData.message || 'เซิร์ฟเวอร์ไม่อนุญาตให้ปฏิเสธรายการนี้');
 
       Alert.alert('ปฏิเสธคำขอสำเร็จ', 'บันทึกการไม่อนุมัติคำขอเรียบร้อยแล้ว');
-      const nowStr = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' น.';
-      setApprovalHistory((prev) => [
-        {
-          ...item,
-          status: 'ไม่อนุมัติ',
-          rejectReason: remarkText,
-          actionTime: nowStr,
-          approverName: currentUser?.name || 'ผู้จัดการ',
-        },
-        ...prev,
-      ]);
-      setPendingRequests((prev) => prev.filter((r) => r.id !== item.id));
       setRejectModal({ visible: false, request: null, remark: '' });
-      fetchPendingApprovals();
+      loadAll();
     } catch (e) {
-      Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถปฏิเสธรายการได้ กรุณาลองอีกครั้ง');
+      Alert.alert('เกิดข้อผิดพลาด', (e && e.message) || 'ไม่สามารถปฏิเสธรายการได้ กรุณาลองอีกครั้ง');
     }
   };
 
   const filteredRequests = pendingRequests.filter((item) => {
-    const type = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+    const type = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
     if (activeTab === 'all') return true;
     if (activeTab === 'leave') return type === 'leave';
-    if (activeTab === 'ot') return type === 'ot';
     if (activeTab === 'time-correction') return type === 'time-correction';
     return true;
   });
 
   const filteredHistory = approvalHistory.filter((item) => {
-    const type = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+    const type = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
     if (activeTab === 'all') return true;
     if (activeTab === 'leave') return type === 'leave';
-    if (activeTab === 'ot') return type === 'ot';
     if (activeTab === 'time-correction') return type === 'time-correction';
     return true;
   });
@@ -247,7 +214,6 @@ export default function ManagerApprovalScreen({ navigation }) {
           {[
             { key: 'all', label: 'ทั้งหมด' },
             { key: 'leave', label: 'ขอลางาน' },
-            { key: 'ot', label: 'ขอ OT' },
             { key: 'time-correction', label: 'ปรับปรุงเวลา' },
           ].map((tab) => (
             <TouchableOpacity
@@ -292,12 +258,10 @@ export default function ManagerApprovalScreen({ navigation }) {
               </View>
             ) : (
               filteredRequests.map((item, index) => {
-                const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+                const reqType = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
                 let typeBadge = { label: 'คำร้อง', bg: '#EFF6FF', text: '#3B82F6', icon: 'document-text-outline' };
                 if (reqType === 'leave') {
                   typeBadge = { label: item.leaveType || 'ขอลางาน', bg: '#FEF3C7', text: '#D97706', icon: 'umbrella-outline' };
-                } else if (reqType === 'ot') {
-                  typeBadge = { label: `ขอ OT (${item.hours || 2} ชม.)`, bg: '#F3E8FF', text: '#9333EA', icon: 'time-outline' };
                 } else if (reqType === 'time-correction') {
                   typeBadge = { label: 'ปรับปรุงเวลา', bg: '#E0F2FE', text: '#0284C7', icon: 'sync-outline' };
                 }
@@ -341,14 +305,6 @@ export default function ManagerApprovalScreen({ navigation }) {
                         </View>
                       )}
 
-                      {reqType === 'ot' && (
-                        <View style={styles.detailRow}>
-                          <Ionicons name="alarm-outline" size={16} color="#64748B" />
-                          <Text style={styles.detailText}>
-                            วันที่: <Text style={styles.boldText}>{item.dateIso}</Text> เวลา <Text style={styles.boldText}>{item.startTime} - {item.endTime} น.</Text>
-                          </Text>
-                        </View>
-                      )}
 
                       {reqType === 'time-correction' && (
                         <View style={styles.detailRow}>
@@ -365,10 +321,17 @@ export default function ManagerApprovalScreen({ navigation }) {
                       </View>
 
                       {item.attachmentUrl && (
-                        <View style={styles.attachmentChip}>
+                        <TouchableOpacity
+                          style={styles.attachmentChip}
+                          onPress={() =>
+                            openLeaveAttachment(item.attachmentUrl).catch((e) =>
+                              Alert.alert('เปิดไฟล์แนบไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง')
+                            )
+                          }
+                        >
                           <Ionicons name="attach" size={14} color="#0EA5E9" />
-                          <Text style={styles.attachmentText}>แนบเอกสาร: {item.attachmentUrl}</Text>
-                        </View>
+                          <Text style={styles.attachmentText}>ดูเอกสารแนบ</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
 
@@ -404,13 +367,11 @@ export default function ManagerApprovalScreen({ navigation }) {
             </View>
           ) : (
             filteredHistory.map((item, index) => {
-              const reqType = item.requestType || (item.leaveType ? 'leave' : item.hours ? 'ot' : 'time-correction');
+              const reqType = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
               const isApproved = item.status === 'อนุมัติแล้ว' || item.status === 'approved';
               let typeBadge = { label: 'คำร้อง', bg: '#EFF6FF', text: '#3B82F6', icon: 'document-text-outline' };
               if (reqType === 'leave') {
                 typeBadge = { label: item.leaveType || 'ขอลางาน', bg: '#FEF3C7', text: '#D97706', icon: 'umbrella-outline' };
-              } else if (reqType === 'ot') {
-                typeBadge = { label: `ขอ OT (${item.hours || 2} ชม.)`, bg: '#F3E8FF', text: '#9333EA', icon: 'time-outline' };
               } else if (reqType === 'time-correction') {
                 typeBadge = { label: 'ปรับปรุงเวลา', bg: '#E0F2FE', text: '#0284C7', icon: 'sync-outline' };
               }
@@ -469,14 +430,6 @@ export default function ManagerApprovalScreen({ navigation }) {
                       </View>
                     )}
 
-                    {reqType === 'ot' && (
-                      <View style={styles.detailRow}>
-                        <Ionicons name="alarm-outline" size={16} color="#64748B" />
-                        <Text style={styles.detailText}>
-                          วันที่: <Text style={styles.boldText}>{item.date || item.dateIso}</Text> ({item.hours || 1} ชม.)
-                        </Text>
-                      </View>
-                    )}
 
                     {reqType === 'time-correction' && (
                       <View style={styles.detailRow}>

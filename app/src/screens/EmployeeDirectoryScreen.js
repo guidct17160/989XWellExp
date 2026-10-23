@@ -19,97 +19,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { tryFetchApi } from '../services/apiClient';
+import { navigationHistory } from '../services/navigationHistory';
+import { authService } from '../services/authService';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const DEFAULT_EMPLOYEES = [
-  {
-    id: 'EMP-001',
-    code: 'EMP-001',
-    name: 'สมชาย พัฒนาการ',
-    position: 'Senior Software Engineer',
-    department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-    email: 'somchai.p@wellx989.com',
-    phone: '081-234-5678',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    status: 'Active',
-    startDate: '2023-01-15',
-  },
-  {
-    id: 'EMP-002',
-    code: 'EMP-002',
-    name: 'กานดา วงศ์สุวรรณ',
-    position: 'HR Specialist',
-    department: 'ฝ่ายทรัพยากรบุคคล (HR)',
-    email: 'kanda.w@wellx989.com',
-    phone: '089-987-6543',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    status: 'Active',
-    startDate: '2023-06-01',
-  },
-  {
-    id: 'EMP-003',
-    code: 'EMP-003',
-    name: 'วรพจน์ จิตเที่ยง',
-    position: 'Mobile Developer',
-    department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-    email: 'worapoj.c@wellx989.com',
-    phone: '082-345-6789',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    status: 'Active',
-    startDate: '2024-02-10',
-  },
-  {
-    id: 'EMP-004',
-    code: 'EMP-004',
-    name: 'พัชรี เลิศปัญญา',
-    position: 'Marketing Specialist',
-    department: 'ฝ่ายการตลาด (Marketing)',
-    email: 'patcharee.l@wellx989.com',
-    phone: '083-456-7890',
-    avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-    status: 'Active',
-    startDate: '2023-09-20',
-  },
-  {
-    id: 'EMP-005',
-    code: 'EMP-005',
-    name: 'ธีรศักดิ์ มั่งคั่ง',
-    position: 'Senior Accountant',
-    department: 'ฝ่ายบัญชีและการเงิน (Finance)',
-    email: 'theerasak.m@wellx989.com',
-    phone: '084-567-8901',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-    status: 'Active',
-    startDate: '2022-11-01',
-  },
-  {
-    id: 'EMP-DEMO',
-    code: 'EMP-DEMO',
-    name: 'พนักงานทดสอบ (Demo Account)',
-    position: 'Mobile Developer',
-    department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-    email: 'demo@wellx989.com',
-    phone: '081-234-5678',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    status: 'Active',
-    startDate: '2024-01-01',
-  },
-];
-
-const DEPARTMENTS = [
-  'ทั้งหมด',
-  'IT',
-  'HR',
-  'Marketing',
-  'Finance',
-  'Operations',
-];
-
 export default function EmployeeDirectoryScreen({ navigation }) {
-  const [employees, setEmployees] = useState(DEFAULT_EMPLOYEES);
+  const { theme, t } = useTheme();
+  const currentUser = authService.getUser();
+  const userDept = currentUser?.department || 'IT';
+
+  const [employees, setEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDept, setSelectedDept] = useState('ทั้งหมด');
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -128,13 +50,12 @@ export default function EmployeeDirectoryScreen({ navigation }) {
       const res = await tryFetchApi('/employees');
       if (res && res.ok) {
         const data = await res.json();
-        if (data && data.success && Array.isArray(data.employees) && data.employees.length > 0) {
-          // Merge with fallback to keep photos rich
-          const serverList = data.employees.map((emp, idx) => ({
+        if (data && data.success && Array.isArray(data.employees)) {
+          const serverList = data.employees.map((emp) => ({
             ...emp,
-            avatarUrl: emp.avatarUrl || emp.avatar_url || DEFAULT_EMPLOYEES[idx % DEFAULT_EMPLOYEES.length]?.avatarUrl,
-            phone: emp.phone || '081-000-0000',
-            email: emp.email || `${(emp.username || emp.code || 'user').toLowerCase()}@wellx989.com`,
+            avatarUrl: emp.avatarUrl || emp.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            phone: emp.phone || '-',
+            email: emp.email || '-',
           }));
           setEmployees(serverList);
         }
@@ -172,21 +93,23 @@ export default function EmployeeDirectoryScreen({ navigation }) {
     });
   };
 
+  // Filter strictly by the current user's department (only members of our department are shown)
   const filteredEmployees = employees.filter((emp) => {
-    const q = searchQuery.toLowerCase().trim();
-    const nameMatch = !q || (emp.name && emp.name.toLowerCase().includes(q));
-    const codeMatch = !q || (emp.code && emp.code.toLowerCase().includes(q));
-    const posMatch = !q || (emp.position && emp.position.toLowerCase().includes(q));
-    const deptMatch = !q || (emp.department && emp.department.toLowerCase().includes(q));
-    const matchesSearch = nameMatch || codeMatch || posMatch || deptMatch;
+    const empDept = String(emp.department || '').toLowerCase().trim();
+    const targetDept = String(userDept).toLowerCase().trim();
+    const isSameDept = !!empDept && !!targetDept && (empDept.includes(targetDept) || targetDept.includes(empDept) || empDept === targetDept);
+    if (!isSameDept) return false;
 
-    if (!matchesSearch) return false;
-    if (selectedDept === 'ทั้งหมด') return true;
-    return emp.department && emp.department.toLowerCase().includes(selectedDept.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const nameMatch = emp.name && emp.name.toLowerCase().includes(q);
+    const codeMatch = emp.code && emp.code.toLowerCase().includes(q);
+    const posMatch = emp.position && emp.position.toLowerCase().includes(q);
+    return nameMatch || codeMatch || posMatch;
   });
 
   return (
-    <SafeAreaView testID="screen-employee-directory" style={styles.safeArea}>
+    <SafeAreaView testID="screen-employee-directory" style={[styles.safeArea, { backgroundColor: theme.card }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
 
       {/* Top Header */}
@@ -194,14 +117,18 @@ export default function EmployeeDirectoryScreen({ navigation }) {
         <TouchableOpacity
           testID="btn-back-directory"
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'HRDashboard' })}
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>สมุดรายชื่อพนักงาน</Text>
-          <Text style={styles.headerSubtitle}>ทีมงานและข้อมูลติดต่อภายในองค์กร</Text>
+          <Text style={styles.headerTitle}>
+            {t('myDepartmentTeam', 'ทีมงานแผนก')} {userDept}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {t('myDepartmentTeam', 'สมาชิกภายในแผนกเดียวกัน')} ({filteredEmployees.length} คน)
+          </Text>
         </View>
         <View style={styles.countBadge}>
           <Text style={styles.countBadgeText}>{filteredEmployees.length}</Text>
@@ -209,13 +136,13 @@ export default function EmployeeDirectoryScreen({ navigation }) {
       </View>
 
       {/* Search Input Box */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
+      <View style={[styles.searchSection, { backgroundColor: theme.background }]}>
+        <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Ionicons name="search" size={20} color="#64748B" style={styles.searchIcon} />
           <TextInput
             testID="employee-search-input"
-            style={styles.searchInput}
-            placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง หรือฝ่าย..."
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder={t('search', 'ค้นหาชื่อ, รหัสพนักงานในแผนก...')}
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -227,30 +154,6 @@ export default function EmployeeDirectoryScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Department Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {DEPARTMENTS.map((dept) => {
-            const isSelected = selectedDept === dept;
-            return (
-              <TouchableOpacity
-                key={dept}
-                testID={`dept-filter-${dept}`}
-                style={[styles.filterChip, isSelected && styles.filterChipActive]}
-                onPress={() => setSelectedDept(dept)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
-                  {dept}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
       {/* Employee List */}
@@ -270,15 +173,19 @@ export default function EmployeeDirectoryScreen({ navigation }) {
         {filteredEmployees.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={56} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>ไม่พบรายชื่อพนักงาน</Text>
-            <Text style={styles.emptyDesc}>ลองค้นหาด้วยคำค้นอื่น หรือเปลี่ยนตัวกรองแผนก</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              {t('noTeamMembers', 'ไม่พบสมาชิกในแผนกนี้')}
+            </Text>
+            <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
+              พนักงานจะแสดงเฉพาะผู้ที่อยู่ในแผนก {userDept} เท่านั้น
+            </Text>
           </View>
         ) : (
           filteredEmployees.map((emp) => (
             <TouchableOpacity
               key={emp.id || emp.code}
               testID={`employee-card-${emp.id || emp.code}`}
-              style={styles.employeeCard}
+              style={[styles.employeeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={() => setSelectedEmp(emp)}
               activeOpacity={0.85}
             >
@@ -288,15 +195,15 @@ export default function EmployeeDirectoryScreen({ navigation }) {
               />
               <View style={styles.empInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.empName} numberOfLines={1}>{emp.name}</Text>
+                  <Text style={[styles.empName, { color: theme.text }]} numberOfLines={1}>{emp.name}</Text>
                   <View style={styles.codeTag}>
                     <Text style={styles.codeTagText}>{emp.code || emp.id}</Text>
                   </View>
                 </View>
-                <Text style={styles.empPosition} numberOfLines={1}>{emp.position || 'พนักงาน'}</Text>
+                <Text style={[styles.empPosition, { color: theme.textSecondary }]} numberOfLines={1}>{emp.position || 'พนักงาน'}</Text>
                 <View style={styles.deptRow}>
                   <Ionicons name="business-outline" size={13} color="#64748B" />
-                  <Text style={styles.empDept} numberOfLines={1}>{emp.department || 'ไม่ระบุฝ่าย'}</Text>
+                  <Text style={styles.empDept} numberOfLines={1}>{emp.department || userDept}</Text>
                 </View>
               </View>
 

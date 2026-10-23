@@ -20,53 +20,10 @@ import { attendanceStorage } from '../services/attendanceStorage';
 import { leaveStorage } from '../services/leaveStorage';
 import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
+import { useTheme } from '../context/ThemeContext';
+import { tryFetchApi } from '../services/apiClient';
 
-const attendanceIssues = [
-  {
-    id: 'issue_corr_13',
-    date: '13/07/2026',
-    dayThai: 'จันทร์, 13 กรกฎาคม 2026',
-    type: 'เข้างานไม่ครบ',
-    typeColor: colors.warning,
-    inTime: '09:00',
-    outTime: '15:30',
-    month: 6, // July (0-indexed)
-    year: 2026,
-  },
-  {
-    id: 'issue_corr_15',
-    date: '15/07/2026',
-    dayThai: 'พุธ, 15 กรกฎาคม 2026',
-    type: 'เข้างานสาย',
-    typeColor: colors.error,
-    inTime: '09:25',
-    outTime: '18:00',
-    month: 6,
-    year: 2026,
-  },
-  {
-    id: 'issue_corr_17',
-    date: '17/07/2026',
-    dayThai: 'ศุกร์, 17 กรกฎาคม 2026',
-    type: 'เข้างานสาย',
-    typeColor: colors.error,
-    inTime: '09:45',
-    outTime: '17:00',
-    month: 6,
-    year: 2026,
-  },
-  {
-    id: 'issue_corr_20',
-    date: '20/07/2026',
-    dayThai: 'จันทร์, 20 กรกฎาคม 2026',
-    type: 'เวลาออกงานไม่ครบกำหนด',
-    typeColor: colors.error,
-    inTime: '08:30',
-    outTime: '16:30',
-    month: 6,
-    year: 2026,
-  }
-];
+const attendanceIssues = [];
 
 const thaiMonths = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -355,6 +312,8 @@ export default function TimeCorrectionScreen({ navigation, route }) {
     if (!record) return;
     if (record.isComplete || record.status === 'ลงเวลาเข้า-ออกครบถ้วน') return;
     if (record.dateIso && processedPunchDates.has(record.dateIso)) return;
+    // Still clocked in today (no check-out yet) is not an issue to correct
+    if (!record.checkOut && record.dateIso === new Date().toISOString().split('T')[0]) return;
 
     if (record.isIncomplete || record.status?.includes('สาย') || record.status?.includes('ไม่ครบ') || record.status?.includes('ออกก่อน')) {
       let recordDate = new Date();
@@ -510,7 +469,7 @@ export default function TimeCorrectionScreen({ navigation, route }) {
     return { isValid: true };
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!remark.trim()) {
       Alert.alert('ข้อผิดพลาด', 'กรุณาระบุหมายเหตุการขอปรับปรุงเวลา');
       return;
@@ -524,9 +483,14 @@ export default function TimeCorrectionScreen({ navigation, route }) {
 
     const dateText = selectedDay?.dayThai || selectedDay?.date || 'วันนี้';
     const targetId = selectedDay?.id || null;
-    const targetRawDate = selectedDay?.date || selectedDay?.dateIso || null;
+    const targetRawDate = selectedDay?.dateIso || selectedDay?.date || null;
 
-    leaveStorage.addTimeCorrectionRequest(dateText, inTime, outTime, remark, targetId, targetRawDate);
+    try {
+      await leaveStorage.addTimeCorrectionRequest(dateText, inTime, outTime, remark, targetId, targetRawDate);
+    } catch (error) {
+      Alert.alert('ส่งคำขอไม่สำเร็จ', error.message);
+      return;
+    }
     attendanceStorage.updateCorrection(dateText, inTime, outTime, remark);
 
     // 🔔 Push top sliding Alert notification banner (matching incomplete check-in alert style)

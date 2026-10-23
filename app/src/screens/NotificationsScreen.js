@@ -28,6 +28,8 @@ export default function NotificationsScreen({ navigation }) {
     const unsubscribe = notificationStorage.subscribe((state) => {
       setNotifState(state);
     });
+    // Pull the latest notifications from the backend
+    notificationStorage.clearAndSync();
 
     return () => {
       unsubscribe();
@@ -65,8 +67,6 @@ export default function NotificationsScreen({ navigation }) {
         navigation.navigate('MainTabs', { screen: 'TimeAttendance' });
       } else if (notif.screen === 'LeaveRequest') {
         navigation.navigate('LeaveRequest');
-      } else if (notif.screen === 'OtRequest') {
-        navigation.navigate('OtRequest');
       } else if (notif.screen === 'Announcements') {
         navigation.navigate('Announcements');
       } else if (notif.screen) {
@@ -136,7 +136,7 @@ export default function NotificationsScreen({ navigation }) {
                   {notif.screen && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600', marginRight: 2 }}>
-                        ไปยังหน้า {notif.tab === 'requests' || notif.activeTab === 'requests' ? 'สถานะคำขอ' : notif.screen === 'TimeCorrection' ? 'ปรับปรุงเวลา' : notif.screen === 'LeaveRequest' ? 'การลางาน' : 'สลิปเงินเดือน'}
+                        ไปยังหน้า {notif.tab === 'requests' || notif.activeTab === 'requests' ? 'สถานะคำขอ' : notif.screen === 'TimeCorrection' ? 'ปรับปรุงเวลา' : notif.screen === 'LeaveRequest' ? 'การลางาน' : 'รายละเอียด'}
                       </Text>
                       <Ionicons name="chevron-forward" size={14} color={colors.primary} />
                     </View>

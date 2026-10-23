@@ -40,19 +40,49 @@ const loadLocalState = () => {
 };
 loadLocalState();
 
+const NOTIF_ICONS = {
+  success: { icon: 'checkmark-circle-outline', iconColor: '#10B981' },
+  warning: { icon: 'alert-circle-outline', iconColor: '#F5A623' },
+  error: { icon: 'close-circle-outline', iconColor: '#EF4444' },
+  info: { icon: 'information-circle-outline', iconColor: '#0074C4' },
+};
+
+const formatNotifTime = (raw) => {
+  if (!raw) return '';
+  const d = new Date(String(raw).includes(' ') && !String(raw).includes('T') ? String(raw).replace(' ', 'T') : raw);
+  if (isNaN(d.getTime())) return String(raw);
+  return d.toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' น.';
+};
+
+// Map backend notification { id, title, message, type, isRead, createdAt } to the UI shape
+const normalizeBackendNotif = (n) => {
+  const look = NOTIF_ICONS[n.type] || NOTIF_ICONS.info;
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: n.type || 'info',
+    icon: n.icon || look.icon,
+    iconColor: n.iconColor || look.iconColor,
+    unread: n.unread !== undefined ? !!n.unread : !n.isRead,
+    time: formatNotifTime(n.createdAt) || n.time || '',
+    screen: n.screen || null,
+    fromServer: true,
+  };
+};
+
 const syncWithBackend = async () => {
   try {
     const res = await tryFetchApi('/notifications');
     if (res && res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.notifications)) {
-        const mergedNotifs = [...data.notifications];
-        (globalState.notifications || []).forEach((localItem) => {
-          if (localItem && !mergedNotifs.some((b) => b.id === localItem.id)) {
-            mergedNotifs.push(localItem);
-          }
-        });
-        globalState.notifications = mergedNotifs;
+        const serverNotifs = data.notifications.map(normalizeBackendNotif);
+        // Keep only purely local (client-generated) items; server-origin items are replaced by the server list
+        const localOnly = (globalState.notifications || []).filter(
+          (localItem) => localItem && !localItem.fromServer && !serverNotifs.some((b) => b.id === localItem.id)
+        );
+        globalState.notifications = [...localOnly, ...serverNotifs];
         saveState();
         listeners.forEach((l) => l(globalState));
       }
@@ -85,6 +115,10 @@ export const notificationStorage = {
     return globalState.notifications.filter(n => n.unread).length;
   },
   toggleRead(id) {
+    const target = globalState.notifications.find((n) => n.id === id);
+    if (target && target.fromServer) {
+      tryFetchApi(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }).catch(() => {});
+    }
     const updated = globalState.notifications.map(n =>
       n.id === id ? { ...n, unread: false } : n
     );
@@ -98,7 +132,7 @@ export const notificationStorage = {
     saveState();
     listeners.forEach(l => l(globalState));
     try {
-      tryFetchApi('/notifications/read-all', { method: 'PATCH' });
+      tryFetchApi('/notifications/read-all', { method: 'PATCH' }).catch(() => {});
     } catch (e) {}
   },
   addNotification(newNotif) {

@@ -6,6 +6,7 @@ import { notificationStorage } from '../services/notificationStorage';
 import { pointsStorage } from '../services/pointsStorage';
 
 import { authService } from '../services/authService';
+import { navigationHistory } from '../services/navigationHistory';
 
 export default function TopNavbar({
   navigation,
@@ -95,19 +96,7 @@ export default function TopNavbar({
       onBackPress();
       return;
     }
-    if (navigation) {
-      if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
-        navigation.goBack();
-        return;
-      }
-      if (typeof navigation.navigate === 'function') {
-        navigation.navigate('MainTabs', { screen: 'HRDashboard' });
-        return;
-      }
-      if (typeof navigation.goBack === 'function') {
-        navigation.goBack();
-      }
-    }
+    navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'Home' });
   };
 
   const handleNamePress = () => {

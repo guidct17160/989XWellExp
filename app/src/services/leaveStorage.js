@@ -33,135 +33,11 @@ const getUserGender = () => {
 
 const getStorageKey = (prefix) => `${prefix}_${getUserId()}`;
 
-const defaultLeavePolicies = [
-  {
-    id: 'LP-01',
-    typeName: 'ลาป่วย (Sick Leave)',
-    categoryKey: 'sick',
-    defaultQuota: 30,
-    isPaid: true,
-    applicableGender: 'all',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 0,
-    maxConsecutiveDays: 3,
-    allowBackdated: true,
-    maxBackdatedDays: 3,
-    requireAttachment: false,
-    description: 'ต้องมีใบรับรองแพทย์กรณีลาติดต่อกันเกิน 3 วัน',
-  },
-  {
-    id: 'LP-02',
-    typeName: 'ลากิจ (Personal Leave)',
-    categoryKey: 'personal',
-    defaultQuota: 6,
-    isPaid: true,
-    applicableGender: 'all',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 1,
-    maxConsecutiveDays: 3,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: false,
-    description: 'ยื่นคำขอล่วงหน้าอย่างน้อย 1 วัน',
-  },
-  {
-    id: 'LP-03',
-    typeName: 'ลาพักร้อนประจำปี (Annual Leave)',
-    categoryKey: 'annual',
-    defaultQuota: 10,
-    isPaid: true,
-    applicableGender: 'all',
-    allowedStartDate: '2026-01-01',
-    allowedEndDate: '2026-12-31',
-    dateRangeEnabled: true,
-    minAdvanceDays: 3,
-    maxConsecutiveDays: 10,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: false,
-    description: 'สำหรับพนักงานที่ผ่านทดลองงานและทำงานครบ 1 ปี (ใช้สิทธิ์ได้ภายในปี 2569 เท่านั้น)',
-  },
-  {
-    id: 'LP-04',
-    typeName: 'ลาคลอดบุตร (Maternity Leave)',
-    categoryKey: 'maternity',
-    defaultQuota: 98,
-    isPaid: true,
-    applicableGender: 'female',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 7,
-    maxConsecutiveDays: 98,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: true,
-    description: 'ตามกฎหมายแรงงานกำหนด พร้อมแนบเอกสารรับรองแพทย์ (เฉพาะเพศหญิง)',
-  },
-  {
-    id: 'LP-05',
-    typeName: 'ลาบวช / ปฏิบัติธรรม (Ordination Leave)',
-    categoryKey: 'ordination',
-    defaultQuota: 15,
-    isPaid: true,
-    applicableGender: 'male',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 15,
-    maxConsecutiveDays: 15,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: true,
-    description: 'ยื่นขอล่วงหน้าอย่างน้อย 15 วัน พร้อมเอกสารรับรอง (เฉพาะเพศชาย)',
-  },
-  {
-    id: 'LP-06',
-    typeName: 'ลาอื่นๆ (Other Leave)',
-    categoryKey: 'other',
-    defaultQuota: 5,
-    isPaid: false,
-    applicableGender: 'all',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 1,
-    maxConsecutiveDays: 5,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: false,
-    description: 'การลาอื่นๆ ที่ไม่เข้าข่ายหมวดข้างต้น',
-  },
-  {
-    id: 'LP-07',
-    typeName: 'ลาดูแลภริยาคลอดบุตร (Paternity Leave)',
-    categoryKey: 'paternity',
-    defaultQuota: 15,
-    isPaid: true,
-    applicableGender: 'male',
-    allowedStartDate: null,
-    allowedEndDate: null,
-    dateRangeEnabled: false,
-    minAdvanceDays: 3,
-    maxConsecutiveDays: 15,
-    allowBackdated: false,
-    maxBackdatedDays: 0,
-    requireAttachment: true,
-    description: 'สำหรับพนักงานชายเพื่อดูแลภริยาคลอดบุตรและบุตรแรกเกิด (เฉพาะเพศชาย)',
-  },
-];
+const defaultLeavePolicies = [];
 
 let globalState = {
-  leaveBalances: [
-    { id: 'annual', label: 'ลาพักร้อน', remaining: 10, total: 10, color: '#F5A623', icon: 'umbrella-outline' },
-    { id: 'sick', label: 'ลาป่วย', remaining: 30, total: 30, color: '#F5A623', icon: 'medical-outline' },
-    { id: 'personal', label: 'ลากิจ', remaining: 6, total: 6, color: '#F5A623', icon: 'briefcase-outline' },
-  ],
-  leavePolicies: defaultLeavePolicies,
+  leaveBalances: [],
+  leavePolicies: [],
   leaveHistory: [],
 };
 
@@ -178,21 +54,18 @@ const loadLocalState = () => {
             return true;
           });
         }
-        if (!parsed.leavePolicies || parsed.leavePolicies.length === 0) {
-          parsed.leavePolicies = defaultLeavePolicies;
-        }
-        globalState = parsed;
+        globalState = {
+          leaveBalances: Array.isArray(parsed.leaveBalances) ? parsed.leaveBalances : [],
+          leavePolicies: Array.isArray(parsed.leavePolicies) ? parsed.leavePolicies : [],
+          leaveHistory: Array.isArray(parsed.leaveHistory) ? parsed.leaveHistory : [],
+        };
         return;
       }
     }
   } catch (e) {}
   globalState = {
-    leaveBalances: [
-      { id: 'annual', label: 'ลาพักร้อน', remaining: 10, total: 10, color: '#F5A623', icon: 'umbrella-outline' },
-      { id: 'sick', label: 'ลาป่วย', remaining: 30, total: 30, color: '#F5A623', icon: 'medical-outline' },
-      { id: 'personal', label: 'ลากิจ', remaining: 6, total: 6, color: '#F5A623', icon: 'briefcase-outline' },
-    ],
-    leavePolicies: defaultLeavePolicies,
+    leaveBalances: [],
+    leavePolicies: [],
     leaveHistory: [],
   };
 };
@@ -208,14 +81,14 @@ const syncWithBackend = async () => {
 
     if (balRes && balRes.ok) {
       const balData = await balRes.json();
-      if (balData && balData.success && Array.isArray(balData.balances) && balData.balances.length > 0) {
+      if (balData && balData.success && Array.isArray(balData.balances)) {
         globalState.leaveBalances = balData.balances;
       }
     }
 
     if (polRes && polRes.ok) {
       const polData = await polRes.json();
-      if (polData && polData.success && Array.isArray(polData.policies) && polData.policies.length > 0) {
+      if (polData && polData.success && Array.isArray(polData.policies)) {
         globalState.leavePolicies = polData.policies;
       }
     }
@@ -226,10 +99,13 @@ const syncWithBackend = async () => {
     ]);
 
     let backendList = [];
+    let leaveListLoaded = false;
+    let correctionListLoaded = false;
 
     if (reqRes && reqRes.ok) {
       const reqData = await reqRes.json();
       if (reqData && reqData.success && Array.isArray(reqData.requests)) {
+        leaveListLoaded = true;
         backendList.push(
           ...reqData.requests.map((r) => ({
             id: r.id,
@@ -255,6 +131,7 @@ const syncWithBackend = async () => {
     if (tcRes && tcRes.ok) {
       const tcData = await tcRes.json();
       if (tcData && tcData.success && Array.isArray(tcData.corrections)) {
+        correctionListLoaded = true;
         backendList.push(
           ...tcData.corrections.map((c) => ({
             id: c.id,
@@ -278,8 +155,15 @@ const syncWithBackend = async () => {
       }
     }
 
-    if (backendList.length > 0) {
+    // Server is the source of truth: replace local history once both lists were fetched (even when empty)
+    if (leaveListLoaded && correctionListLoaded) {
       globalState.leaveHistory = backendList;
+    } else if (backendList.length > 0) {
+      // One list failed to load: keep the previously known items of that category
+      const kept = (globalState.leaveHistory || []).filter(
+        (h) => (!leaveListLoaded && h.typeId === 'leave') || (!correctionListLoaded && h.typeId === 'time_correction')
+      );
+      globalState.leaveHistory = [...backendList, ...kept];
     }
     saveState();
     listeners.forEach((l) => l(globalState));
@@ -302,7 +186,7 @@ const saveState = () => {
 };
 
 const formatThaiDate = (dateStr) => {
-  const parts = dateStr.split('-');
+  const parts = String(dateStr).slice(0, 10).split('-');
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   return date.toLocaleDateString('th-TH', {
     day: 'numeric',
@@ -342,23 +226,12 @@ export const leaveStorage = {
     return policies.find(p => p.categoryKey === typeId || p.id === typeId || (p.typeName && p.typeName.toLowerCase().includes(typeId.toLowerCase())));
   },
 
-  async addLeaveRequest(typeId, startStr, endStr, reason) {
+  async addLeaveRequest(typeId, startStr, endStr, reason, attachmentUrl = null) {
     const start = new Date(startStr);
     const end = new Date(endStr);
     const diffTime = Math.abs(end - start);
     const requestedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-    // Check policy constraints
-    const policy = this.getPolicyForType(typeId);
-    if (policy && policy.dateRangeEnabled) {
-      if (policy.allowedStartDate && startStr < policy.allowedStartDate) {
-        throw new Error(`ไม่สามารถยื่นลาได้ เนื่องจากวันที่เริ่มต้น (${startStr}) อยู่นอกช่วงเวลาที่กำหนดให้ลาได้ (เปิดให้ลาได้ตั้งแต่วันที่ ${policy.allowedStartDate})`);
-      }
-      if (policy.allowedEndDate && endStr > policy.allowedEndDate) {
-        throw new Error(`ไม่สามารถยื่นลาได้ เนื่องจากวันที่สิ้นสุด (${endStr}) เกินวันที่กำหนดให้ลาได้ (สิ้นสุดวันที่ ${policy.allowedEndDate})`);
-      }
-    }
-    
     // Find the leave type balance
     const currentBal = globalState.leaveBalances.find(b => b.id === typeId || b.categoryKey === typeId);
     if (currentBal) {
@@ -370,6 +243,7 @@ export const leaveStorage = {
       }
     }
 
+    const policy = this.getPolicyForType(typeId);
     const leaveFullName = policy?.typeName || currentBal?.fullName || currentBal?.label || 'ลางาน';
     
     // Call Live Backend API to insert into PostgreSQL
@@ -381,14 +255,16 @@ export const leaveStorage = {
         endDate: endStr,
         totalDays: requestedDays,
         reason: reason || 'ไม่ได้ระบุเหตุผล',
+        ...(attachmentUrl ? { attachmentUrl } : {}),
       }),
     });
 
-    if (res) {
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.message || 'ไม่สามารถยื่นใบลาได้');
-      }
+    if (!res) {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ใบลายังไม่ถูกบันทึก กรุณาลองใหม่อีกครั้ง');
+    }
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok || !resData.success) {
+      throw new Error(resData.message || 'ไม่สามารถยื่นใบลาได้');
     }
 
     // Refresh live balances and history from the database
@@ -400,21 +276,54 @@ export const leaveStorage = {
     const today = new Date();
     let isoDate = today.toISOString().split('T')[0];
     if (rawDate && typeof rawDate === 'string') {
-      if (rawDate.includes('-') && rawDate.split('-').length === 3) {
-        isoDate = rawDate;
+      const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const thaiMatch = rawDate.trim().match(/^(d{1,2})s+(S+?).?s+(d{4})$/);
+      if (/^d{4}-d{2}-d{2}/.test(rawDate)) {
+        isoDate = rawDate.slice(0, 10);
       } else if (rawDate.includes('/') && rawDate.split('/').length === 3) {
         const parts = rawDate.split('/');
         let y = parseInt(parts[2], 10);
         if (y > 2500) y -= 543;
         isoDate = `${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      } else if (thaiMatch) {
+        const mIdx = THAI_MONTHS.findIndex((m) => m.replace('.', '') === thaiMatch[2].replace('.', ''));
+        if (mIdx >= 0) {
+          let y = parseInt(thaiMatch[3], 10);
+          if (y > 2500) y -= 543;
+          isoDate = `${y}-${String(mIdx + 1).padStart(2, '0')}-${thaiMatch[1].padStart(2, '0')}`;
+        }
       }
     }
 
-    const formattedIn = inTime ? (inTime.includes('น.') ? inTime : `${inTime} น.`) : '09:00 น.';
-    const formattedOut = outTime ? (outTime.includes('น.') ? outTime : `${outTime} น.`) : '18:00 น.';
+    const formattedIn = inTime ? (inTime.includes('น.') ? inTime : `${inTime} น.`) : null;
+    const formattedOut = outTime ? (outTime.includes('น.') ? outTime : `${outTime} น.`) : null;
+    if (!formattedIn && !formattedOut) {
+      throw new Error('กรุณาระบุเวลาเข้างานหรือเวลาออกงานอย่างน้อยหนึ่งช่อง');
+    }
 
+    // Submit to the backend FIRST; only reflect it locally when the server accepted it
+    const res = await tryFetchApi('/attendance/corrections', {
+      method: 'POST',
+      body: JSON.stringify({
+        dateIso: isoDate,
+        oldCheckIn: '-',
+        newCheckIn: formattedIn,
+        oldCheckOut: '-',
+        newCheckOut: formattedOut,
+        reason: reason || 'ขอปรับปรุงเวลาเข้า-ออกงาน',
+      }),
+    });
+    if (!res) {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ คำขอยังไม่ถูกบันทึก กรุณาลองใหม่อีกครั้ง');
+    }
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok || !resData.success) {
+      throw new Error(resData.message || 'ไม่สามารถยื่นคำขอปรับปรุงเวลาได้');
+    }
+
+    const created = resData.correction || {};
     const newRequest = {
-      id: 'tc_' + Date.now(),
+      id: created.id || 'tc_' + Date.now(),
       issueId: issueId || null,
       rawDate: rawDate || isoDate,
       typeId: 'time_correction',
@@ -422,9 +331,9 @@ export const leaveStorage = {
       categoryName: 'ปรับปรุงเวลา',
       type: 'ปรับปรุงเวลาเข้า-ออกงาน',
       dates: dateStr || 'วันนี้',
-      inTime: formattedIn,
-      outTime: formattedOut,
-      status: 'รออนุมัติ',
+      inTime: formattedIn || '-',
+      outTime: formattedOut || '-',
+      status: created.status || 'รออนุมัติ',
       statusColor: '#F5A623',
       start: isoDate,
       end: isoDate,
@@ -442,19 +351,8 @@ export const leaveStorage = {
     saveState();
     listeners.forEach(l => l(globalState));
 
-    try {
-      await tryFetchApi('/attendance/corrections', {
-        method: 'POST',
-        body: JSON.stringify({
-          dateIso: rawDate || isoDate,
-          oldCheckIn: '-',
-          newCheckIn: formattedIn,
-          oldCheckOut: '-',
-          newCheckOut: formattedOut,
-          reason: reason || 'ขอปรับปรุงเวลาเข้า-ออกงาน',
-        }),
-      });
-    } catch (e) {}
+    // Reconcile with the database (non-blocking)
+    syncWithBackend();
 
     return newRequest;
   }

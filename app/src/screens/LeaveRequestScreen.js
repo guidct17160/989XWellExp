@@ -21,16 +21,11 @@ import { leaveStorage } from '../services/leaveStorage';
 import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
 import { tryFetchApi } from '../services/apiClient';
+import { pickAttachment, uploadLeaveAttachment } from '../services/attachmentService';
+import { getPublicHolidayName, fetchHolidaysFromBackend } from '../utils/thaiHolidays';
 
 const { width } = Dimensions.get('window');
 
-const DEFAULT_POLICIES = [
-  { id: 'LP-01', leaveType: 'annual', name: 'ลาพักร้อน (Annual Leave)', defaultQuota: 10, advanceNoticeDays: 3, requireAttachment: false, description: 'สำหรับพนักงานประจำที่ผ่านการทดลองงาน สามารถสะสมวันลาได้ตามระเบียบบริษัท' },
-  { id: 'LP-02', leaveType: 'sick', name: 'ลาป่วย (Sick Leave)', defaultQuota: 30, advanceNoticeDays: 0, requireAttachment: true, description: 'ลาป่วยตั้งแต่ 3 วันทำงานขึ้นไป ต้องแนบใบรับรองแพทย์จากสถานพยาบาลที่ได้รับการรับรอง' },
-  { id: 'LP-03', leaveType: 'personal', name: 'ลากิจ (Business Leave)', defaultQuota: 5, advanceNoticeDays: 1, requireAttachment: false, description: 'สำหรับการทำธุระส่วนตัวที่ไม่สามารถดำเนินการนอกเวลาทำการได้ ต้องแจ้งหัวหน้างานล่วงหน้า' },
-  { id: 'LP-04', leaveType: 'maternity', name: 'ลาคลอด (Maternity Leave)', defaultQuota: 98, advanceNoticeDays: 30, requireAttachment: true, description: 'สิทธิ์ลาคลอดบุตรสำหรับพนักงานหญิง ได้รับค่าจ้างตามที่กฎหมายแรงงานกำหนด' },
-  { id: 'LP-05', leaveType: 'ordination', name: 'ลาบวช (Ordination Leave)', defaultQuota: 15, advanceNoticeDays: 15, requireAttachment: true, description: 'สิทธิ์ลาอุปสมบทหรือประกอบพิธีทางศาสนา สำหรับพนักงานที่มีอายุงานครบ 1 ปีขึ้นไป' },
-];
 
 export default function LeaveRequestScreen({ navigation }) {
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
@@ -39,11 +34,12 @@ export default function LeaveRequestScreen({ navigation }) {
   // Request Leave Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isPoliciesModalVisible, setIsPoliciesModalVisible] = useState(false);
-  const [policiesList, setPoliciesList] = useState(DEFAULT_POLICIES);
+  const [policiesList, setPoliciesList] = useState([]);
   const [selectedType, setSelectedType] = useState('annual');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
+  // uploaded attachment: { id, url, fileName } (already stored on the server)
   const [attachedFile, setAttachedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -60,7 +56,7 @@ export default function LeaveRequestScreen({ navigation }) {
       const res = await tryFetchApi('/leave-policies');
       if (res && res.ok) {
         const data = await res.json();
-        if (data && data.success && Array.isArray(data.policies) && data.policies.length > 0) {
+        if (data && data.success && Array.isArray(data.policies)) {
           setPoliciesList(data.policies);
         }
       }
@@ -91,32 +87,32 @@ export default function LeaveRequestScreen({ navigation }) {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
 
-  const handleUploadFile = () => {
-    setIsUploading(true);
-    setTimeout(() => {
+  // Employee picks a real file or photo; it is uploaded to the server right away
+  const chooseAndUpload = async (source) => {
+    try {
+      const picked = await pickAttachment(source);
+      if (!picked) return;
+      setIsUploading(true);
+      const saved = await uploadLeaveAttachment(picked);
+      setAttachedFile(saved);
+    } catch (e) {
+      Alert.alert('แนบไฟล์ไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง');
+    } finally {
       setIsUploading(false);
-      setAttachedFile('ใบรับรองแพทย์_สมบูรณ์.pdf');
-    }, 1000);
+    }
   };
 
-  const activePolicy = leaveStorage.getPolicyForType(selectedType);
-
-  const isDateOutsidePolicy = (dateStr) => {
-    if (!activePolicy || !activePolicy.dateRangeEnabled) return false;
-    if (activePolicy.allowedStartDate && dateStr < activePolicy.allowedStartDate) return true;
-    if (activePolicy.allowedEndDate && dateStr > activePolicy.allowedEndDate) return true;
-    return false;
+  const handleUploadFile = () => {
+    Alert.alert('แนบเอกสาร', 'เลือกวิธีแนบไฟล์', [
+      { text: 'ถ่ายรูป', onPress: () => chooseAndUpload('camera') },
+      { text: 'เลือกรูปจากคลังภาพ', onPress: () => chooseAndUpload('library') },
+      { text: 'เลือกไฟล์ (PDF / Word / รูป)', onPress: () => chooseAndUpload('file') },
+      { text: 'ยกเลิก', style: 'cancel' },
+    ]);
   };
+
 
   const onSelectDate = (dateStr) => {
-    if (isDateOutsidePolicy(dateStr)) {
-      Alert.alert(
-        'ไม่สามารถเลือกวันที่นี้ได้',
-        `ประเภทการลานี้เปิดให้ยื่นได้เฉพาะช่วงวันที่ ${activePolicy.allowedStartDate} ถึง ${activePolicy.allowedEndDate} เท่านั้น หากเกินวันที่กำหนดจะไม่สามารถลาได้`
-      );
-      return;
-    }
-
     if (datePickerTarget === 'start') {
       setStartDate(dateStr);
       // Auto-update End Date using selectedDays
@@ -173,6 +169,7 @@ export default function LeaveRequestScreen({ navigation }) {
 
     leaveStorage.clearAndSync();
     fetchPolicies();
+    fetchHolidaysFromBackend();
 
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -215,25 +212,14 @@ export default function LeaveRequestScreen({ navigation }) {
       return;
     }
 
-    // Check policy date range constraint
-    if (activePolicy && activePolicy.dateRangeEnabled) {
-      if (activePolicy.allowedStartDate && startDate < activePolicy.allowedStartDate) {
-        Alert.alert(
-          'ไม่สามารถยื่นขอลาได้',
-          `วันที่เริ่มต้น (${startDate}) อยู่นอกช่วงเวลาที่องค์กรกำหนด (เปิดให้ลาได้ตั้งแต่วันที่ ${activePolicy.allowedStartDate})`
-        );
-        return;
-      }
-      if (activePolicy.allowedEndDate && endDate > activePolicy.allowedEndDate) {
-        Alert.alert(
-          'ไม่สามารถยื่นขอลาได้',
-          `วันที่สิ้นสุด (${endDate}) เกินวันที่กำหนดให้ลาได้ (สิ้นสุดวันที่ ${activePolicy.allowedEndDate}) หากเกินกำหนดจะไม่สามารถลาได้`
-        );
-        return;
-      }
-    }
-
     const requestedDays = selectedDays;
+
+    // The policy set by HR on the web can require a supporting document
+    const selectedPolicy = leaveStorage.getPolicyForType(selectedType);
+    if (selectedPolicy && selectedPolicy.requireAttachment && !attachedFile) {
+      Alert.alert('ต้องแนบเอกสาร', `ประเภทการลา "${selectedPolicy.typeName}" ต้องแนบเอกสารประกอบการลา (เช่น ใบรับรองแพทย์) กรุณากด "อัปโหลดไฟล์" ก่อนส่งใบลา`);
+      return;
+    }
 
     // Find the leave type balance
     const balance = leaveBalances.find(bal => bal.id === selectedType);
@@ -253,7 +239,7 @@ export default function LeaveRequestScreen({ navigation }) {
     }
 
     try {
-      await leaveStorage.addLeaveRequest(selectedType, startDate, endDate, reason);
+      await leaveStorage.addLeaveRequest(selectedType, startDate, endDate, reason, attachedFile ? attachedFile.url : null);
 
       // 🔔 Push real-time GREEN success notification banner
       notificationStorage.addNotification({
@@ -304,26 +290,20 @@ export default function LeaveRequestScreen({ navigation }) {
             />
           }
         >
-          {/* Company Leave Policies Banner */}
-          <TouchableOpacity
-            testID="btn-open-leave-policies"
-            style={styles.policiesBanner}
-            onPress={() => setIsPoliciesModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.policiesBannerLeft}>
-              <View style={styles.policiesBannerIcon}>
-                <Ionicons name="document-text" size={20} color="#2563EB" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.policiesBannerTitle}>คู่มือและข้อกำหนดการลาของบริษัท</Text>
-                <Text style={styles.policiesBannerSubtitle}>แตะเพื่อดูระเบียบวันลา, เอกสารแนบ และเงื่อนไข</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-          </TouchableOpacity>
+          
 
           {/* Leave Balance Cards */}
+          {leaveBalances.length === 0 && (
+            <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 16 }}>
+              <Ionicons name="document-text-outline" size={44} color="#94A3B8" />
+              <Text style={{ marginTop: 10, fontSize: 14, fontWeight: '700', color: '#475569', textAlign: 'center' }}>
+                ยังไม่มีประเภทการลาที่เปิดให้คุณใช้งาน
+              </Text>
+              <Text style={{ marginTop: 4, fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
+                HR ยังไม่ได้ตั้งนโยบายการลา หรือไม่มีนโยบายที่ตรงกับคุณ กรุณาติดต่อ HR
+              </Text>
+            </View>
+          )}
           {leaveBalances.map((type) => {
             const used = type.total - type.remaining;
             const isExhausted = type.remaining <= 0;
@@ -376,11 +356,6 @@ export default function LeaveRequestScreen({ navigation }) {
                     >
                       {type.label}
                     </Text>
-                    {type.dateRangeEnabled && type.allowedStartDate && type.allowedEndDate ? (
-                      <Text style={{ fontSize: 11, color: isExhausted ? '#94A3B8' : '#D97706', fontWeight: '600', marginTop: 2 }}>
-                        📅 ยื่นลาได้: {type.allowedStartDate} ถึง {type.allowedEndDate}
-                      </Text>
-                    ) : null}
                   </View>
                 </View>
                 <View style={styles.leaveCardBody}>
@@ -417,62 +392,7 @@ export default function LeaveRequestScreen({ navigation }) {
         </ScrollView>
       </Animated.View>
 
-      {/* Company Leave Policies & Rules Modal */}
-      <Modal
-        testID="leave-policies-modal"
-        animationType="slide"
-        transparent={false}
-        visible={isPoliciesModalVisible}
-        onRequestClose={() => setIsPoliciesModalVisible(false)}
-      >
-        <SafeAreaView style={styles.fullScreenModalContainer}>
-          <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
-          <TopNavbar
-            navigation={navigation}
-            onBackPress={() => setIsPoliciesModalVisible(false)}
-            title="ระเบียบและข้อกำหนดการลา"
-            showBack
-          />
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.formScrollContentFull}
-          >
-            <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
-              ข้อบังคับและสิทธิประโยชน์การลาของพนักงาน อ้างอิงตามนโยบายฝ่ายบริหารทรัพยากรบุคคล (HR)
-            </Text>
-
-            {policiesList.map((pol) => (
-              <View key={pol.id} style={styles.policyCard}>
-                <View style={styles.policyHeader}>
-                  <Text style={styles.policyTitle}>{pol.name || pol.leaveType}</Text>
-                  <View style={styles.policyQuotaBadge}>
-                    <Text style={styles.policyQuotaText}>สิทธิ์ {pol.defaultQuota || 0} วัน/ปี</Text>
-                  </View>
-                </View>
-                <Text style={styles.policyDesc}>{pol.description || 'สิทธิการลาตามระเบียบพนักงาน'}</Text>
-                <View style={styles.policyMetaRow}>
-                  <View style={styles.policyMetaItem}>
-                    <Ionicons name="time-outline" size={14} color="#64748B" />
-                    <Text style={styles.policyMetaText}>
-                      แจ้งล่วงหน้า {pol.advanceNoticeDays || 0} วัน
-                    </Text>
-                  </View>
-                  <View style={styles.policyMetaItem}>
-                    <Ionicons
-                      name={pol.requireAttachment ? 'attach' : 'checkmark-circle-outline'}
-                      size={14}
-                      color={pol.requireAttachment ? '#D97706' : '#10B981'}
-                    />
-                    <Text style={[styles.policyMetaText, pol.requireAttachment && { color: '#D97706', fontWeight: '600' }]}>
-                      {pol.requireAttachment ? 'ต้องมีเอกสารแนบ' : 'ไม่ต้องแนบเอกสาร'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      
 
       {/* Leave Request Form Modal (Full Screen) */}
       <Modal
@@ -512,31 +432,6 @@ export default function LeaveRequestScreen({ navigation }) {
                 </View>
               );
             })()}
-
-            {/* Policy Allowed Date Range Banner */}
-            {activePolicy && activePolicy.dateRangeEnabled && activePolicy.allowedStartDate && activePolicy.allowedEndDate && (
-              <View style={{
-                backgroundColor: '#FEF3C7',
-                borderColor: '#F59E0B',
-                borderWidth: 1.5,
-                borderRadius: 16,
-                padding: 14,
-                marginBottom: 16,
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                gap: 10,
-              }}>
-                <Ionicons name="alert-circle" size={22} color="#D97706" style={{ marginTop: 1 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#92400E' }}>
-                    กำหนดช่วงวันเวลาที่อนุญาตให้ลา
-                  </Text>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#B45309', marginTop: 2, lineHeight: 16 }}>
-                    เปิดให้ยื่นได้เฉพาะช่วงวันที่ {activePolicy.allowedStartDate} ถึง {activePolicy.allowedEndDate} เท่านั้น (หากเกินวันที่กำหนดจะไม่สามารถลาได้)
-                  </Text>
-                </View>
-              </View>
-            )}
 
             {/* Start Date */}
             <Text style={styles.formLabel}>วันที่เริ่มต้น</Text>
@@ -598,7 +493,9 @@ export default function LeaveRequestScreen({ navigation }) {
             </View>
 
             {/* Attachment */}
-            <Text style={styles.formLabel}>เอกสารแนบ (ถ้ามี)</Text>
+            <Text style={styles.formLabel}>
+              {leaveStorage.getPolicyForType(selectedType)?.requireAttachment ? 'เอกสารแนบ (จำเป็นต้องแนบ) *' : 'เอกสารแนบ (ถ้ามี)'}
+            </Text>
             <View style={styles.attachmentContainer}>
               {isUploading ? (
                 <View style={styles.uploadingState}>
@@ -607,7 +504,7 @@ export default function LeaveRequestScreen({ navigation }) {
               ) : attachedFile ? (
                 <View style={styles.attachedFileRow}>
                   <Ionicons name="document-attach-outline" size={20} color={colors.success} />
-                  <Text style={styles.attachedFileName}>{attachedFile}</Text>
+                  <Text style={styles.attachedFileName} numberOfLines={1}>{attachedFile.fileName}</Text>
                   <TouchableOpacity onPress={() => setAttachedFile(null)} style={styles.removeAttachmentBtn}>
                     <Ionicons name="close-circle" size={18} color={colors.error} />
                   </TouchableOpacity>
@@ -691,22 +588,23 @@ export default function LeaveRequestScreen({ navigation }) {
                     const d = String(day.getDate()).padStart(2, '0');
                     const dateStr = `${y}-${m}-${d}`;
                     const isDaySelected = dateStr === (datePickerTarget === 'start' ? startDate : endDate);
-                    const isDayDisabled = isDateOutsidePolicy(dateStr);
+                    const holidayName = getPublicHolidayName(day);
+                    const isHoliday = Boolean(holidayName);
 
                     return (
                       <TouchableOpacity
                         key={dateStr}
                         style={[
                           styles.pickerDayCell,
+                          !isDaySelected && isHoliday && { backgroundColor: '#FEE2E2', borderColor: '#EF4444', borderWidth: 1 },
                           isDaySelected && styles.pickerDayCellSelected,
-                          isDayDisabled && { opacity: 0.25, backgroundColor: '#F1F5F9' },
                         ]}
                         onPress={() => onSelectDate(dateStr)}
                       >
                         <Text style={[
                           styles.pickerDayText,
+                          !isDaySelected && isHoliday && { color: '#DC2626', fontWeight: 'bold' },
                           isDaySelected && styles.pickerDayTextSelected,
-                          isDayDisabled && { color: '#94A3B8', textDecorationLine: 'line-through' },
                         ]}>
                           {dayVal}
                         </Text>
@@ -714,6 +612,23 @@ export default function LeaveRequestScreen({ navigation }) {
                     );
                   })}
                 </View>
+
+                {/* Holiday notice if selected date is holiday */}
+                {(() => {
+                  const targetDateStr = datePickerTarget === 'start' ? startDate : endDate;
+                  const holiday = getPublicHolidayName(targetDateStr);
+                  if (holiday) {
+                    return (
+                      <View style={{ backgroundColor: '#FEF2F2', padding: 8, borderRadius: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="calendar" size={16} color="#DC2626" />
+                        <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '700', flex: 1 }}>
+                          วันหยุดราชการ: {holiday}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <TouchableOpacity
                   style={styles.pickerCloseBtn}

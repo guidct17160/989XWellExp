@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import * as Location from 'expo-location';
 import { tryFetchApi } from './apiClient';
 
 const defaultHistory = [];
@@ -57,46 +59,21 @@ let globalState = {
   punchLogs: [],
 };
 
-const checkMidnightAutoClockOut = () => {
+const syncPreviousDayState = () => {
   const now = new Date();
   if (globalState.isCheckedIn && globalState.checkInTime) {
     const checkInDate = new Date(globalState.checkInTime);
     if (checkInDate.toDateString() !== now.toDateString() && checkInDate < now) {
-      const checkInFormatted = checkInDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
-      const dateIsoStr = checkInDate.toISOString().split('T')[0];
-      const formattedDateStr = checkInDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-      const dayThaiStr = checkInDate.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      const durationStr = calculateCorrectedDuration(checkInFormatted, '23:59 น.');
-
-      const autoCloseRecord = {
-        id: 'att_auto_' + checkInDate.getTime(),
-        date: formattedDateStr,
-        dateIso: dateIsoStr,
-        dayThai: dayThaiStr,
-        checkIn: checkInFormatted,
-        checkOut: '23:59 น.',
-        duration: durationStr,
-        isIncomplete: true,
-        isComplete: false,
-        isAutoClosed: true,
-        status: 'ไม่ลงเวลาออกงาน (ตัดอัตโนมัติตอนเที่ยงคืน)',
-        statusColor: '#EF4444',
-      };
-
-      const currentHistory = globalState.history || [];
-      const exists = currentHistory.some((h) => h.dateIso === dateIsoStr || h.id === autoCloseRecord.id);
-      const newHistory = exists ? currentHistory : [autoCloseRecord, ...currentHistory];
-
+      // Previous day check-in was auto-closed on backend database
       globalState = {
         ...globalState,
         isCheckedIn: false,
         checkInTime: null,
         checkOutTime: null,
-        history: newHistory,
       };
-
       saveState();
       listeners.forEach((l) => l(globalState));
+      syncWithBackend();
     }
   }
 };
@@ -116,7 +93,7 @@ const loadLocalState = () => {
           history: Array.isArray(parsed.history) ? parsed.history : [],
           punchLogs: Array.isArray(parsed.punchLogs) ? parsed.punchLogs : [],
         };
-        checkMidnightAutoClockOut();
+        syncPreviousDayState();
         return;
       }
     }
@@ -131,21 +108,98 @@ const loadLocalState = () => {
 };
 loadLocalState();
 
-// Async sync with backend API database
+// Parse "HH:mm น." (as written by the backend) into a Date on the given ISO day
+const parseTimeOnDate = (timeStr, dateIso) => {
+  if (!timeStr || !dateIso) return null;
+  const m = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const [y, mo, d] = String(dateIso).slice(0, 10).split('-').map(Number);
+  const dt = new Date(y, (mo || 1) - 1, d || 1, parseInt(m[1], 10), parseInt(m[2], 10), 0, 0);
+  return isNaN(dt.getTime()) ? null : dt;
+};
+
+// Map a backend attendance row { id, dateIso, checkIn, checkOut, duration, status, statusColor, ... }
+// to the display shape the screens expect (date / dayThai / isComplete / isLate ...)
+const normalizeServerAttendance = (r) => {
+  const dateIso = r.dateIso ? String(r.dateIso).slice(0, 10) : null;
+  let dateObj = null;
+  if (dateIso) {
+    const [y, mo, d] = dateIso.split('-').map(Number);
+    dateObj = new Date(y, (mo || 1) - 1, d || 1);
+  }
+  const checkOut = r.checkOut && r.checkOut !== 'กำลังทำงาน...' ? r.checkOut : null;
+  const rawStatus = r.status || '';
+  const isLate = rawStatus === 'สาย' || rawStatus.includes('เข้างานสาย') || !!r.isLate;
+  // A past-day record that never got a clock-out is incomplete (backend may leave it open)
+  const staleOpen = !checkOut && !!dateIso && dateIso < new Date().toISOString().split('T')[0];
+  const isIncomplete = !!r.isIncomplete || rawStatus.includes('ไม่ลงเวลา') || staleOpen;
+  let status = staleOpen && !rawStatus.includes('ไม่ลงเวลา') ? 'ไม่ลงเวลาออกงาน' : rawStatus;
+  let statusColor = staleOpen ? '#EF4444' : r.statusColor;
+  if (!isIncomplete) {
+    if (checkOut) {
+      // late first; only an on-time record is checked for the worked hours (under 9 hours = not enough)
+      const m = String(r.duration || '').match(/(\d+):(\d+)/);
+      const workedSec = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 : null;
+      const shortHours = workedSec !== null && workedSec > 0 && workedSec < 9 * 3600;
+      status = isLate ? 'เข้างานสาย' : shortHours ? 'ทำงานไม่ครบเวลา' : 'ลงเวลาเข้า-ออกครบถ้วน';
+    } else {
+      status = isLate ? 'เข้างานสาย (กำลังทำงาน)' : 'เข้างานตรงเวลา (กำลังทำงาน)';
+    }
+    statusColor = isLate ? '#EF4444' : status === 'ทำงานไม่ครบเวลา' ? '#F5A623' : '#27AE60';
+  }
+  return {
+    ...r,
+    dateIso,
+    date: dateObj ? dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : r.date,
+    dayThai: dateObj ? dateObj.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : r.dayThai,
+    checkIn: r.checkIn || '--:--',
+    checkOut,
+    duration: r.duration || '00:00:00 ชม.',
+    status,
+    statusColor,
+    isLate,
+    isIncomplete,
+    isComplete: !!checkOut && !isIncomplete,
+    isApproved: !!r.isApproved,
+    isCorrected: !!r.isCorrected && !r.isApproved,
+  };
+};
+
+// Async sync with backend API database (server is the source of truth for history)
 const syncWithBackend = async () => {
   try {
     const res = await tryFetchApi('/attendance/history');
     if (res && res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.history)) {
-        const mergedHistory = [...data.history];
-        (globalState.history || []).forEach((localItem) => {
-          if (localItem && !mergedHistory.some((b) => b.id === localItem.id || b.dateIso === localItem.dateIso)) {
-            mergedHistory.push(localItem);
+        const serverHistory = data.history.map(normalizeServerAttendance);
+        globalState.history = serverHistory;
+
+        // Restore today's clocked-in state from the server (e.g. new device / cleared storage)
+        const todayIso = new Date().toISOString().split('T')[0];
+        const todayRecords = serverHistory.filter((h) => h.dateIso === todayIso);
+        if (todayRecords.length > 0) {
+          const openRecord = todayRecords.find((h) => h.checkIn && h.checkIn !== '--:--' && !h.checkOut);
+          if (openRecord) {
+            const inDate = parseTimeOnDate(openRecord.checkIn, todayIso);
+            if (inDate && !globalState.isCheckedIn) {
+              globalState.isCheckedIn = true;
+              globalState.checkInTime = inDate;
+              globalState.checkOutTime = null;
+            }
+          } else if (globalState.isCheckedIn) {
+            globalState.isCheckedIn = false;
+            const outDate = parseTimeOnDate(todayRecords[0].checkOut, todayIso);
+            if (outDate) globalState.checkOutTime = outDate;
           }
-        });
-        globalState.history = mergedHistory;
-        checkMidnightAutoClockOut();
+        } else if (globalState.isCheckedIn) {
+          // Server has no record for today -> stale local "checked in" flag (previous day / other account)
+          globalState.isCheckedIn = false;
+          globalState.checkInTime = null;
+          globalState.checkOutTime = null;
+        }
+
+        syncPreviousDayState();
         saveState();
         listeners.forEach((l) => l(globalState));
       }
@@ -155,13 +209,6 @@ const syncWithBackend = async () => {
   }
 };
 syncWithBackend();
-
-// Check for midnight auto-cutoff every 15 seconds
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    checkMidnightAutoClockOut();
-  }, 15000);
-}
 
 const listeners = new Set();
 
@@ -175,9 +222,90 @@ const saveState = () => {
   }
 };
 
+// Real device position (expo-location on native, browser geolocation on web). Resolves null when
+// unavailable or denied — never fabricates coordinates, so the backend geofence check is not
+// bypassed by a fake HQ position.
+const getCurrentPosition = async () => {
+  try {
+    if (Platform.OS !== 'web') {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return null;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+    }
+    return await new Promise((resolve) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+      );
+    });
+  } catch (e) {
+    return null;
+  }
+};
+
 export const attendanceStorage = {
+  /**
+   * POST /attendance/clock-in | /attendance/clock-out. Throws if the server did not accept the punch,
+   * so callers never record a punch locally that the backend does not have.
+   * @param {'clock-in'|'clock-out'} kind
+   * @param {{latitude?:number,longitude?:number,locationName?:string,photoUrl?:string}} [extra]
+   */
+  async punch(kind, extra = {}) {
+    let { latitude, longitude } = extra;
+    if (latitude === undefined || longitude === undefined) {
+      const pos = await getCurrentPosition();
+      latitude = pos ? pos.latitude : null;
+      longitude = pos ? pos.longitude : null;
+    }
+    const payload = { latitude, longitude };
+    if (extra.locationId) payload.locationId = extra.locationId;
+    if (extra.locationName) payload.locationName = extra.locationName;
+    if (kind === 'clock-in' && extra.photoUrl) payload.photoUrl = extra.photoUrl;
+
+    const res = await tryFetchApi(`/attendance/${kind}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!res) {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ระบบยังไม่ได้บันทึกเวลา กรุณาลองใหม่อีกครั้ง');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'ไม่สามารถบันทึกเวลาได้ กรุณาลองใหม่อีกครั้ง');
+    }
+    return data.attendance || null;
+  },
+
+  /** Current device position { latitude, longitude } or null (permission denied / GPS off) */
+  getPosition() {
+    return getCurrentPosition();
+  },
+
+  /**
+   * Work locations this employee may punch at, nearest first (GET /attendance/locations).
+   * `required` is false while no location has been set up, so punching stays unrestricted.
+   */
+  async fetchWorkLocations(position) {
+    const q = position ? `?latitude=${position.latitude}&longitude=${position.longitude}` : '';
+    const res = await tryFetchApi(`/attendance/locations${q}`);
+    if (!res) throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || 'ไม่สามารถโหลดสถานที่ลงเวลาได้');
+    return { required: !!data.required, locations: data.locations || [] };
+  },
+
+  /** Re-fetch attendance history / today's state from the backend */
+  refresh() {
+    return syncWithBackend();
+  },
   getState() {
-    checkMidnightAutoClockOut();
+    syncPreviousDayState();
     return { ...globalState };
   },
   setState(newState) {
@@ -215,17 +343,12 @@ export const attendanceStorage = {
       isLate: isLate,
       status: isLate ? 'สาย' : 'ปกติ',
       statusColor: isLate ? '#EF4444' : '#10B981',
-      latitude: latitude || 13.7563,
-      longitude: longitude || 100.5018,
-      locationName: locationName || 'อาคารสำนักงานใหญ่ (HQ)',
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      locationName: locationName || 'ไม่ระบุพิกัด',
     };
 
-    try {
-      await tryFetchApi('/attendance/clock-in', {
-        method: 'POST',
-        body: JSON.stringify({ latitude, longitude, locationName }),
-      });
-    } catch (e) { }
+    await this.punch('clock-in', { latitude, longitude, locationName });
 
     this.addPunchLog('check_in', nowTime, formattedDateStr, locationName);
 
@@ -243,12 +366,7 @@ export const attendanceStorage = {
     const nowTime = nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
     const dateIsoStr = nowObj.toISOString().split('T')[0];
 
-    try {
-      await tryFetchApi('/attendance/clock-out', {
-        method: 'POST',
-        body: JSON.stringify({ latitude, longitude, locationName }),
-      });
-    } catch (e) { }
+    await this.punch('clock-out', { latitude, longitude, locationName });
 
     this.addPunchLog('check_out', nowTime, nowObj.toLocaleDateString('th-TH'), locationName);
 

@@ -18,8 +18,9 @@ export default function WebResponsiveWrapper({ children }) {
             width: 100%;
             margin: 0;
             padding: 0;
-            background-color: #0B0D13 !important;
-            overflow-x: hidden;
+            background-color: #F8FAFC !important;
+            overflow: hidden;
+            overscroll-behavior: none;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
           }
           /* Custom scrollbar for web */

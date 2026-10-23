@@ -40,6 +40,12 @@ export default function LoginScreen({ navigation }) {
   const passwordInputRef = useRef(null);
 
   React.useEffect(() => {
+    // If user is already authenticated and has PIN configured, go directly to PIN unlock
+    if (authService.isLoggedIn() && authService.hasPin()) {
+      navigation?.replace('PinLock');
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -87,28 +93,19 @@ export default function LoginScreen({ navigation }) {
       const hasPin = res.user?.hasPin || authService.hasPin();
 
       if (!hasPin) {
+        // As requested: after username/password login, prompt to set PIN
         Alert.alert(
-          'เข้าสู่ระบบสำเร็จ',
-          `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser}\n\nคุณต้องการตั้งรหัส PIN 6 หลักเพื่อเข้าใช้งานอย่างสะดวกรวดเร็วในครั้งถัดไปหรือไม่?`,
+          'เข้าสู่ระบบสำเร็จ 🎉',
+          `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser}\n\nกรุณาตั้งรหัส PIN 6 หลัก เพื่อใช้เข้าใช้งานแอปในครั้งถัดไป`,
           [
             {
-              text: 'ไว้ภายหลัง',
-              style: 'cancel',
-              onPress: () => navigation?.replace('MainTabs'),
-            },
-            {
-              text: 'ตั้งค่า PIN ทันที',
+              text: 'ตั้งรหัส PIN ทันที',
               onPress: () => navigation?.replace('SetPin', { fromSetupPrompt: true, mode: 'setup' }),
             },
           ]
         );
       } else {
-        Alert.alert('เข้าสู่ระบบสำเร็จ', `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser} (${res.user?.role || 'User'})`, [
-          {
-            text: 'เข้าสู่แอปพลิเคชัน',
-            onPress: () => navigation?.replace('MainTabs'),
-          },
-        ]);
+        navigation?.replace('MainTabs');
       }
     } catch (err) {
       setLoading(false);
@@ -123,16 +120,14 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView testID="screen-login" className="flex-1 bg-white" style={styles.safeArea}>
+    <SafeAreaView testID="screen-login" style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <KeyboardAvoidingView
         style={styles.flex}
-        className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { justifyContent: 'center', alignItems: 'center', minHeight: '100%' }]}
-          className="flex-grow px-6 py-8"
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -143,39 +138,35 @@ export default function LoginScreen({ navigation }) {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
                 width: '100%',
-                maxWidth: 420,
+                maxWidth: 400,
                 alignSelf: 'center',
               },
             ]}
-            className="w-full justify-center items-stretch"
           >
             {/* Header with WellX989 Branding */}
-            <View style={styles.headerSection} className="mb-6 items-center justify-center">
-              <View className="items-center justify-center">
-                <Image
-                  source={{ uri: logoUri }}
-                  style={{ width: 120, height: 80 }}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text testID="login-header-title" style={styles.headerTitle} className="text-2xl font-extrabold text-slate-800 mb-1 text-center">Login</Text>
-              <Text testID="login-header-subtitle" style={styles.headerSubtitle} className="text-xs text-slate-500 text-center">
+            <View style={styles.headerSection}>
+              <Image
+                source={{ uri: logoUri }}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text testID="login-header-title" style={styles.headerTitle}>Login</Text>
+              <Text testID="login-header-subtitle" style={styles.headerSubtitle}>
                 Welcome to WellX989 2 in 1 Application
               </Text>
             </View>
 
             {/* Error Alert Banner (Shown in Web & App) */}
             {errorMsg ? (
-              <View style={styles.errorBanner} className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex-row items-center">
+              <View style={styles.errorBanner}>
                 <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginRight: 8 }} />
-                <Text style={styles.errorText} className="text-red-700 text-xs font-bold flex-1">
+                <Text style={styles.errorText}>
                   {errorMsg}
                 </Text>
               </View>
             ) : null}
 
             {/* อีเมล (Email) */}
-            <Text testID="login-employee-id-label" style={styles.label} className="text-sm font-semibold text-slate-700 mb-2"></Text>
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => employeeInputRef.current?.focus()}
@@ -183,20 +174,17 @@ export default function LoginScreen({ navigation }) {
                 styles.inputWrapper,
                 employeeFocused && styles.inputWrapperFocused,
               ]}
-              className="flex-row items-center border border-slate-200 rounded-xl px-4 bg-slate-50 mb-5"
             >
               <Ionicons
                 name="mail-outline"
                 size={18}
                 color={employeeFocused ? colors.primary : colors.textSecondary}
                 style={styles.inputIcon}
-                className="mr-3"
               />
               <TextInput
                 ref={employeeInputRef}
                 testID="login-employee-id-input"
                 style={styles.input}
-                className="flex-1 text-slate-900"
                 value={employeeId}
                 onChangeText={setEmployeeId}
                 placeholder="Username"
@@ -215,7 +203,6 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
 
             {/* รหัสผ่าน */}
-            <Text testID="login-password-label" style={styles.label} className="text-sm font-semibold text-slate-700 mb-2"></Text>
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => passwordInputRef.current?.focus()}
@@ -223,20 +210,17 @@ export default function LoginScreen({ navigation }) {
                 styles.inputWrapper,
                 passwordFocused && styles.inputWrapperFocused,
               ]}
-              className="flex-row items-center border border-slate-200 rounded-xl px-4 bg-slate-50 mb-4"
             >
               <Ionicons
                 name="lock-closed-outline"
                 size={18}
                 color={passwordFocused ? colors.primary : colors.textSecondary}
                 style={styles.inputIcon}
-                className="mr-3"
               />
               <TextInput
                 ref={passwordInputRef}
                 testID="login-password-input"
                 style={styles.input}
-                className="flex-1 text-slate-900"
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
@@ -264,12 +248,12 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
 
             {/* ลืมรหัสผ่าน (ชิดขวา) */}
-            <View style={[styles.row, { justifyContent: 'flex-end' }]} className="flex-row items-center justify-end mb-6">
+            <View style={styles.row}>
               <TouchableOpacity
                 testID="login-forgot-password-link"
                 onPress={() => navigation?.navigate('ForgotPassword')}
               >
-                <Text style={styles.link} className="text-sm font-semibold text-primary">Forgot Password?</Text>
+                <Text style={styles.link}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
@@ -277,7 +261,6 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               testID="login-submit-btn"
               style={styles.loginButton}
-              className="bg-primary rounded-xl py-3.5 items-center justify-center mb-6"
               onPress={handleLogin}
               disabled={loading}
               activeOpacity={0.85}
@@ -285,22 +268,21 @@ export default function LoginScreen({ navigation }) {
               {loading ? (
                 <ActivityIndicator color={colors.buttonPrimaryText} />
               ) : (
-                <Text style={styles.loginButtonText} className="text-white font-bold text-base">Login</Text>
+                <Text style={styles.loginButtonText}>Login</Text>
               )}
             </TouchableOpacity>
 
             {/* เส้นคั่น "หรือ" */}
-            <View style={styles.dividerRow} className="flex-row items-center mb-6">
-              <View style={styles.dividerLine} className="flex-1 h-px bg-slate-200" />
-              <Text style={styles.dividerText} className="px-4 text-xs text-slate-400 font-medium">or continue with</Text>
-              <View style={styles.dividerLine} className="flex-1 h-px bg-slate-200" />
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
             </View>
 
             {/* ปุ่ม Face ID */}
             <TouchableOpacity
               testID="login-face-id-btn"
-              style={styles.faceIdButton}
-              className="flex-row items-center justify-center border border-primary rounded-xl py-3.5 mb-6"
+              style={[styles.faceIdButton, { marginBottom: 12 }]}
               onPress={handleFaceId}
             >
               <Ionicons
@@ -309,14 +291,13 @@ export default function LoginScreen({ navigation }) {
                 color={colors.faceIdText}
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.faceIdText} className="text-primary font-semibold text-base">Log in with Face ID</Text>
+              <Text style={styles.faceIdText}>Log in with Face ID</Text>
             </TouchableOpacity>
 
             {/* ปุ่มเข้าสู่ระบบด้วยรหัส PIN */}
             <TouchableOpacity
               testID="login-pin-btn"
-              style={[styles.faceIdButton, { borderColor: '#0074C4', backgroundColor: '#F0F9FF', marginBottom: 20 }]}
-              className="flex-row items-center justify-center border rounded-xl py-3.5"
+              style={[styles.faceIdButton, { borderColor: '#0074C4', backgroundColor: '#F0F9FF' }]}
               onPress={() => navigation?.navigate('PinLock')}
             >
               <Ionicons
@@ -325,7 +306,7 @@ export default function LoginScreen({ navigation }) {
                 color="#0074C4"
                 style={{ marginRight: 8 }}
               />
-              <Text style={[styles.faceIdText, { color: '#0074C4', fontWeight: '700' }]} className="font-bold text-base">
+              <Text style={[styles.faceIdText, { color: '#0074C4', fontWeight: '700' }]}>
                 เข้าสู่ระบบด้วยรหัส PIN (6 หลัก)
               </Text>
             </TouchableOpacity>
@@ -349,28 +330,34 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
   },
   container: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    width: '100%',
   },
   headerSection: {
-    marginTop: 70,
-    marginBottom: 24,
+    marginBottom: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  logo: {
+    width: 104,
+    height: 70,
+  },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: colors.title,
-    marginBottom: 6,
-    marginTop: 30,
+    marginTop: 14,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    paddingTop: 8,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   label: {
     fontSize: 13,
@@ -387,8 +374,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     borderRadius: 12,
     paddingHorizontal: 14,
-    height: 52,
+    height: 50,
     paddingVertical: 0,
+    marginBottom: 14,
   },
   inputWrapperFocused: {
     borderColor: colors.inputBorderFocus,
@@ -413,10 +401,10 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: 14,
-    marginBottom: 24,
+    marginTop: -2,
+    marginBottom: 20,
   },
   rememberRow: {
     flexDirection: 'row',
@@ -447,8 +435,8 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     backgroundColor: colors.buttonPrimary,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primary,
@@ -465,7 +453,7 @@ const styles = StyleSheet.create({
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 18,
   },
   dividerLine: {
     flex: 1,
@@ -481,8 +469,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderWidth: 1.5,
     borderColor: colors.faceIdBorder,
-    borderRadius: 14,
-    paddingVertical: 15,
+    borderRadius: 12,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -521,7 +509,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   errorText: {
     color: '#DC2626',

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { getCandidateUrls, tryFetchWithCandidates } from './apiUtils';
+import { getCandidateUrls, tryFetchWithCandidates, describeLastAttempts } from './apiUtils';
 
 // MED-6 FIX: getCandidateUrls and tryFetchApi now use shared apiUtils.js
 
@@ -31,6 +31,7 @@ const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 let currentUser = { ...DEFAULT_USER };
 let loggedIn = false;
 let currentToken = null;
+let currentRefreshToken = null;
 let accessTokenIssuedAt = Date.now();
 let refreshTokenIssuedAt = Date.now();
 
@@ -49,11 +50,13 @@ try {
           console.log('Refresh Token expired after 30 days. User must re-login.');
           loggedIn = false;
           currentToken = null;
+          currentRefreshToken = null;
           window.localStorage.removeItem('wellx989_session');
         } else {
           currentUser = { ...DEFAULT_USER, ...parsed.user };
           loggedIn = true;
           currentToken = parsed.token || parsed.accessToken || null;
+          currentRefreshToken = parsed.refreshToken || null;
           refreshTokenIssuedAt = refIssued;
           
           // Auto-refresh Access Token if older than 15 minutes
@@ -80,6 +83,7 @@ const saveSession = () => {
         user: currentUser,
         token: currentToken,
         accessToken: currentToken,
+        refreshToken: currentRefreshToken,
         accessTokenIssuedAt,
         refreshTokenIssuedAt,
         tokenConfig: {
@@ -102,12 +106,43 @@ export const authService = {
     return currentToken;
   },
 
-  setUser(userObj, token = null) {
+  getRefreshToken() {
+    return currentRefreshToken;
+  },
+
+  async refreshAccessToken() {
+    if (!currentRefreshToken) return null;
+    try {
+      const response = await tryFetchApi('/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: currentRefreshToken }),
+      });
+      if (response && response.ok) {
+        const data = await response.json();
+        const newToken = data.accessToken || data.token;
+        if (newToken) {
+          currentToken = newToken;
+          accessTokenIssuedAt = Date.now();
+          saveSession();
+          return newToken;
+        }
+      }
+    } catch (e) {
+      console.log('Error refreshing token:', e.message);
+    }
+    return null;
+  },
+
+  setUser(userObj, token = null, refreshToken = null) {
     if (userObj && userObj.name) {
       userObj.name = userObj.name.replace(/\s*\([^)]*\)/g, '').trim();
     }
     if (token) {
       currentToken = token;
+    }
+    if (refreshToken) {
+      currentRefreshToken = refreshToken;
     }
     const now = Date.now();
     currentUser = { ...currentUser, ...userObj };
@@ -124,9 +159,16 @@ export const authService = {
         require('./leaveStorage').leaveStorage.clearAndSync();
         require('./notificationStorage').notificationStorage.clearAndSync();
         require('./pointsStorage').pointsStorage.clearAndSync();
-        require('./otStorage').otStorage.clearAndSync();
       } catch (e) {}
     }, 0);
+  },
+
+  // Update only the profile picture of the signed-in user (after the server accepted it),
+  // without touching the token timers or re-syncing the other storages like setUser does
+  setAvatar(avatarUrl) {
+    currentUser = { ...currentUser, avatarUrl };
+    saveSession();
+    listeners.forEach((l) => l(currentUser));
   },
 
   isLoggedIn() {
@@ -153,30 +195,50 @@ export const authService = {
 
   hasPin() {
     if (!loggedIn || !currentUser) return false;
-    if (currentUser.hasPin !== undefined) return Boolean(currentUser.hasPin);
+    // Check local PIN storage flag or hash
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const id = currentUser.id || currentUser.code || currentUser.username || 'current';
-        return window.localStorage.getItem(`wellx989_pin_enabled_${id}`) === 'true';
+        const isEnabledLocally = window.localStorage.getItem(`wellx989_pin_enabled_${id}`) === 'true';
+        const hasLocalPinHash = Boolean(window.localStorage.getItem(`wellx989_local_pin_${id}`));
+        if (isEnabledLocally || hasLocalPinHash) return true;
       }
     } catch (e) {}
+    if (currentUser.hasPin !== undefined) return Boolean(currentUser.hasPin);
     return false;
   },
 
   logout() {
-    // 1. Save all current storage states to user-scoped localStorage keys before clearing session
+    const prevUserId = currentUser?.id || currentUser?.code || currentUser?.username;
+    const token = currentToken;
+
+    // 1. Notify backend to clear pinHash on database
+    if (prevUserId) {
+      tryFetchApi('/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ userId: prevUserId }),
+      }).catch(() => {});
+    }
+
+    // 2. Clear all local PIN storage and flags
+    try {
+      require('./pinService').pinService.clearPin(prevUserId);
+    } catch (e) {}
+
+    // 3. Save all current storage states to user-scoped localStorage keys before clearing session
     try {
       require('./attendanceStorage').attendanceStorage.getState();
       require('./leaveStorage').leaveStorage.getState();
       require('./notificationStorage').notificationStorage.getState();
       require('./pointsStorage').pointsStorage.getState();
-      require('./otStorage').otStorage.getState();
     } catch (e) {}
 
-    // 2. Reset currentUser and remove active session
-    currentUser = { ...DEFAULT_USER };
+    // 4. Reset currentUser and remove active session
+    currentUser = { ...DEFAULT_USER, hasPin: false };
     loggedIn = false;
     currentToken = null;
+    currentRefreshToken = null;
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem('wellx989_session');
@@ -184,14 +246,13 @@ export const authService = {
     } catch (e) {}
     listeners.forEach((l) => l(currentUser));
 
-    // 3. Re-sync storage modules for default/guest session (lazy to avoid circular require)
+    // 5. Re-sync storage modules for default/guest session
     setTimeout(() => {
       try {
         require('./attendanceStorage').attendanceStorage.clearAndSync();
         require('./leaveStorage').leaveStorage.clearAndSync();
         require('./notificationStorage').notificationStorage.clearAndSync();
         require('./pointsStorage').pointsStorage.clearAndSync();
-        require('./otStorage').otStorage.clearAndSync();
       } catch (e) {}
     }, 0);
   },
@@ -228,7 +289,7 @@ export const authService = {
       if (response) {
         const data = await response.json();
         if (response.ok && data.success && data.user) {
-          this.setUser(data.user, data.token || data.accessToken);
+          this.setUser(data.user, data.token || data.accessToken, data.refreshToken);
           return data;
         } else {
           // Backend responded with an error (e.g. Wrong Password, User Not Found, Admin Restriction)
@@ -236,32 +297,11 @@ export const authService = {
         }
       }
 
-      // Offline / Network Error Fallback (ONLY when backend server cannot be reached)
-      const uLower = cleanUsername.toLowerCase();
-
-      // Mobile App Access Control: Admins CANNOT log in to Mobile App
-      if (uLower === 'admin' || uLower === 'hr_admin' || uLower === 'sys_admin') {
-        throw new Error('บัญชีนี้เป็นผู้ดูแลระบบ (Admin) สามารถเข้าใช้งานได้เฉพาะบน Web Admin เท่านั้น');
-      }
-
-      if (uLower === 'demo' && (cleanPassword === 'demo' || cleanPassword === '1234')) {
-        const demoUser = {
-          id: 'EMP-DEMO',
-          code: 'demo',
-          username: 'demo',
-          name: 'พนักงานทดสอบ (Demo)',
-          email: 'demo@wellx989.com',
-          role: 'Employee',
-          department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-          position: 'Mobile Developer',
-          avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        };
-        const demoToken = 'wellx989-jwt-demo-001';
-        this.setUser(demoUser, demoToken);
-        return { success: true, message: 'เข้าสู่ระบบสำเร็จ (Demo)', user: demoUser, token: demoToken };
-      }
-
-      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบว่าเซิร์ฟเวอร์เปิดอยู่');
+      // Connection failed - no offline bypass allowed, enforce real server connection
+      const tried = describeLastAttempts();
+      throw new Error(
+        'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบว่าเซิร์ฟเวอร์เปิดอยู่' + (tried ? `\n\nลองเชื่อมต่อที่:\n${tried}` : '')
+      );
     } catch (error) {
       throw error;
     }

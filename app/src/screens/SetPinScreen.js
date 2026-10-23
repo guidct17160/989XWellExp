@@ -17,6 +17,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { authService } from '../services/authService';
 import { pinService } from '../services/pinService';
+import { navigationHistory } from '../services/navigationHistory';
+
+const KEYPAD_LETTERS = {
+  1: '',
+  2: 'ABC',
+  3: 'DEF',
+  4: 'GHI',
+  5: 'JKL',
+  6: 'MNO',
+  7: 'PQRS',
+  8: 'TUV',
+  9: 'WXYZ',
+  0: '+',
+};
 
 export default function SetPinScreen({ navigation, route }) {
   const isSetupPrompt = route?.params?.fromSetupPrompt || false;
@@ -75,7 +89,6 @@ export default function SetPinScreen({ navigation, route }) {
     if (step === 'current') {
       setCurrentPin(nextCode);
       if (nextCode.length === 6) {
-        // Move to 'new' step
         setTimeout(() => {
           setStep('new');
         }, 200);
@@ -83,7 +96,6 @@ export default function SetPinScreen({ navigation, route }) {
     } else if (step === 'new') {
       setNewPin(nextCode);
       if (nextCode.length === 6) {
-        // Move to 'confirm' step
         setTimeout(() => {
           setStep('confirm');
         }, 200);
@@ -91,7 +103,6 @@ export default function SetPinScreen({ navigation, route }) {
     } else if (step === 'confirm') {
       setConfirmPin(nextCode);
       if (nextCode.length === 6) {
-        // Evaluate confirmation
         setTimeout(() => {
           handleSubmit(newPin, nextCode);
         }, 250);
@@ -133,7 +144,7 @@ export default function SetPinScreen({ navigation, route }) {
           {
             text: 'ตกลง',
             onPress: () => {
-              if (isSetupPrompt) {
+              if (isSetupPrompt || initialMode === 'setup' || !navigation.canGoBack()) {
                 navigation.replace('MainTabs');
               } else {
                 navigation.goBack();
@@ -148,7 +159,6 @@ export default function SetPinScreen({ navigation, route }) {
       const msg = err.message || 'เกิดข้อผิดพลาดในการตั้งรหัส PIN';
       setErrorMsg(msg);
       if (step === 'confirm' && initialMode === 'change') {
-        // If current PIN was rejected by backend, reset to current step
         setConfirmPin('');
         setNewPin('');
         setCurrentPin('');
@@ -175,9 +185,9 @@ export default function SetPinScreen({ navigation, route }) {
 
   return (
     <SafeAreaView testID="screen-set-pin" style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Top Bar */}
+      {/* Modern Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity
           testID="btn-back-set-pin"
@@ -192,11 +202,11 @@ export default function SetPinScreen({ navigation, route }) {
             } else if (isSetupPrompt) {
               navigation.replace('MainTabs');
             } else {
-              navigation.goBack();
+              navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'Profile' });
             }
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
+          <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>
           {initialMode === 'change' ? 'เปลี่ยนรหัส PIN' : 'ตั้งรหัส PIN บัญชี'}
@@ -213,10 +223,25 @@ export default function SetPinScreen({ navigation, route }) {
           },
         ]}
       >
-        {/* Shield Icon Badge */}
-        <View style={styles.iconContainer}>
+        {/* Step Progress Pill Indicator */}
+        <View style={styles.stepBadgeContainer}>
+          <View style={[styles.stepPill, step === 'current' || step === 'new' ? styles.stepPillActive : styles.stepPillInactive]}>
+            <Text style={[styles.stepPillText, step === 'current' || step === 'new' ? styles.stepPillTextActive : styles.stepPillTextInactive]}>
+              {initialMode === 'change' ? '1. PIN ใหม่' : '1. ตั้งรหัส PIN'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={12} color="#94A3B8" style={{ marginHorizontal: 4 }} />
+          <View style={[styles.stepPill, step === 'confirm' ? styles.stepPillActive : styles.stepPillInactive]}>
+            <Text style={[styles.stepPillText, step === 'confirm' ? styles.stepPillTextActive : styles.stepPillTextInactive]}>
+              2. ยืนยันรหัส PIN
+            </Text>
+          </View>
+        </View>
+
+        {/* Shield Icon Badge with Glowing Aura */}
+        <View style={styles.iconOuterRing}>
           <LinearGradient
-            colors={[colors.gradientStart, colors.primary]}
+            colors={['#7C3AED', '#3B82F6']}
             style={styles.iconGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -229,7 +254,7 @@ export default function SetPinScreen({ navigation, route }) {
         <Text testID="txt-set-pin-title" style={styles.title}>{getStepTitle()}</Text>
         <Text style={styles.subtitle}>{getStepSubtitle()}</Text>
 
-        {/* 6 PIN Indicator Dots */}
+        {/* 6 Modern PIN Indicator Dots */}
         <View style={styles.dotsRow}>
           {[0, 1, 2, 3, 4, 5].map((index) => {
             const isFilled = index < activeCode.length;
@@ -237,11 +262,19 @@ export default function SetPinScreen({ navigation, route }) {
               <View
                 key={index}
                 style={[
-                  styles.dot,
-                  isFilled ? styles.dotFilled : styles.dotEmpty,
-                  errorMsg ? styles.dotError : null,
+                  styles.dotContainer,
+                  errorMsg ? styles.dotContainerError : isFilled ? styles.dotContainerFilled : styles.dotContainerEmpty,
                 ]}
-              />
+              >
+                {isFilled && !errorMsg && (
+                  <LinearGradient
+                    colors={['#7C3AED', '#3B82F6']}
+                    style={styles.dotFilledCore}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                )}
+              </View>
             );
           })}
         </View>
@@ -249,20 +282,20 @@ export default function SetPinScreen({ navigation, route }) {
         {/* Error Message Display */}
         {errorMsg ? (
           <View style={styles.errorBox}>
-            <Ionicons name="alert-circle" size={16} color="#EF4444" style={{ marginRight: 6 }} />
+            <Ionicons name="alert-circle" size={16} color="#DC2626" style={{ marginRight: 6 }} />
             <Text testID="txt-pin-error" style={styles.errorText}>{errorMsg}</Text>
           </View>
         ) : (
-          <View style={{ height: 26 }} />
+          <View style={{ height: 28 }} />
         )}
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color="#7C3AED" />
             <Text style={styles.loadingText}>กำลังบันทึกรหัส PIN...</Text>
           </View>
         ) : (
-          /* Numeric Keypad */
+          /* Modern Fintech Keypad */
           <View style={styles.keypad}>
             {[
               [1, 2, 3],
@@ -276,9 +309,12 @@ export default function SetPinScreen({ navigation, route }) {
                     testID={`keypad-btn-${num}`}
                     style={styles.keypadBtn}
                     onPress={() => handleKeyPress(num)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.65}
                   >
                     <Text style={styles.keypadNum}>{num}</Text>
+                    {KEYPAD_LETTERS[num] ? (
+                      <Text style={styles.keypadLetter}>{KEYPAD_LETTERS[num]}</Text>
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -295,8 +331,11 @@ export default function SetPinScreen({ navigation, route }) {
                   else setConfirmPin('');
                   setErrorMsg('');
                 }}
-                activeOpacity={0.7}
+                activeOpacity={0.65}
               >
+                <View style={styles.actionIconCircle}>
+                  <Ionicons name="refresh-outline" size={19} color="#64748B" />
+                </View>
                 <Text style={styles.actionText}>ล้าง</Text>
               </TouchableOpacity>
 
@@ -305,9 +344,10 @@ export default function SetPinScreen({ navigation, route }) {
                 testID="keypad-btn-0"
                 style={styles.keypadBtn}
                 onPress={() => handleKeyPress(0)}
-                activeOpacity={0.7}
+                activeOpacity={0.65}
               >
                 <Text style={styles.keypadNum}>0</Text>
+                <Text style={styles.keypadLetter}>+</Text>
               </TouchableOpacity>
 
               {/* Backspace Button */}
@@ -315,9 +355,12 @@ export default function SetPinScreen({ navigation, route }) {
                 testID="keypad-btn-backspace"
                 style={styles.keypadActionBtn}
                 onPress={handleDelete}
-                activeOpacity={0.7}
+                activeOpacity={0.65}
               >
-                <Ionicons name="backspace-outline" size={26} color="#475569" />
+                <View style={styles.actionIconCircle}>
+                  <Ionicons name="backspace-outline" size={20} color="#475569" />
+                </View>
+                <Text style={styles.actionText}>ลบ</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -336,11 +379,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   backButton: {
     width: 40,
@@ -348,146 +391,218 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
   },
   topBarTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: 0.2,
   },
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 16,
     paddingBottom: Platform.OS === 'ios' ? 24 : 16,
   },
-  iconContainer: {
-    marginBottom: 16,
-  },
-  iconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  stepBadgeContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  stepPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  stepPillActive: {
+    backgroundColor: '#EDE9FE',
+  },
+  stepPillInactive: {
+    backgroundColor: 'transparent',
+  },
+  stepPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepPillTextActive: {
+    color: '#7C3AED',
+  },
+  stepPillTextInactive: {
+    color: '#94A3B8',
+  },
+  iconOuterRing: {
+    padding: 4,
+    borderRadius: 34,
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    marginBottom: 6,
+  },
+  iconGradient: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 8,
+    elevation: 6,
   },
   title: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 8,
+    marginBottom: 2,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#64748B',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    lineHeight: 20,
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    lineHeight: 16,
+    marginBottom: 10,
+    fontWeight: '500',
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 8,
   },
-  dot: {
+  dotContainer: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    marginHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dotEmpty: {
+  dotContainerEmpty: {
+    backgroundColor: '#F1F5F9',
     borderWidth: 2,
     borderColor: '#CBD5E1',
-    backgroundColor: 'transparent',
   },
-  dotFilled: {
-    backgroundColor: colors.primary,
+  dotContainerFilled: {
+    backgroundColor: '#7C3AED',
     transform: [{ scale: 1.15 }],
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  dotError: {
-    borderColor: '#EF4444',
+  dotContainerError: {
     backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
+    borderWidth: 2,
+  },
+  dotFilledCore: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 6,
   },
   errorText: {
-    color: '#EF4444',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '700',
   },
   loadingContainer: {
-    height: 320,
+    height: 280,
     alignItems: 'center',
     justifyContent: 'center',
   },
   loadingText: {
-    marginTop: 14,
+    marginTop: 12,
     color: '#64748B',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   keypad: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 296,
     alignSelf: 'center',
   },
   keypadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 8,
   },
   keypadBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
     elevation: 2,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#F1F5F9',
   },
+  keypadNum: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 27,
+  },
+  keypadLetter: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1.2,
+    marginTop: 1,
+  },
   keypadActionBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keypadNum: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E293B',
+  actionIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
   },
   actionText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#64748B',
   },
 });

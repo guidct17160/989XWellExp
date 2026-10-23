@@ -18,6 +18,19 @@ import { colors } from '../theme/colors';
 import { authService } from '../services/authService';
 import { pinService } from '../services/pinService';
 
+const KEYPAD_LETTERS = {
+  1: '',
+  2: 'ABC',
+  3: 'DEF',
+  4: 'GHI',
+  5: 'JKL',
+  6: 'MNO',
+  7: 'PQRS',
+  8: 'TUV',
+  9: 'WXYZ',
+  0: '+',
+};
+
 export default function PinLockScreen({ navigation }) {
   const [user, setUser] = useState(authService.getUser() || {});
   const [pin, setPin] = useState('');
@@ -104,12 +117,13 @@ export default function PinLockScreen({ navigation }) {
 
   const handleLoginWithPassword = () => {
     Alert.alert(
-      'เข้าสู่ระบบด้วยรหัสผ่าน',
-      'ต้องการสลับไปเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านใช่หรือไม่?',
+      'ออกจากระบบ',
+      'คุณต้องการออกจากระบบใช่หรือไม่?\n(เมื่อออกจากระบบ คุณจะต้องเข้าสู่ระบบด้วยชื่อผู้ใช้/รหัสผ่าน และตั้งรหัส PIN ใหม่อีกครั้ง)',
       [
         { text: 'ยกเลิก', style: 'cancel' },
         {
-          text: 'ยืนยัน',
+          text: 'ออกจากระบบ',
+          style: 'destructive',
           onPress: () => {
             authService.logout();
             navigation.replace('Login');
@@ -206,6 +220,9 @@ export default function PinLockScreen({ navigation }) {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.keypadNum}>{num}</Text>
+                    {KEYPAD_LETTERS[num] ? (
+                      <Text style={styles.keypadLetter}>{KEYPAD_LETTERS[num]}</Text>
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -230,6 +247,7 @@ export default function PinLockScreen({ navigation }) {
                 activeOpacity={0.7}
               >
                 <Text style={styles.keypadNum}>0</Text>
+                <Text style={styles.keypadLetter}>+</Text>
               </TouchableOpacity>
 
               {/* Backspace Button */}
@@ -245,15 +263,15 @@ export default function PinLockScreen({ navigation }) {
           </View>
         )}
 
-        {/* Switch to Password Login Option */}
+        {/* Logout / Switch Account Option */}
         <TouchableOpacity
           testID="btn-switch-to-password"
           style={styles.switchLoginBtn}
           onPress={handleLoginWithPassword}
           activeOpacity={0.7}
         >
-          <Ionicons name="key-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
-          <Text style={styles.switchLoginText}>เข้าสู่ระบบด้วยรหัสผ่าน / สลับบัญชี</Text>
+          <Ionicons name="log-out-outline" size={16} color="#64748B" style={{ marginRight: 6 }} />
+          <Text style={styles.switchLoginText}>ออกจากระบบ / เข้าสู่ระบบด้วยรหัสผ่านใหม่</Text>
         </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
@@ -264,40 +282,41 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
   },
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 36,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 20,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 14 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
   userSection: {
     alignItems: 'center',
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   avatarImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 3,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 2.5,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   lockBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    bottom: -1,
+    right: -1,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -305,18 +324,18 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   userRole: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   lockInstructions: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#0074C4',
   },
@@ -324,13 +343,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 14,
+    marginVertical: 8,
   },
   dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    marginHorizontal: 10,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginHorizontal: 8,
   },
   dotEmpty: {
     borderWidth: 2,
@@ -355,72 +374,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 6,
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   loadingContainer: {
-    height: 320,
+    height: 280,
     alignItems: 'center',
     justifyContent: 'center',
   },
   loadingText: {
-    marginTop: 14,
+    marginTop: 12,
     color: '#64748B',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   keypad: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 296,
     alignSelf: 'center',
   },
   keypadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 8,
   },
   keypadBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
     elevation: 2,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#F1F5F9',
   },
   keypadActionBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: 'center',
     justifyContent: 'center',
   },
   keypadNum: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 27,
+  },
+  keypadLetter: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1.2,
+    marginTop: 1,
   },
   switchLoginBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'center',
+    paddingVertical: 8,
     paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   switchLoginText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
   },

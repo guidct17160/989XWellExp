@@ -10,25 +10,26 @@ import {
   StatusBar,
   RefreshControl,
   Modal,
-  TextInput,
   Alert,
-  ActivityIndicator,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useScrollToTop } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { leaveStorage } from '../services/leaveStorage';
 import TopNavbar from '../components/TopNavbar';
-
 import { authService } from '../services/authService';
 import { tryFetchApi } from '../services/apiClient';
-
-const API_BASE = 'http://localhost:5000/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function ProfileScreen({ navigation }) {
   const scrollViewRef = useRef(null);
   useScrollToTop(scrollViewRef);
+
+  const { isDarkMode, language, t, theme } = useTheme();
 
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
   const [authUser, setAuthUser] = useState(authService.getUser());
@@ -41,30 +42,16 @@ export default function ProfileScreen({ navigation }) {
     phone: authUser.phone || '-',
     role: authUser.role || 'Employee',
     avatarUrl: authUser.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    attendanceRate: '98%',
-    kpiScore: '4.8',
-    projects: '15',
-    tenure: '3 ปี 2 เดือน',
-    workHours: '132 ชม.',
+    attendanceRate: '-',
+    status: authUser.status || 'Active',
+    tenure: '-',
   });
 
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Modals state
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [showSwitchRoleModal, setShowSwitchRoleModal] = useState(false);
-
-  // Edit form state
-  const [editForm, setEditForm] = useState({
-    name: '',
-    position: '',
-    phone: '',
-    email: '',
-  });
 
   const fetchProfileData = async () => {
     try {
@@ -84,7 +71,7 @@ export default function ProfileScreen({ navigation }) {
           authService.setUser(merged);
 
           // Calculate dynamic tenure from real start_date
-          let dynamicTenure = '1 ปี';
+          let dynamicTenure = '-';
           const empStartDate = merged.startDate || merged.start_date;
           if (empStartDate) {
             const start = new Date(empStartDate);
@@ -105,6 +92,7 @@ export default function ProfileScreen({ navigation }) {
             email: merged.email || prev.email,
             phone: merged.phone || prev.phone,
             role: merged.role || 'Employee',
+            status: merged.status || 'Active',
             avatarUrl: merged.avatarUrl || prev.avatarUrl,
             startDate: empStartDate || prev.startDate,
             tenure: dynamicTenure,
@@ -112,33 +100,22 @@ export default function ProfileScreen({ navigation }) {
 
           // Fetch dynamic live metrics from PostgreSQL
           try {
-            const [attSummaryRes, kpiRes] = await Promise.all([
-              tryFetchApi('/attendance/summary'),
-              tryFetchApi('/kpi/evaluations'),
-            ]);
-
+            const attSummaryRes = await tryFetchApi('/attendance/summary');
             if (attSummaryRes && attSummaryRes.ok) {
               const attJson = await attSummaryRes.json();
-              if (attJson.summary) {
+              const sum = attJson.summary;
+              if (sum) {
+                // Backend summary = { totalWorkDays, onTimeDays, lateDays, absentDays, totalHours }
+                const total = Number(sum.totalWorkDays) || 0;
+                const rateText = sum.rate
+                  ? String(sum.rate)
+                  : total > 0
+                    ? `${Math.round(((total - (Number(sum.absentDays) || 0)) / total) * 100)}%`
+                    : null;
                 setProfile((prev) => ({
                   ...prev,
-                  attendanceRate: attJson.summary.rate || prev.attendanceRate,
-                  workHours: attJson.summary.totalHours || prev.workHours,
+                  attendanceRate: rateText || prev.attendanceRate,
                 }));
-              }
-            }
-
-            if (kpiRes && kpiRes.ok) {
-              const kpiJson = await kpiRes.json();
-              if (Array.isArray(kpiJson.evaluations)) {
-                const myEval = kpiJson.evaluations.find(e => e.employeeId === targetId || e.employeeCode === targetId);
-                if (myEval && myEval.kpiScore) {
-                  const score5 = (Number(myEval.kpiScore) / 20).toFixed(1);
-                  setProfile((prev) => ({
-                    ...prev,
-                    kpiScore: score5,
-                  }));
-                }
               }
             }
           } catch (e) {}
@@ -164,6 +141,7 @@ export default function ProfileScreen({ navigation }) {
         email: u.email || prev.email,
         phone: u.phone || prev.phone,
         role: u.role || 'Employee',
+        status: u.status || 'Active',
         avatarUrl: u.avatarUrl || prev.avatarUrl,
       }));
     });
@@ -184,107 +162,92 @@ export default function ProfileScreen({ navigation }) {
     };
   }, []);
 
+  // Change the profile picture: pick (camera or gallery), crop to a square, shrink, send to the server first,
+  // then update the picture shown in the app. No Admin needed.
+  const [avatarSaving, setAvatarSaving] = useState(false);
+
+  const uploadAvatar = async (pickerResult) => {
+    if (!pickerResult || pickerResult.canceled || !pickerResult.assets || !pickerResult.assets[0]) return;
+    setAvatarSaving(true);
+    try {
+      const small = await ImageManipulator.manipulateAsync(
+        pickerResult.assets[0].uri,
+        [{ resize: { width: 320 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const avatarUrl = `data:image/jpeg;base64,${small.base64}`;
+      const res = await tryFetchApi('/auth/profile/avatar', {
+        method: 'PUT',
+        body: JSON.stringify({ avatarUrl }),
+      });
+      if (!res) throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ รูปโปรไฟล์ยังไม่ถูกเปลี่ยน');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'ไม่สามารถเปลี่ยนรูปโปรไฟล์ได้');
+      authService.setAvatar(avatarUrl);
+      setProfile((prev) => ({ ...prev, avatarUrl }));
+      Alert.alert('สำเร็จ', 'เปลี่ยนรูปโปรไฟล์เรียบร้อยแล้ว');
+    } catch (e) {
+      Alert.alert('เปลี่ยนรูปโปรไฟล์ไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const pickAvatar = async (source) => {
+    try {
+      const perm =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'ไม่ได้รับอนุญาต',
+          source === 'camera' ? 'กรุณาอนุญาตการใช้กล้องในตั้งค่าของเครื่อง' : 'กรุณาอนุญาตการเข้าถึงรูปภาพในตั้งค่าของเครื่อง'
+        );
+        return;
+      }
+      const options = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 };
+      const result =
+        source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+      await uploadAvatar(result);
+    } catch (e) {
+      Alert.alert('เปลี่ยนรูปโปรไฟล์ไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง');
+    }
+  };
+
+  const changeAvatar = () => {
+    if (avatarSaving) return;
+    Alert.alert('เปลี่ยนรูปโปรไฟล์', 'เลือกรูปภาพของคุณเอง', [
+      { text: 'ถ่ายรูป', onPress: () => pickAvatar('camera') },
+      { text: 'เลือกจากคลังรูปภาพ', onPress: () => pickAvatar('library') },
+      { text: 'ยกเลิก', style: 'cancel' },
+    ]);
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchProfileData();
     setLeaveState(leaveStorage.getState());
     setTimeout(() => {
       setRefreshing(false);
-    }, 1000);
+    }, 800);
   }, []);
 
-  const annualBalance = leaveState.leaveBalances.find((b) => b.id === 'annual')?.remaining || 6;
-
-  // Handle Edit Profile Open
-  const handleOpenEdit = () => {
-    setEditForm({
-      name: profile.name,
-      position: profile.position,
-      phone: profile.phone,
-      email: profile.email,
-    });
-    setShowEditModal(true);
-  };
-
-  // Handle Edit Profile Save
-  const handleSaveEdit = async () => {
-    if (!editForm.name || !editForm.email) {
-      Alert.alert('แจ้งเตือน', 'กรุณากรอกชื่อและอีเมลให้ถูกต้อง');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const current = authService.getUser();
-      const targetEmpId = current.id || current.code || profile.code || 'EMP-001';
-      
-      await tryFetchApi(`/employees/${targetEmpId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      });
-
-      const updatedUser = {
-        ...current,
-        name: editForm.name,
-        position: editForm.position,
-        phone: editForm.phone,
-        email: editForm.email,
-      };
-
-      authService.setUser(updatedUser);
-
-      setProfile((prev) => ({
-        ...prev,
-        ...editForm,
-      }));
-
-      Alert.alert('สำเร็จ', 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว');
-      setShowEditModal(false);
-    } catch (err) {
-      console.error('Save profile error:', err);
-      const current = authService.getUser();
-      const updatedUser = {
-        ...current,
-        name: editForm.name,
-        position: editForm.position,
-        phone: editForm.phone,
-        email: editForm.email,
-      };
-      authService.setUser(updatedUser);
-      setProfile((prev) => ({
-        ...prev,
-        ...editForm,
-      }));
-      Alert.alert('สำเร็จ', 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว');
-      setShowEditModal(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const avatarPresets = [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-  ];
+  const annualBalance = leaveState.leaveBalances.find((b) => b.id === 'annual')?.remaining || 8;
 
   const profileMenuItems = [
     {
-      section: 'ข้อมูลส่วนตัวและองค์กร',
+      section: t('personalInfo') || 'ข้อมูลส่วนตัวและองค์กร (จัดการโดย Web Admin)',
       items: [
-        { icon: 'person-outline', label: 'แก้ไขข้อมูลส่วนตัว', chevron: true, onPress: handleOpenEdit },
-        { icon: 'call-outline', label: 'เบอร์โทรศัพท์', value: profile.phone || '-' },
-        { icon: 'mail-outline', label: 'อีเมลองค์กร', value: profile.email },
-        { icon: 'business-outline', label: 'สังกัดฝ่าย/แผนก', value: profile.department },
-        { icon: 'shield-checkmark-outline', label: 'บทบาทและสิทธิ์', value: profile.role || 'Employee' },
-        { icon: 'calendar-outline', label: 'วันที่เริ่มงาน', value: profile.startDate || '26 ส.ค. 2569' },
+        { icon: 'call-outline', label: t('phone') || 'เบอร์โทรศัพท์', value: profile.phone || '-' },
+        { icon: 'mail-outline', label: t('email') || 'อีเมลองค์กร', value: profile.email },
+        { icon: 'business-outline', label: t('department') || 'สังกัดฝ่าย/แผนก', value: profile.department },
+        { icon: 'shield-checkmark-outline', label: t('role') || 'บทบาทและสิทธิ์', value: profile.role || 'Employee' },
+        { icon: 'calendar-outline', label: t('startDate') || 'วันที่เริ่มงาน', value: profile.startDate || '15 ม.ค. 2567' },
       ],
     },
     {
-      section: 'การใช้งานบัญชี',
+      section: t('appPreferences') || 'การใช้งานบัญชี',
       items: [
         {
           icon: 'qr-code-outline',
@@ -294,20 +257,20 @@ export default function ProfileScreen({ navigation }) {
         },
         {
           icon: 'settings-outline',
-          label: 'การตั้งค่าระบบและแอปพลิเคชัน',
+          label: t('settings') || 'การตั้งค่าระบบและแอปพลิเคชัน',
           chevron: true,
           onPress: () => navigation.navigate('Settings'),
         },
         {
           icon: 'log-out-outline',
-          label: 'ออกจากระบบ',
+          label: t('logout') || 'ออกจากระบบ',
           isLogout: true,
           chevron: true,
           onPress: () => {
-            Alert.alert('ออกจากระบบ', 'คุณต้องการออกจากระบบใช่หรือไม่?', [
-              { text: 'ยกเลิก', style: 'cancel' },
+            Alert.alert(t('logout') || 'ออกจากระบบ', 'คุณต้องการออกจากระบบใช่หรือไม่?', [
+              { text: t('cancel') || 'ยกเลิก', style: 'cancel' },
               {
-                text: 'ออกจากระบบ',
+                text: t('logout') || 'ออกจากระบบ',
                 style: 'destructive',
                 onPress: () => {
                   authService.logout();
@@ -337,14 +300,14 @@ export default function ProfileScreen({ navigation }) {
       : (profile.position || 'พนักงาน');
 
   return (
-    <SafeAreaView testID="screen-profile" style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
+    <SafeAreaView testID="screen-profile" style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBackground} />
 
       <TopNavbar navigation={navigation} title={profile.name} />
 
       <ScrollView
         ref={scrollViewRef}
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: theme.background }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -357,42 +320,52 @@ export default function ProfileScreen({ navigation }) {
         }
       >
         {/* Profile Card Header */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
-            <TouchableOpacity
-              style={styles.editAvatarBtn}
-              onPress={() => setShowAvatarModal(true)}
-            >
-              <Ionicons name="camera" size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            testID="profile-change-avatar-btn"
+            style={styles.avatarContainer}
+            onPress={changeAvatar}
+            activeOpacity={0.8}
+            accessibilityLabel="เปลี่ยนรูปโปรไฟล์"
+          >
+            <Image source={{ uri: profile.avatarUrl }} style={[styles.avatarImage, avatarSaving && { opacity: 0.5 }]} />
+            <View style={styles.avatarEditBadge}>
+              {avatarSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={14} color="#FFFFFF" />
+              )}
+            </View>
+          </TouchableOpacity>
 
-          <Text style={styles.nameText}>{profile.name}</Text>
-          <Text style={styles.positionText}>{displayPosition}</Text>
+          <Text style={[styles.nameText, { color: theme.text }]}>{profile.name}</Text>
+          <Text style={[styles.positionText, { color: theme.textSecondary }]}>{displayPosition}</Text>
 
-          <TouchableOpacity style={styles.idBadge} onPress={() => setShowQrModal(true)}>
-            <Ionicons name="id-card-outline" size={16} color="#0074C4" />
-            <Text style={styles.idText}>รหัส: {profile.code}</Text>
-            <Ionicons name="qr-code-outline" size={14} color="#0074C4" style={{ marginLeft: 6 }} />
+          <TouchableOpacity
+            style={[styles.idBadge, { backgroundColor: isDarkMode ? '#1E293B' : '#F0F9FF', borderColor: isDarkMode ? '#334155' : '#BAE6FD' }]}
+            onPress={() => setShowQrModal(true)}
+          >
+            <Ionicons name="id-card-outline" size={16} color={colors.primary} />
+            <Text style={[styles.idText, { color: colors.primary }]}>รหัส: {profile.code}</Text>
+            <Ionicons name="qr-code-outline" size={14} color={colors.primary} style={{ marginLeft: 6 }} />
           </TouchableOpacity>
         </View>
 
         {/* Stats Summary Bar */}
-        <Animated.View style={[styles.statsCard, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.border, opacity: fadeAnim }]}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{annualBalance} วัน</Text>
-            <Text style={styles.statLabel}>วันลาพักร้อน</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>วันลาพักร้อน</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{profile.role || 'Employee'}</Text>
-            <Text style={styles.statLabel}>บทบาทระบบ</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>บทบาทระบบ</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
             <Text style={[styles.statNumber, { color: '#10B981' }]}>{profile.status || 'Active'}</Text>
-            <Text style={styles.statLabel}>สถานะบัญชี</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>สถานะบัญชี</Text>
           </View>
         </Animated.View>
 
@@ -400,14 +373,14 @@ export default function ProfileScreen({ navigation }) {
         <Animated.View style={[styles.body, { opacity: fadeAnim }]}>
           {profileMenuItems.map((section, sIndex) => (
             <View key={sIndex} style={styles.menuSection}>
-              <Text style={styles.sectionTitle}>{section.section}</Text>
-              <View style={styles.menuCard}>
+              <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{section.section}</Text>
+              <View style={[styles.menuCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 {section.items.map((item, iIndex) => (
                   <TouchableOpacity
                     key={iIndex}
                     style={[
                       styles.menuItem,
-                      iIndex < section.items.length - 1 && styles.menuItemBorder,
+                      iIndex < section.items.length - 1 && [styles.menuItemBorder, { borderBottomColor: theme.border }],
                     ]}
                     onPress={item.onPress}
                     activeOpacity={item.onPress ? 0.7 : 1}
@@ -416,6 +389,7 @@ export default function ProfileScreen({ navigation }) {
                       <View
                         style={[
                           styles.menuIconBg,
+                          { backgroundColor: isDarkMode ? '#1E293B' : colors.primaryLight },
                           item.isLogout && { backgroundColor: '#FEE2E2' },
                         ]}
                       >
@@ -428,6 +402,7 @@ export default function ProfileScreen({ navigation }) {
                       <Text
                         style={[
                           styles.menuLabel,
+                          { color: theme.text },
                           item.isLogout && { color: '#DC2626', fontWeight: '700' },
                         ]}
                       >
@@ -440,6 +415,7 @@ export default function ProfileScreen({ navigation }) {
                         <Text
                           style={[
                             styles.menuValue,
+                            { color: theme.textSecondary },
                             item.valueColor && { color: item.valueColor },
                           ]}
                         >
@@ -450,7 +426,7 @@ export default function ProfileScreen({ navigation }) {
                         <Ionicons
                           name="chevron-forward"
                           size={18}
-                          color={item.isLogout ? '#DC2626' : colors.textSecondary}
+                          color={item.isLogout ? '#DC2626' : theme.textSecondary}
                         />
                       )}
                     </View>
@@ -462,145 +438,35 @@ export default function ProfileScreen({ navigation }) {
         </Animated.View>
       </ScrollView>
 
-      {/* EDIT PROFILE MODAL */}
-      <Modal visible={showEditModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>แก้ไขข้อมูลโปรไฟล์</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>ชื่อ-นามสกุล</Text>
-              <TextInput
-                style={styles.input}
-                value={editForm.name}
-                onChangeText={(t) => setEditForm((prev) => ({ ...prev, name: t }))}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>ตำแหน่งงาน</Text>
-              <TextInput
-                style={styles.input}
-                value={editForm.position}
-                onChangeText={(t) => setEditForm((prev) => ({ ...prev, position: t }))}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>เบอร์โทรศัพท์</Text>
-              <TextInput
-                style={styles.input}
-                value={editForm.phone}
-                onChangeText={(t) => setEditForm((prev) => ({ ...prev, phone: t }))}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>อีเมล</Text>
-              <TextInput
-                style={styles.input}
-                value={editForm.email}
-                onChangeText={(t) => setEditForm((prev) => ({ ...prev, email: t }))}
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowEditModal(false)}
-              >
-                <Text style={styles.cancelBtnText}>ยกเลิก</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSaveEdit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.saveBtnText}>บันทึกข้อมูล</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* DIGITAL ID CARD & QR CODE MODAL */}
       <Modal visible={showQrModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.cardModalContainer}>
-            <View style={styles.cardHeader}>
+          <View style={[styles.cardModalContainer, { backgroundColor: theme.surface }]}>
+            <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="shield-checkmark" size={24} color="#0074C4" />
-                <Text style={styles.cardHeaderTitle}>WellX989 Digital ID</Text>
+                <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+                <Text style={[styles.cardHeaderTitle, { color: theme.text }]}>WellX989 Digital ID</Text>
               </View>
               <TouchableOpacity onPress={() => setShowQrModal(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.cardBody}>
               <Image source={{ uri: profile.avatarUrl }} style={styles.cardAvatar} />
-              <Text style={styles.cardName}>{profile.name}</Text>
-              <Text style={styles.cardPos}>{profile.position}</Text>
-              <Text style={styles.cardDept}>{profile.department}</Text>
+              <Text style={[styles.cardName, { color: theme.text }]}>{profile.name}</Text>
+              <Text style={[styles.cardPos, { color: theme.textSecondary }]}>{profile.position}</Text>
+              <Text style={[styles.cardDept, { color: colors.primary }]}>{profile.department}</Text>
 
-              {/* QR Code Placeholder Graphic */}
-              <View style={styles.qrContainer}>
+              {/* QR Code Container */}
+              <View style={[styles.qrContainer, { backgroundColor: '#FFFFFF' }]}>
                 <Ionicons name="qr-code" size={140} color="#0F172A" />
                 <Text style={styles.qrCodeText}>{profile.code}</Text>
               </View>
-              <Text style={styles.cardFooterText}>สแกนเพื่อยืนยันตัวตนหรือบันทึกเวลาเข้างาน</Text>
+              <Text style={[styles.cardFooterText, { color: theme.textSecondary }]}>
+                สแกนเพื่อยืนยันตัวตนหรือบันทึกเวลาเข้างาน (Real DB)
+              </Text>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* AVATAR SELECTOR MODAL */}
-      <Modal visible={showAvatarModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>เลือกรูปโปรไฟล์</Text>
-              <TouchableOpacity onPress={() => setShowAvatarModal(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 16, flexWrap: 'wrap' }}>
-              {avatarPresets.map((url, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => {
-                    setProfile((p) => ({ ...p, avatarUrl: url }));
-                    setShowAvatarModal(false);
-                  }}
-                >
-                  <Image
-                    source={{ uri: url }}
-                    style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 30,
-                      borderWidth: profile.avatarUrl === url ? 3 : 1,
-                      borderColor: profile.avatarUrl === url ? colors.primary : '#E2E8F0',
-                    }}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity style={styles.saveBtn} onPress={() => setShowAvatarModal(false)}>
-              <Text style={styles.saveBtnText}>ปิด</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -611,25 +477,20 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     paddingBottom: 100,
   },
   header: {
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     paddingTop: 20,
     paddingBottom: 28,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   avatarContainer: {
-    position: 'relative',
     marginBottom: 12,
   },
   avatarImage: {
@@ -637,16 +498,16 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     borderWidth: 3,
-    borderColor: '#0074C4',
+    borderColor: colors.primary,
   },
-  editAvatarBtn: {
+  avatarEditBadge: {
     position: 'absolute',
-    bottom: 0,
     right: 0,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#0074C4',
+    bottom: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     alignItems: 'center',
@@ -655,45 +516,33 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
     marginBottom: 2,
   },
   positionText: {
     fontSize: 14,
-    color: '#64748B',
     marginBottom: 10,
     fontWeight: '500',
   },
   idBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F9FF',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#BAE6FD',
   },
   idText: {
-    color: '#0369A1',
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 6,
   },
-  // Stats
   statsCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginTop: -16,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
     paddingVertical: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
     elevation: 3,
   },
   statItem: {
@@ -703,19 +552,16 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0074C4',
+    color: colors.primary,
   },
   statLabel: {
     fontSize: 11,
-    color: '#64748B',
     marginTop: 2,
     fontWeight: '600',
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#E2E8F0',
   },
-  // Body
   body: {
     paddingHorizontal: 16,
     paddingTop: 20,
@@ -724,23 +570,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   menuCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
     elevation: 2,
   },
   menuItem: {
@@ -752,25 +591,23 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   menuIconBg: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   menuLabel: {
     fontSize: 14,
-    color: '#1E293B',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   menuItemRight: {
     flexDirection: 'row',
@@ -778,170 +615,77 @@ const styles = StyleSheet.create({
   },
   menuValue: {
     fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
-    marginRight: 4,
+    marginRight: 6,
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  modalContainer: {
+  cardModalContainer: {
     width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    maxWidth: 360,
     borderRadius: 24,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
     elevation: 8,
   },
-  modalHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#0F172A',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  cancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  saveBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  // Card Modal Styles
-  cardModalContainer: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   cardHeaderTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
   },
   cardBody: {
     alignItems: 'center',
-    paddingVertical: 16,
-    width: '100%',
   },
   cardAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     borderWidth: 2,
     borderColor: colors.primary,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   cardName: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: '700',
+    marginBottom: 4,
   },
   cardPos: {
     fontSize: 13,
-    color: '#0074C4',
-    fontWeight: '600',
-    marginTop: 2,
+    marginBottom: 2,
   },
   cardDept: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 16,
   },
   qrContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
     padding: 16,
+    borderRadius: 16,
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   qrCodeText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0074C4',
+    color: '#0F172A',
     marginTop: 8,
     letterSpacing: 1,
   },
   cardFooterText: {
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 12,
     textAlign: 'center',
+    marginTop: 8,
   },
 });

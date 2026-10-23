@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -16,27 +17,27 @@ import SplashScreen from '../screens/SplashScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import HRDashboardScreen from '../screens/HRDashboardScreen';
 import LeaveRequestScreen from '../screens/LeaveRequestScreen';
-import PayslipScreen from '../screens/PayslipScreen';
 import RewardsScreen from '../screens/RewardsScreen';
 import AboutAppScreen from '../screens/AboutAppScreen';
 import TimeAttendanceScreen from '../screens/TimeAttendanceScreen';
 import TimeCorrectionScreen from '../screens/TimeCorrectionScreen';
-import OtRequestScreen from '../screens/OtRequestScreen';
 import AnnouncementsScreen from '../screens/AnnouncementsScreen';
 import RequestStatusScreen from '../screens/RequestStatusScreen';
 import PointHistoryScreen from '../screens/PointHistoryScreen';
-import MissionsScreen from '../screens/MissionsScreen';
 import SetPasswordScreen from '../screens/SetPasswordScreen';
 import SetPinScreen from '../screens/SetPinScreen';
 import PinLockScreen from '../screens/PinLockScreen';
 import ManagerApprovalScreen from '../screens/ManagerApprovalScreen';
 import EmployeeDirectoryScreen from '../screens/EmployeeDirectoryScreen';
-import TeamAttendanceScreen from '../screens/TeamAttendanceScreen';
+import QuestsScreen from '../screens/QuestsScreen';
+import QuestPlayScreen from '../screens/QuestPlayScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const { theme, t } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -62,22 +63,22 @@ function MainTabs() {
               break;
           }
           return (
-            <View style={[styles.tabIconContainer, focused && styles.tabIconActive]}>
+            <View style={[styles.tabIconContainer, focused && (theme.isDark ? { backgroundColor: '#334155' } : styles.tabIconActive)]}>
               <Ionicons name={iconName} size={22} color={color} />
             </View>
           );
         },
         tabBarActiveTintColor: colors.tabBarActive,
-        tabBarInactiveTintColor: colors.tabBarInactive,
+        tabBarInactiveTintColor: theme.isDark ? '#64748B' : colors.tabBarInactive,
         tabBarStyle: {
-          backgroundColor: colors.tabBarBackground,
+          backgroundColor: theme.isDark ? '#1E293B' : colors.tabBarBackground,
           borderTopWidth: 0,
           height: Platform.OS === 'ios' ? 88 : 68,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.06,
+          shadowOpacity: theme.isDark ? 0.3 : 0.06,
           shadowRadius: 12,
           elevation: 10,
         },
@@ -91,41 +92,43 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: 'หน้าหลัก', tabBarButtonTestID: 'tab-home' }}
+        options={{ tabBarLabel: t('home', 'หน้าหลัก'), tabBarButtonTestID: 'tab-home' }}
       />
       <Tab.Screen
         name="TimeAttendance"
         component={TimeAttendanceScreen}
-        options={{ tabBarLabel: 'ปฏิทิน', tabBarButtonTestID: 'tab-time-attendance' }}
+        options={{ tabBarLabel: t('calendar', 'ปฏิทิน'), tabBarButtonTestID: 'tab-time-attendance' }}
       />
       <Tab.Screen
         name="HRDashboard"
         component={HRDashboardScreen}
-        options={{ tabBarLabel: 'HR', tabBarButtonTestID: 'tab-hr-dashboard' }}
+        options={{ tabBarLabel: t('hr', 'HR'), tabBarButtonTestID: 'tab-hr-dashboard' }}
       />
       <Tab.Screen
         name="Rewards"
         component={RewardsScreen}
-        options={{ tabBarLabel: 'สิทธิพิเศษ', tabBarButtonTestID: 'tab-rewards' }}
+        options={{ tabBarLabel: t('rewards', 'สิทธิพิเศษ'), tabBarButtonTestID: 'tab-rewards' }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarLabel: 'โปรไฟล์', tabBarButtonTestID: 'tab-profile' }}
+        options={{ tabBarLabel: t('profile', 'โปรไฟล์'), tabBarButtonTestID: 'tab-profile' }}
       />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
+  const { theme } = useTheme();
+
   return (
     <Stack.Navigator
       initialRouteName="Splash"
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right', // Ultra Smooth Slide From Right Animation for all stack screens
+        animation: 'slide_from_right',
         animationDuration: 280,
-        contentStyle: { backgroundColor: '#F8FAFC' },
+        contentStyle: { backgroundColor: theme.isDark ? '#0F172A' : '#F8FAFC' },
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -147,19 +150,17 @@ export default function AppNavigator() {
       <Stack.Screen name="HRDashboard" component={HRDashboardScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="LeaveRequest" component={LeaveRequestScreen} />
-      <Stack.Screen name="Payslip" component={PayslipScreen} />
       <Stack.Screen name="Rewards" component={RewardsScreen} />
       <Stack.Screen name="AboutApp" component={AboutAppScreen} />
       <Stack.Screen name="TimeCorrection" component={TimeCorrectionScreen} />
-      <Stack.Screen name="OtRequest" component={OtRequestScreen} />
       <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
       <Stack.Screen name="RequestStatus" component={RequestStatusScreen} />
       <Stack.Screen name="PointHistory" component={PointHistoryScreen} />
-      <Stack.Screen name="Missions" component={MissionsScreen} />
       <Stack.Screen name="ManagerApproval" component={ManagerApprovalScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="EmployeeDirectory" component={EmployeeDirectoryScreen} />
-      <Stack.Screen name="TeamAttendance" component={TeamAttendanceScreen} />
+      <Stack.Screen name="Quests" component={QuestsScreen} />
+      <Stack.Screen name="QuestPlay" component={QuestPlayScreen} />
     </Stack.Navigator>
   );
 }

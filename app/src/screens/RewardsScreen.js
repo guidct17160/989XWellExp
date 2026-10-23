@@ -21,152 +21,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
 import { pointsStorage } from '../services/pointsStorage';
-import { missionStorage } from '../services/missionStorage';
 import { tryFetchApi } from '../services/apiClient';
+import QuestPreviewSection from '../components/QuestPreviewSection';
+import { useTheme } from '../context/ThemeContext';
+import { authService } from '../services/authService';
 
 const { width } = Dimensions.get('window');
 
-// pointTransactions now comes from pointsStorage (shared singleton)
-
-// 2. ประวัติแลกรางวัล (Redeemed Rewards Data - เอาแค่รางวัลที่เราแลกไป)
-const redeemedRewards = [
-  {
-    id: 'r1',
-    title: 'Starbucks (เครื่องดื่ม 1 แก้ว)',
-    subtitle: 'รหัสคูปอง: STB-883921',
-    points: 500,
-    date: '22 ก.ย. 2026 • 12:15 น.',
-    status: 'ใช้งานแล้ว',
-    color: '#00704A',
-    icon: 'cafe',
-  },
-  {
-    id: 'r2',
-    title: 'Shopee Voucher 100 THB',
-    subtitle: 'รหัสคูปอง: SHP-991204',
-    points: 900,
-    date: '15 ก.ย. 2026 • 14:20 น.',
-    status: 'พร้อมใช้งาน',
-    color: '#FF6B35',
-    icon: 'gift',
-  },
-];
-
-// missions now comes from missionStorage (shared singleton)
-
-const rewardsCatalog = [
-  {
-    id: 'rw_shopee_100',
-    title: 'Shopee Voucher 100 THB',
-    brandName: 'Shopee Voucher',
-    subtitle: '100 THB',
-    points: 900,
-    category: 'popular',
-    icon: 'bag-handle',
-    color: '#FF5722',
-    bannerGradient: ['#FF5722', '#FF8A65'],
-    desc: 'Shopee Voucher มูลค่า 100 บาท สำหรับใช้เป็นส่วนลดการสั่งซื้อสินค้าทุกหมวดหมู่บน Shopee แอปพลิเคชัน',
-    terms: [
-      'ใช้กับการสั่งซื้อขั้นต่ำ 300 บาทขึ้นไป',
-      'รหัสส่วนลดมีอายุใช้งานถึง 31 ธ.ค. 2026',
-      'ไม่สามารถแลกเปลี่ยน หรือทอนเป็นเงินสดได้',
-    ],
-  },
-  {
-    id: 'rw_lazada_100',
-    title: 'Lazada Voucher 100 THB',
-    brandName: 'Lazada Voucher',
-    subtitle: '100 THB',
-    points: 900,
-    category: 'popular',
-    icon: 'heart',
-    color: '#0F146D',
-    bannerGradient: ['#0F146D', '#2A34B6'],
-    desc: 'Lazada Voucher มูลค่า 100 บาท สำหรับใช้เป็นส่วนลดในการซื้อสินค้าที่ร่วมรายการบน Lazada',
-    terms: [
-      'ใช้กับการสั่งซื้อขั้นต่ำ 300 บาทขึ้นไป',
-      'รหัสส่วนลดมีอายุใช้งานถึง 31 ธ.ค. 2026',
-      'ไม่สามารถแลกเปลี่ยน หรือทอนเป็นเงินสดได้',
-    ],
-  },
-  {
-    id: 'rw_villa_100',
-    title: 'Villa Market 100 THB',
-    brandName: 'Villa Market',
-    subtitle: '100 THB',
-    points: 900,
-    category: 'lifestyle',
-    icon: 'cart',
-    color: '#1A2B6D',
-    bannerGradient: ['#1A2B6D', '#3B4D9D'],
-    desc: 'บัตรส่วนลด Villa Market มูลค่า 100 บาท ใช้ชำระค่าสินค้าได้ทุกสาขาทั่วประเทศ',
-    terms: [
-      'แสดงรหัสคูปองกับพนักงานก่อนชำระเงิน',
-      'ใช้ได้ถึง 31 ธ.ค. 2026',
-      'ไม่สามารถทอนเป็นเงินสดได้',
-    ],
-  },
-  {
-    id: 'rw_starbucks_100',
-    title: 'Starbucks 100 THB',
-    brandName: 'Starbucks',
-    subtitle: '100 THB',
-    points: 900,
-    category: 'food',
-    icon: 'cafe',
-    color: '#00704A',
-    bannerGradient: ['#00704A', '#00A862'],
-    desc: 'คูปองแลกเครื่องดื่ม Starbucks ฟรี 1 แก้ว มูลค่าสูงสุด 100 บาท ทุกสาขา',
-    terms: [
-      'ยื่นสแกน QR Code หน้าเคาน์เตอร์ก่อนสั่งซื้อ',
-      'ใช้ได้กับเครื่องดื่มทุกประเภท',
-      'รหัสคูปองมีอายุ 30 วันนับจากวันที่กดแลก',
-    ],
-  },
-  {
-    id: 'rw_leave_1day',
-    title: 'เพิ่มวันลาพักร้อน +1 วัน',
-    brandName: 'สิทธิพิเศษ HR',
-    subtitle: '+1 วันลา',
-    points: 1500,
-    category: 'lifestyle',
-    icon: 'calendar',
-    color: '#1F4C9C',
-    bannerGradient: ['#1F4C9C', '#3B82F6'],
-    desc: 'สิทธิพิเศษแลกวันลาพักร้อนเพิ่ม 1 วัน โดยระบบจะอนุมัติเพิ่มสิทธิ์วันลาให้อัตโนมัติ',
-    terms: [
-      'ระบบจะเพิ่มวันลาพักร้อนให้ในโควต้าประจำปีทันที',
-      'ต้องยื่นใบลาก่อนวันหยุดอย่างน้อย 2 วัน',
-    ],
-  },
-  {
-    id: 'rw_grabfood_100',
-    title: 'GrabFood Voucher 100 THB',
-    brandName: 'GrabFood',
-    subtitle: '100 THB',
-    points: 900,
-    category: 'food',
-    icon: 'restaurant',
-    color: '#00B14F',
-    bannerGradient: ['#00B14F', '#20D672'],
-    desc: 'GrabFood Voucher ส่วนลดค่าอาหาร 100 บาท เมื่อสั่งซื้อผ่าน GrabApp',
-    terms: [
-      'ใช้เป็นส่วนลดค่าอาหารขั้นต่ำ 200 บาท',
-      'ใช้ได้ถึง 31 ธ.ค. 2026',
-    ],
-  },
-];
-
-const rewards = rewardsCatalog;
-
-// Base leaderboard data (other people's points are static, user's points will be dynamic)
-const baseLeaderboard = [
-  { name: 'พี่นิ้ง', basePoints: 5000, dept: 'PR' },
-  { name: 'พี่ฟิล์ม', basePoints: 4700, dept: 'UV Design' },
-  { name: 'กุยช่าย', basePoints: 4580, dept: 'Super Developer', isMe: true },
-];
+const redeemedRewards = [];
+const baseLeaderboard = [];
+const rewards = [];
 
 export default function RewardsScreen({ navigation, route }) {
+  const { theme, isDarkMode, t, language } = useTheme();
+  const currentUser = authService.getUser();
   const scrollViewRef = useRef(null);
   useScrollToTop(scrollViewRef);
 
@@ -181,25 +49,30 @@ export default function RewardsScreen({ navigation, route }) {
   const [selectedReward, setSelectedReward] = useState(null);
   const [catalogFilter, setCatalogFilter] = useState('all'); // 'all' | 'popular' | 'lifestyle' | 'food'
 
-  // Dynamic Catalog Rewards List State
-  const [catalogRewards, setCatalogRewards] = useState(rewardsCatalog);
+  // Dynamic Catalog Rewards List State (100% Real DB)
+  const [catalogRewards, setCatalogRewards] = useState([]);
 
-  // Dynamic Redeemed History List State
-  const [redeemedHistoryList, setRedeemedHistoryList] = useState(redeemedRewards);
+  // Dynamic Redeemed History List State (100% Real DB)
+  const [redeemedHistoryList, setRedeemedHistoryList] = useState([]);
 
-  const fetchBackendRewards = async () => {
+  // Dynamic Real Leaderboard List State (100% Real DB)
+  const [realLeaderboard, setRealLeaderboard] = useState([]);
+
+  const fetchRealData = async () => {
     try {
+      // 1. Rewards Catalog from Real DB
       const res = await tryFetchApi('/rewards');
       if (res && res.ok) {
         const json = await res.json();
-        if (json.success && json.rewards && json.rewards.length > 0) {
+        if (json.success && Array.isArray(json.rewards)) {
           const formatted = json.rewards.map((r) => ({
             id: r.id,
             title: r.title,
             brandName: r.title.split(' ')[0] || 'Reward',
-            subtitle: `${r.pointsCost || r.pointsRequired || 500} Points`,
-            points: r.pointsCost || r.pointsRequired || 500,
-            category: r.category ? r.category.toLowerCase() : 'popular',
+            subtitle: `${r.pointsRequired || r.pointsCost || 500} Points`,
+            points: r.pointsRequired || r.pointsCost || 500,
+            category: r.category ? String(r.category).trim().toLowerCase() : 'other',
+            categoryLabel: r.category ? String(r.category).trim() : 'อื่นๆ',
             icon: 'gift',
             color: '#FF5722',
             bannerGradient: ['#FF5722', '#FF8A65'],
@@ -208,19 +81,54 @@ export default function RewardsScreen({ navigation, route }) {
               'แสดงรหัสคูปองกับพนักงานก่อนชำระเงิน',
               'ไม่สามารถแลกเปลี่ยน หรือทอนเป็นเงินสดได้',
             ],
-            stockQuantity: r.stockQuantity || 10,
+            stockQuantity: r.stock !== undefined ? r.stock : (r.stockQuantity || 10),
           }));
           setCatalogRewards(formatted);
         }
       }
+
+      // 2. User Redeemed History from Real DB
+      const resCoupons = await tryFetchApi('/rewards/my-coupons');
+      if (resCoupons && resCoupons.ok) {
+        const jsonCoupons = await resCoupons.json();
+        if (jsonCoupons.success && Array.isArray(jsonCoupons.coupons)) {
+          setRedeemedHistoryList(
+            jsonCoupons.coupons.map((c) => ({
+              id: c.id,
+              title: c.title,
+              subtitle: `รหัสคูปอง: ${c.couponCode}`,
+              points: c.pointsUsed,
+              date: c.createdAt || 'วันนี้',
+              status: (c.status === 'Used' || c.status === 'used' || c.status === 'ใช้งานแล้ว') ? 'ใช้งานแล้ว' : 'พร้อมใช้งาน',
+              color: '#00704A',
+              icon: 'gift',
+            }))
+          );
+        }
+      }
+
+      // 3. Leaderboard from Real DB
+      const resLead = await tryFetchApi('/leaderboard');
+      if (resLead && resLead.ok) {
+        const jsonLead = await resLead.json();
+        if (jsonLead.success && Array.isArray(jsonLead.leaderboard)) {
+          setRealLeaderboard(jsonLead.leaderboard);
+        }
+      }
     } catch (e) {
-      console.error('Failed to sync backend rewards in mobile app', e);
+      console.error('Failed to sync rewards/leaderboard in mobile app', e);
     }
   };
 
   useEffect(() => {
-    fetchBackendRewards();
+    fetchRealData();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRealData();
+    }, [])
+  );
 
   // Success, Warning & Confirm Popups
   const [confirmRedeemPopup, setConfirmRedeemPopup] = useState({ visible: false, reward: null });
@@ -281,75 +189,29 @@ export default function RewardsScreen({ navigation, route }) {
   // Filter state for Point History: 'all', 'in', 'out'
   const [pointFilter, setPointFilter] = useState('all');
 
-  // Live transaction data from pointsStorage (shared with MissionsScreen)
+  // Live transaction data from pointsStorage (synced with the backend)
   const [liveTransactions, setLiveTransactions] = useState(pointsStorage.getTransactions());
   const [liveUserPoints, setLiveUserPoints] = useState(pointsStorage.getUserPoints());
 
-  // Live mission data from missionStorage
-  const [liveMissions, setLiveMissions] = useState(
-    missionStorage.getMissions().filter((m) => m.status !== 'expired').slice(0, 4)
-  );
-
-  // Claimed mission reward modal
-  const [claimedModal, setClaimedModal] = useState({ visible: false, points: 0, title: '' });
-
-  // Refresh missions and points whenever screen gains focus
+  // Refresh points whenever screen gains focus
   useFocusEffect(
     useCallback(() => {
-      const currentList = missionStorage.getMissions();
-      if (currentList && currentList.length > 0) {
-        setLiveMissions(currentList.filter((m) => m.status !== 'expired').slice(0, 4));
-      }
       setLiveUserPoints(pointsStorage.getUserPoints());
       setLiveTransactions(pointsStorage.getTransactions());
     }, [])
   );
 
-  // Subscribe to live mission & points updates in real-time
+  // Subscribe to live points updates in real-time
   useEffect(() => {
-    const unsubscribeMissions = missionStorage.subscribe((updatedMissions) => {
-      if (updatedMissions && updatedMissions.length > 0) {
-        setLiveMissions(updatedMissions.filter((m) => m.status !== 'expired').slice(0, 4));
-      }
-    });
     const unsubscribePoints = pointsStorage.subscribe?.((state) => {
       if (state?.userPoints !== undefined) {
         setLiveUserPoints(state.userPoints);
       }
     });
     return () => {
-      if (typeof unsubscribeMissions === 'function') unsubscribeMissions();
       if (typeof unsubscribePoints === 'function') unsubscribePoints();
     };
   }, []);
-
-  const handleClaimMission = async (item) => {
-    if (!item || item.status !== 'ready_to_claim') return;
-    try {
-      const claimResult = await missionStorage.claimMission(item.id);
-      const earned = claimResult?.pointsEarned || item.points || 50;
-
-      const { userPoints: updatedPoints, transactions: newTxs } = pointsStorage.addTransaction(
-        item.title,
-        earned,
-        'in',
-        'ภารกิจ (Mission)'
-      );
-
-      const finalPts = claimResult?.newTotalPoints !== undefined ? claimResult.newTotalPoints : updatedPoints;
-      setLiveUserPoints(finalPts);
-      if (newTxs) setLiveTransactions(newTxs);
-
-      setClaimedModal({
-        visible: true,
-        points: earned,
-        title: item.title,
-      });
-    } catch (e) {
-      console.error('Error claiming mission in RewardsScreen:', e);
-      Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถรับรางวัลได้ กรุณาลองใหม่อีกครั้ง');
-    }
-  };
 
   // Coupon redemption tab state: 'code' | 'qr' | 'barcode'
   const [couponRedeemTab, setCouponRedeemTab] = useState('code');
@@ -884,41 +746,33 @@ export default function RewardsScreen({ navigation, route }) {
     );
   };
 
-  const reloadMissions = () => {
-    setLiveMissions(
-      missionStorage.getMissions().filter((m) => m.status !== 'expired').slice(0, 4)
-    );
-    setLiveTransactions(pointsStorage.getTransactions());
-    setLiveUserPoints(pointsStorage.getUserPoints());
-  };
-
-  // Dynamic leaderboard for main screen
-  const leaderboard = useMemo(() => {
-    const updated = baseLeaderboard.map((person) => ({
-      ...person,
-      points: person.isMe ? liveUserPoints : person.basePoints,
-    }));
-    updated.sort((a, b) => b.points - a.points);
-    return updated.map((person, index) => ({
-      ...person,
-      rank: index + 1,
-    }));
-  }, [liveUserPoints]);
-
-  // Dynamic Full-Screen Leaderboard Data computed DIRECTLY from real liveUserPoints (4,500+ pt)
+  // Dynamic Full-Screen Leaderboard Data computed strictly from Real DB employees
   const dynamicLeaderboardData = useMemo(() => {
-    const colleagues = [
-      { name: 'พี่นิ้ง', weekPoints: 5200, monthPoints: 5100, yearPoints: 5000, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' },
-      { name: 'พี่ฟิล์ม', weekPoints: 4800, monthPoints: 4750, yearPoints: 4700, avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150' },
-      { name: 'กุยช่าย', isMe: true, weekPoints: liveUserPoints, monthPoints: liveUserPoints, yearPoints: liveUserPoints, avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150' },
-      { name: 'Wanatsanun L.', weekPoints: 2400, monthPoints: 2400, yearPoints: 2400, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' },
-      { name: 'ฐิตีรัตน์ ภ.', weekPoints: 1850, monthPoints: 1850, yearPoints: 1850, avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150' },
-      { name: 'Wilas C.', weekPoints: 1200, monthPoints: 1200, yearPoints: 1200, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
-      { name: 'Pureepon S.', weekPoints: 950, monthPoints: 950, yearPoints: 950, avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150' },
-      { name: 'Yodsaphorn T.', weekPoints: 600, monthPoints: 600, yearPoints: 600, avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150' },
-      { name: 'ธนพล ใ.', weekPoints: 300, monthPoints: 300, yearPoints: 300, avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150' },
-      { name: 'Pragasit T.', weekPoints: 100, monthPoints: 100, yearPoints: 100, avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150' },
-    ];
+    const colleagues = realLeaderboard.length > 0
+      ? realLeaderboard.map((e) => {
+          const isMe = e.id === currentUser?.id || e.code === currentUser?.code;
+          const pts = isMe ? Math.max(e.points || 0, liveUserPoints) : (e.points || 0);
+          return {
+            name: e.name,
+            avatar: e.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+            isMe,
+            weekPoints: pts,
+            monthPoints: pts,
+            yearPoints: pts,
+            points: pts,
+          };
+        })
+      : [
+          {
+            name: currentUser?.name || 'พนักงาน',
+            avatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+            isMe: true,
+            weekPoints: liveUserPoints,
+            monthPoints: liveUserPoints,
+            yearPoints: liveUserPoints,
+            points: liveUserPoints,
+          }
+        ];
 
     const calculateRankings = (periodKey) => {
       const listWithPeriodPoints = colleagues.map((c) => ({
@@ -951,7 +805,12 @@ export default function RewardsScreen({ navigation, route }) {
       month: calculateRankings('monthPoints'),
       year: calculateRankings('yearPoints'),
     };
-  }, [liveUserPoints]);
+  }, [realLeaderboard, liveUserPoints, currentUser]);
+
+  // Dynamic leaderboard for main screen (Top 3)
+  const leaderboard = useMemo(() => {
+    return dynamicLeaderboardData.month.all.slice(0, 3);
+  }, [dynamicLeaderboardData]);
 
   const handlePerformRedeem = (targetReward) => {
     const rewardToRedeem = targetReward || selectedReward;
@@ -974,33 +833,40 @@ export default function RewardsScreen({ navigation, route }) {
     });
   };
 
-  const executeRedeemReward = (rewardToRedeem) => {
+  const executeRedeemReward = async (rewardToRedeem) => {
     if (!rewardToRedeem) return;
 
-    // Process point deduction
-    const { userPoints: newPoints, transactions: newTxs } = pointsStorage.addTransaction(
-      rewardToRedeem.title,
-      rewardToRedeem.points,
-      'out',
-      'แลกของรางวัล'
-    );
-    setLiveUserPoints(newPoints);
-    setLiveTransactions(newTxs);
+    // Redeem on the backend FIRST: points are deducted and the coupon code is issued by the server only
+    let couponCode = '';
+    try {
+      const res = await tryFetchApi(`/rewards/${rewardToRedeem.id}/redeem`, {
+        method: 'POST',
+      });
+      if (!res) {
+        throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ยังไม่มีการตัดแต้ม กรุณาลองใหม่อีกครั้ง');
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || 'ไม่สามารถแลกของรางวัลได้');
+      }
+      couponCode = json.redemption?.couponCode || '';
+    } catch (e) {
+      console.error('Error redeeming on backend:', e);
+      setConfirmRedeemPopup({ visible: false, reward: null });
+      Alert.alert('แลกของรางวัลไม่สำเร็จ', e.message || 'ไม่สามารถแลกของรางวัลได้ กรุณาลองใหม่อีกครั้ง');
+      return;
+    }
 
-    // Generate Coupon Voucher Code
-    const prefix = rewardToRedeem.id.includes('shopee')
-      ? 'SHP'
-      : rewardToRedeem.id.includes('starbucks')
-        ? 'STB'
-        : rewardToRedeem.id.includes('lazada')
-          ? 'LAZ'
-          : 'VOU';
-    const code = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Reconcile points + history + coupons with the server
+    await pointsStorage.syncWithBackend();
+    setLiveUserPoints(pointsStorage.getUserPoints());
+    setLiveTransactions(pointsStorage.getTransactions());
+    fetchRealData();
 
     const newRedeemedItem = {
       id: `r_${Date.now()}`,
       title: rewardToRedeem.title,
-      subtitle: `รหัสคูปอง: ${code}`,
+      subtitle: `รหัสคูปอง: ${couponCode}`,
       points: rewardToRedeem.points,
       date: 'วันนี้ • เพิ่งกดแลก',
       status: 'พร้อมใช้งาน',
@@ -1017,7 +883,7 @@ export default function RewardsScreen({ navigation, route }) {
     setRedeemSuccessPopup({
       visible: true,
       reward: rewardToRedeem,
-      voucherCode: code,
+      voucherCode: couponCode,
     });
   };
 
@@ -1028,11 +894,6 @@ export default function RewardsScreen({ navigation, route }) {
       useNativeDriver: true,
     }).start();
 
-    const unsubscribeMissions = missionStorage.subscribe((list) => {
-      setLiveMissions((list || []).filter((m) => m.status !== 'expired').slice(0, 4));
-    });
-
-    return () => unsubscribeMissions();
   }, []);
 
   useEffect(() => {
@@ -1050,7 +911,7 @@ export default function RewardsScreen({ navigation, route }) {
     useCallback(() => {
       setLiveTransactions(pointsStorage.getTransactions());
       setLiveUserPoints(pointsStorage.getUserPoints());
-      missionStorage.fetchMissions();
+      pointsStorage.syncWithBackend();
     }, [])
   );
 
@@ -1064,11 +925,14 @@ export default function RewardsScreen({ navigation, route }) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
+    Promise.all([
+      pointsStorage.syncWithBackend(),
+      fetchRealData(),
+    ]).finally(() => {
       setLiveTransactions(pointsStorage.getTransactions());
       setLiveUserPoints(pointsStorage.getUserPoints());
       setRefreshing(false);
-    }, 1200);
+    });
   }, []);
 
   const filteredPointTransactions = liveTransactions.filter((item) => {
@@ -1134,76 +998,8 @@ export default function RewardsScreen({ navigation, route }) {
 
         {/* Main Content Body (No Inline Transactions) */}
         <Animated.View style={[styles.body, { opacity: fadeAnim }]} className="p-4">
-          {/* Missions */}
-          <View testID="rewards-missions-section" style={styles.sectionHeader} className="flex-row items-center justify-between mb-3 px-1">
-            <Text style={styles.sectionTitle} className="text-base font-bold text-slate-800">🎯 ภารกิจสะสมแต้ม (Missions)</Text>
-            <TouchableOpacity testID="rewards-missions-see-all-btn" onPress={() => navigation && navigation.navigate('Missions')}>
-              <Text style={styles.seeAll} className="text-xs font-semibold text-primary">ดูทั้งหมด</Text>
-            </TouchableOpacity>
-          </View>
-
-          {liveMissions.map((mission) => {
-            const isCompleted = mission.status === 'completed';
-            const isReady = mission.status === 'ready_to_claim';
-            return (
-              <TouchableOpacity
-                key={mission.id}
-                style={[styles.missionCard, isCompleted && { opacity: 0.6 }]}
-                onPress={() => {
-                  if (isCompleted) return;
-                  if (isReady) {
-                    handleClaimMission(mission);
-                  } else {
-                    navigation && navigation.navigate('Missions', { targetMissionId: mission.id, openTimestamp: Date.now() });
-                  }
-                }}
-                activeOpacity={isCompleted ? 1 : 0.85}
-              >
-                <View style={styles.missionLeft}>
-                  <View style={[styles.missionIconBg, { backgroundColor: mission.bgColor || colors.primaryLight }]}>
-                    <Ionicons name={mission.icon} size={20} color={mission.iconColor || colors.primary} />
-                  </View>
-                  <View style={styles.missionInfo}>
-                    <Text style={styles.missionTitle}>{mission.title}</Text>
-                    <View style={styles.missionProgressRow}>
-                      <View style={styles.missionProgressBg}>
-                        <View
-                          style={[
-                            styles.missionProgressFill,
-                            {
-                              width: `${(mission.progress / mission.total) * 100}%`,
-                              backgroundColor: isCompleted ? '#10B981' : isReady ? '#F5A623' : colors.primary,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.missionProgressText}>
-                        {mission.progress}/{mission.total}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                {isCompleted ? (
-                  <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#10B98130' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#10B981' }}>เสร็จสิ้น</Text>
-                  </View>
-                ) : isReady ? (
-                  <TouchableOpacity
-                    onPress={() => handleClaimMission(mission)}
-                    style={{ backgroundColor: '#F5A623', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>🎁 รับรางวัล</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.missionPoints}>
-                    <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.missionPointsText}>+{mission.points}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+          {/* Quests assigned to the employee (pass them to earn points and free rewards) */}
+          <QuestPreviewSection navigation={navigation} />
 
           {/* Redeem Rewards Carousel */}
           <View style={styles.sectionHeader}>
@@ -1218,7 +1014,10 @@ export default function RewardsScreen({ navigation, route }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.rewardsRow}
           >
-            {rewardsCatalog.map((reward) => (
+            {catalogRewards.length === 0 && (
+              <Text style={{ fontSize: 13, color: '#94A3B8', paddingVertical: 24, paddingHorizontal: 8 }}>ยังไม่มีของรางวัลให้แลกในขณะนี้</Text>
+            )}
+            {catalogRewards.map((reward) => (
               <TouchableOpacity
                 testID={`rewards-item-card-${reward.id}`}
                 key={reward.id}
@@ -1560,12 +1359,10 @@ export default function RewardsScreen({ navigation, route }) {
           </View>
 
           {/* Filter Tabs: ทั้งหมด | ยอดนิยม | ไลฟ์สไตล์ | อาหาร */}
-          <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
             {[
               { id: 'all', label: 'ทั้งหมด' },
-              { id: 'popular', label: 'ยอดนิยม' },
-              { id: 'lifestyle', label: 'ไลฟ์สไตล์' },
-              { id: 'food', label: 'อาหาร' },
+              ...[...new Map(catalogRewards.map((r) => [r.category, r.categoryLabel])).entries()].map(([id, label]) => ({ id, label })),
             ].map((tab) => {
               const active = catalogFilter === tab.id;
               return (
@@ -1576,6 +1373,7 @@ export default function RewardsScreen({ navigation, route }) {
                     paddingVertical: 8,
                     borderRadius: 20,
                     marginRight: 8,
+                    marginBottom: 6,
                     backgroundColor: active ? '#1F4C9C' : '#F1F5F9',
                   }}
                   onPress={() => setCatalogFilter(tab.id)}
@@ -1591,7 +1389,10 @@ export default function RewardsScreen({ navigation, route }) {
 
           {/* Catalog List matching Screen 18 Reference Image */}
           <ScrollView style={styles.fullScreenBody} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-            {rewardsCatalog
+            {catalogRewards.length === 0 && (
+              <Text style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingVertical: 40 }}>ยังไม่มีของรางวัลให้แลกในขณะนี้</Text>
+            )}
+            {catalogRewards
               .filter((item) => catalogFilter === 'all' || item.category === catalogFilter)
               .map((reward) => (
                 <TouchableOpacity
@@ -2444,37 +2245,6 @@ export default function RewardsScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* 4. CLAIMED MISSION REWARD OVERLAY */}
-      {claimedModal.visible && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, backgroundColor: 'rgba(15, 23, 42, 0.65)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <Ionicons name="gift" size={38} color="#F59E0B" />
-            </View>
-
-            <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 6 }}>
-              🎉 รับรางวัลสำเร็จ!
-            </Text>
-            <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 14 }}>
-              คุณได้รับคะแนนสะสมจากการทำภารกิจ "{claimedModal.title}"
-            </Text>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, marginBottom: 20, gap: 6 }}>
-              <Ionicons name="star" size={20} color="#F59E0B" />
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#D97706' }}>
-                +{claimedModal.points.toLocaleString()} คะแนน
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={{ backgroundColor: '#1F4C9C', borderRadius: 14, paddingVertical: 12, width: '100%', alignItems: 'center' }}
-              onPress={() => setClaimedModal({ visible: false, points: 0, title: '' })}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>ตกลง</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -2552,80 +2322,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.link,
     fontWeight: '500',
-  },
-  // Missions
-  missionCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    shadowColor: colors.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  missionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  missionIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  missionInfo: {
-    flex: 1,
-  },
-  missionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.title,
-    marginBottom: 6,
-  },
-  missionProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  missionProgressBg: {
-    flex: 1,
-    height: 5,
-    backgroundColor: colors.divider,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginRight: 8,
-  },
-  missionProgressFill: {
-    height: 5,
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  missionProgressText: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  missionPoints: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF8E1',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  missionPointsText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FF8C00',
-    marginLeft: 2,
   },
   // Rewards
   rewardsRow: {

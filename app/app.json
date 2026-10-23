@@ -19,6 +19,23 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WellX989 ใช้ตำแหน่งของคุณเพื่อบันทึกสถานที่ลงเวลาเข้า-ออกงาน"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "WellX989 ขอเข้าถึงรูปภาพของคุณเพื่อใช้เป็นรูปโปรไฟล์",
+          "cameraPermission": "WellX989 ขอใช้กล้องเพื่อถ่ายรูปโปรไฟล์ของคุณ"
+        }
+      ],
+      "expo-status-bar"
+    ]
   }
 }

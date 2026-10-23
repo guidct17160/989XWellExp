@@ -14,7 +14,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { leaveStorage } from '../services/leaveStorage';
-import { otStorage } from '../services/otStorage';
 import { tryFetchApi } from '../services/apiClient';
 import TopNavbar from '../components/TopNavbar';
 
@@ -27,10 +26,9 @@ const thaiMonths = [
 
 export default function RequestStatusScreen({ navigation }) {
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
-  const [otState, setOtState] = useState(otStorage.getState());
   const [refreshing, setRefreshing] = useState(false);
 
-  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'leave' | 'correction' | 'ot'
+  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'leave' | 'correction'
   const [activeStatus, setActiveStatus] = useState('all'); // 'all' | 'รออนุมัติ' | 'อนุมัติ' | 'ไม่อนุมัติ'
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [activeYear, setActiveYear] = useState(new Date().getFullYear());
@@ -40,10 +38,8 @@ export default function RequestStatusScreen({ navigation }) {
       setRefreshing(true);
       await Promise.all([
         leaveStorage.clearAndSync ? leaveStorage.clearAndSync() : Promise.resolve(),
-        otStorage.clearAndSync ? otStorage.clearAndSync() : Promise.resolve(),
       ]);
       setLeaveState(leaveStorage.getState());
-      setOtState(otStorage.getState());
     } catch (e) {
       console.log('Error syncing requests:', e);
     } finally {
@@ -59,10 +55,8 @@ export default function RequestStatusScreen({ navigation }) {
 
   useEffect(() => {
     const unsubLeave = leaveStorage.subscribe((state) => setLeaveState(state));
-    const unsubOt = otStorage.subscribe((state) => setOtState(state));
     return () => {
       unsubLeave();
-      unsubOt();
     };
   }, []);
 
@@ -84,21 +78,14 @@ export default function RequestStatusScreen({ navigation }) {
     }
   };
 
-  // Combine history from Leave Storage & OT Storage
+  // Leave and time-correction history
   const leaveList = (leaveState.leaveHistory || []).map(item => ({
     ...item,
     categoryKey: item.typeId === 'time_correction' || item.type === 'ปรับปรุงเวลางาน' || item.categoryKey === 'correction' ? 'correction' : 'leave',
     categoryName: item.typeId === 'time_correction' || item.type === 'ปรับปรุงเวลางาน' || item.categoryKey === 'correction' ? 'ปรับปรุงเวลา' : 'ลางาน',
   }));
 
-  const otList = (otState.otHistory || []).map(item => ({
-    ...item,
-    categoryKey: 'ot',
-    categoryName: 'ขอ OT',
-    dates: item.dates || (item.start ? item.start : 'ไม่ระบุวัน'),
-  }));
-
-  const combinedList = [...leaveList, ...otList];
+  const combinedList = [...leaveList];
 
   const parseItemDate = (item) => {
     const dateStr = item.start || item.end || item.createdAt;
@@ -167,7 +154,6 @@ export default function RequestStatusScreen({ navigation }) {
               { key: 'all', label: 'ทั้งหมด', icon: 'grid-outline' },
               { key: 'leave', label: 'ลางาน', icon: 'calendar-outline' },
               { key: 'correction', label: 'ปรับปรุงเวลา', icon: 'time-outline' },
-              { key: 'ot', label: 'ขอ OT', icon: 'briefcase-outline' },
             ].map(cat => {
               const isActive = activeCategory === cat.key;
               const count = getCategoryCount(cat.key);

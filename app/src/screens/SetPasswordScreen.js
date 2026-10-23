@@ -16,10 +16,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { tryFetchApi } from '../services/apiClient';
+import { navigationHistory } from '../services/navigationHistory';
 
 export default function SetPasswordScreen({ navigation, route }) {
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
+  const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,31 +37,71 @@ export default function SetPasswordScreen({ navigation, route }) {
       useNativeDriver: true,
     }).start();
 
-    // Extract email from route params or URL query string
+    // Extract email & token from route params or URL query string
     let initialEmail = route?.params?.email || '';
+    let initialToken = route?.params?.token || '';
 
-    if (!initialEmail && typeof window !== 'undefined' && window.location) {
+    if (typeof window !== 'undefined' && window.location) {
       try {
         const searchParams = new URLSearchParams(window.location.search);
-        initialEmail = searchParams.get('email') || '';
+        if (!initialEmail) initialEmail = searchParams.get('email') || '';
+        if (!initialToken) initialToken = searchParams.get('token') || '';
       } catch (e) {}
     }
 
+    if (initialToken) setToken(initialToken);
     if (initialEmail) {
       const decodedEmail = decodeURIComponent(initialEmail);
       setEmail(decodedEmail);
-      // Auto suggest default username prefix from email if empty
-      const suggestedUser = decodedEmail.split('@')[0].replace(/[^a-zA-Z0-9._]/g, '');
-      setUsername(suggestedUser);
     }
   }, [route]);
 
+  const [secondsRemaining, setSecondsRemaining] = useState(null);
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) {
+          base64 += '=';
+        }
+        const atobFn = typeof atob === 'function' ? atob : (input) => {
+          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+          let str = input.replace(/=+$/, '');
+          let output = '';
+          for (let bc = 0, bs = 0, buffer, i = 0;
+            buffer = str.charAt(i++);
+            ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
+              bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
+          ) {
+            buffer = chars.indexOf(buffer);
+          }
+          return output;
+        };
+        const payload = JSON.parse(atobFn(base64));
+        if (payload.exp) {
+          const update = () => {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const remaining = payload.exp - nowSec;
+            if (remaining <= 0) {
+              setSecondsRemaining(0);
+              setIsExpired(true);
+            } else {
+              setSecondsRemaining(remaining);
+            }
+          };
+          update();
+          const timer = setInterval(update, 1000);
+          return () => clearInterval(timer);
+        }
+      }
+    } catch (e) {}
+  }, [token]);
+
   // --- REAL-TIME VALIDATIONS ---
-  // Username Checks
-  const userLenValid = username.length >= 4 && username.length <= 20;
-  const userCharsValid = username.length > 0 && /^[a-zA-Z0-9._]+$/.test(username);
-  const userNoThaiValid = username.length > 0 && !/[\s\u0E00-\u0E7F]/.test(username);
-  const isUsernameValid = userLenValid && userCharsValid && userNoThaiValid;
 
   // Password Checks
   const passLenValid = newPassword.length >= 6;
@@ -73,16 +114,15 @@ export default function SetPasswordScreen({ navigation, route }) {
 
   const handleSetPassword = async () => {
     const cleanEmail = email.trim();
-    const cleanUsername = username.trim();
     const cleanPassword = newPassword.trim();
 
-    if (!cleanEmail) {
-      Alert.alert('แจ้งเตือน', 'กรุณาระบุอีเมลพนักงาน');
+    if (isExpired) {
+      Alert.alert('ลิงก์หมดอายุ', 'ลิงก์ตั้งรหัสผ่านหมดอายุแล้ว (จำกัดเวลา 15 นาที) กรุณาขอลิงก์ใหม่จากผู้ดูแลระบบ');
       return;
     }
 
-    if (!isUsernameValid) {
-      Alert.alert('ข้อกำหนดความปลอดภัย', 'กรุณากรอก Username ให้ถูกต้องครบตามเงื่อนไข (ติ๊กถูกครบถ้วน)');
+    if (!cleanEmail) {
+      Alert.alert('แจ้งเตือน', 'กรุณาระบุอีเมลพนักงาน');
       return;
     }
 
@@ -102,8 +142,9 @@ export default function SetPasswordScreen({ navigation, route }) {
         method: 'POST',
         body: JSON.stringify({
           email: cleanEmail,
-          username: cleanUsername,
+          username: cleanEmail,
           password: cleanPassword,
+          token: token.trim(),
         }),
       });
 
@@ -112,16 +153,12 @@ export default function SetPasswordScreen({ navigation, route }) {
       if (response && response.ok) {
         setSuccess(true);
       } else {
-        const data = response ? await response.json() : null;
-        if (data && !data.success) {
-          Alert.alert('เกิดข้อผิดพลาด', data.message || 'ไม่สามารถตั้งรหัสผ่านได้');
-        } else {
-          setSuccess(true);
-        }
+        const data = response ? await response.json().catch(() => null) : null;
+        Alert.alert('เกิดข้อผิดพลาด', data?.message || 'ไม่สามารถตั้งรหัสผ่านได้ กรุณาตรวจสอบลิงก์หรือติดต่อฝ่าย HR');
       }
     } catch (error) {
       setLoading(false);
-      setSuccess(true);
+      Alert.alert('เกิดข้อผิดพลาด', error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
@@ -151,7 +188,7 @@ export default function SetPasswordScreen({ navigation, route }) {
             {/* Back Button */}
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.navigate('Login')}
+              onPress={() => navigationHistory.goBackSafe(navigation, 'Login')}
             >
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
@@ -160,9 +197,9 @@ export default function SetPasswordScreen({ navigation, route }) {
               <View style={styles.iconCircle}>
                 <Ionicons name="shield-checkmark-sharp" size={32} color="#F43F5E" />
               </View>
-              <Text style={styles.title}>ตั้งบัญชีผู้ใช้ & รหัสผ่านใหม่</Text>
+              <Text style={styles.title}>ตั้งรหัสผ่านเข้าใช้งาน</Text>
               <Text style={styles.subtitle}>
-                กำหนด Username และ Password สำหรับเข้าใช้งาน WellX989
+                กำหนดรหัสผ่านสำหรับเข้าใช้งาน WellX989 Mobile App
               </Text>
             </View>
 
@@ -171,10 +208,10 @@ export default function SetPasswordScreen({ navigation, route }) {
                 <View style={styles.successIconCircle}>
                   <Ionicons name="checkmark-circle" size={64} color="#10B981" />
                 </View>
-                <Text style={styles.successTitle}>เปิดใช้งานบัญชีสำเร็จ!</Text>
+                <Text style={styles.successTitle}>ตั้งรหัสผ่านสำเร็จ!</Text>
                 <Text style={styles.successSubtitle}>
-                  ชื่อผู้ใช้: <Text style={{ color: '#F43F5E', fontWeight: 'bold' }}>{username}</Text>{'\n'}
-                  บันทึกข้อมูลเรียบร้อยแล้ว สามารถเข้าสู่ระบบด้วย Username หรือ Email นี้ได้ทันที
+                  ชื่อผู้ใช้ (Username): <Text style={{ color: '#F43F5E', fontWeight: 'bold' }}>{email}</Text>{'\n'}
+                  บันทึกรหัสผ่านเรียบร้อยแล้ว สามารถเข้าสู่ระบบด้วย Email นี้ได้ทันที
                 </Text>
 
                 <TouchableOpacity
@@ -187,8 +224,8 @@ export default function SetPasswordScreen({ navigation, route }) {
               </View>
             ) : (
               <View style={styles.card}>
-                {/* Readonly Verified Email */}
-                <Text style={styles.label}>อีเมลพนักงานที่ยืนยันแล้ว (Verified Email)</Text>
+                {/* Readonly Verified Email & Username Notice */}
+                <Text style={styles.label}>อีเมลพนักงาน (ใช้เป็น Username สำหรับเข้าแอป)</Text>
                 <View style={[styles.inputContainer, styles.readonlyInput]}>
                   <Ionicons name="mail-unread-outline" size={20} color="#64748B" style={styles.inputIcon} />
                   <TextInput
@@ -198,43 +235,35 @@ export default function SetPasswordScreen({ navigation, route }) {
                   />
                   <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                 </View>
-
-                {/* Username Input */}
-                <Text style={styles.label}>ตั้งชื่อผู้ใช้งาน (Username) *</Text>
-                <View style={[
-                  styles.inputContainer,
-                  isUsernameValid && styles.inputSuccessBorder
-                ]}>
-                  <Ionicons name="person-outline" size={20} color={isUsernameValid ? '#10B981' : '#94A3B8'} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="เช่น somchai_it หรือ dev01"
-                    placeholderTextColor="#64748B"
-                    value={username}
-                    onChangeText={setUsername}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  {isUsernameValid && (
-                    <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                  )}
+                <View style={styles.usernameNoticeBox}>
+                  <Ionicons name="information-circle-outline" size={16} color="#3B82F6" style={{ marginRight: 6 }} />
+                  <Text style={styles.usernameNoticeText}>
+                    ระบบใช้ Email นี้เป็นชื่อผู้ใช้งาน (Username) สำหรับเข้าสู่ระบบอัตโนมัติ
+                  </Text>
                 </View>
 
-                {/* Username Interactive Checklist */}
-                <View style={styles.checklistCard}>
-                  <Text style={styles.checklistHeader}>ข้อกำหนดชื่อผู้ใช้ (Username Rules):</Text>
-                  <RequirementItem
-                    isMet={userLenValid}
-                    label="ความยาว 4 - 20 ตัวอักษร"
-                  />
-                  <RequirementItem
-                    isMet={userCharsValid}
-                    label="ใช้ภาษาอังกฤษ (A-Z, a-z), ตัวเลข (0-9), _ หรือ ."
-                  />
-                  <RequirementItem
-                    isMet={userNoThaiValid}
-                    label="ไม่มีภาษาไทย หรือช่องว่าง (Space)"
-                  />
+                {/* 15-Minute Expiration Countdown Badge */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  borderWidth: 1,
+                  borderColor: isExpired ? '#EF4444' : '#10B981',
+                  marginBottom: 16,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="time-outline" size={16} color={isExpired ? '#EF4444' : '#10B981'} style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: isExpired ? '#EF4444' : '#10B981' }}>
+                      {isExpired ? 'ลิงก์หมดอายุแล้ว (เกิน 15 นาที)' : 'เวลาที่เหลือ (จำกัด 15 นาที):'}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: isExpired ? '#EF4444' : '#10B981' }}>
+                    {isExpired ? '00:00' : secondsRemaining !== null ? `${String(Math.floor(secondsRemaining / 60)).padStart(2, '0')}:${String(secondsRemaining % 60).padStart(2, '0')}` : '15:00'}
+                  </Text>
                 </View>
 
                 {/* New Password Input */}
@@ -314,10 +343,10 @@ export default function SetPasswordScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    (!isUsernameValid || !isPasswordValid || !isConfirmValid) && styles.disabledButton
+                    (!isPasswordValid || !isConfirmValid || isExpired) && styles.disabledButton
                   ]}
                   onPress={handleSetPassword}
-                  disabled={loading}
+                  disabled={loading || !isPasswordValid || !isConfirmValid || isExpired}
                 >
                   {loading ? (
                     <ActivityIndicator color="#FFFFFF" />
@@ -512,5 +541,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
+  },
+  usernameNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: -8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  usernameNoticeText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    flex: 1,
+    lineHeight: 16,
   },
 });

@@ -9,56 +9,36 @@ import {
   TextInput,
   Animated,
   StatusBar,
-  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
 import { tryFetchApi } from '../services/apiClient';
+import { navigationHistory } from '../services/navigationHistory';
+import { useTheme } from '../context/ThemeContext';
 
-const initialAnnouncements = [
-  {
-    id: '1',
-    category: 'อัปเดตระบบ',
-    categoryColor: '#3AAAE8',
-    title: '📢 ประกาศปิดปรับปรุงระบบประจำเดือน',
-    desc: 'ระบบจะทำการปิดปรับปรุงชั่วคราวเพื่ออัปเกรดประสิทธิภาพในวันเสาร์ที่ 2 สิงหาคม เวลา 22:00 - 02:00 น. กรุณาวางแผนการใช้งานล่วงหน้า',
-    time: '26 ก.ค. 2026',
-    isNew: true,
-    author: 'ฝ่ายไอทีและระบบบริหาร',
-  },
-  {
-    id: '2',
-    category: 'โปรโมชั่น & กิจกรรม',
-    categoryColor: '#D93A8B',
-    title: '🎉 กิจกรรม Team Building พัทยา 2026',
-    desc: 'ขอเชิญชวนพนักงานทุกคนเข้าร่วมกิจกรรม Team Building ประจำปี ณ โรงแรมดุสิตธานี พัทยา วันที่ 15-16 ส.ค. นี้ ฟรีตลอดงาน! สามารถลงทะเบียนได้แล้ววันนี้',
-    time: '24 ก.ค. 2026',
-    isNew: true,
-    author: 'ฝ่ายทรัพยากรบุคคล (HR)',
-  },
-  {
-    id: '3',
-    category: 'ประกาศสำคัญ',
-    categoryColor: '#1F4C9C',
-    title: '⚠️ แจ้งเปลี่ยนแปลงระเบียบการเบิกค่ารักษาพยาบาล',
-    desc: 'ฝ่าย HR ขอแจ้งปรับปรุงขั้นตอนการยื่นเอกสารเบิกค่ารักษาพยาบาลรูปแบบใหม่ ผ่านระบบดิจิทัล เริ่มใช้งานตั้งแต่วันที่ 1 ส.ค. เป็นต้นไป',
-    time: '20 ก.ค. 2026',
-    isNew: false,
-    author: 'ฝ่ายสวัสดิการและสิทธิประโยชน์',
-  },
-];
-
-const categories = ['ทั้งหมด', 'ประกาศสำคัญ', 'โปรโมชั่น & กิจกรรม', 'อัปเดตระบบ'];
+const getCategoryColor = (cat) => {
+  if (cat?.includes('สำคัญ') || cat?.toLowerCase().includes('important')) return '#EF4444';
+  if (cat?.includes('โปรโมชั่น') || cat?.toLowerCase().includes('promo')) return '#EC4899';
+  if (cat?.includes('ระบบ') || cat?.toLowerCase().includes('system')) return '#3B82F6';
+  return '#8B5CF6';
+};
 
 export default function AnnouncementsScreen({ navigation, route }) {
+  const { theme, isDarkMode, t, language } = useTheme();
   const scrollViewRef = useRef(null);
 
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
-  const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(language === 'en' ? 'All' : 'ทั้งหมด');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const categories = language === 'en'
+    ? ['All', 'Announcements', 'Promotions & Events', 'System Updates']
+    : ['ทั้งหมด', 'ประกาศสำคัญ', 'โปรโมชั่น & กิจกรรม', 'อัปเดตระบบ'];
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -67,20 +47,31 @@ export default function AnnouncementsScreen({ navigation, route }) {
       useNativeDriver: true,
     }).start();
 
-    // Fetch from backend database API
+    // Fetch from real PostgreSQL database API
     const fetchAnnouncements = async () => {
+      setLoading(true);
       try {
         const res = await tryFetchApi('/announcements');
         if (res && res.ok) {
           const data = await res.json();
-          if (data && data.success && Array.isArray(data.announcements) && data.announcements.length > 0) {
-            setAnnouncements(data.announcements);
+          if (data && data.success && Array.isArray(data.announcements)) {
+            const mapped = data.announcements.map((a) => ({
+              ...a,
+              desc: a.desc || a.content,
+              categoryColor: a.categoryColor || getCategoryColor(a.category),
+              time: a.time || (a.createdAt ? new Date(a.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH') : ''),
+            }));
+            setAnnouncements(mapped);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error fetching announcements:', e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchAnnouncements();
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     if (route?.params?.selectedAnnouncement) {
@@ -91,91 +82,88 @@ export default function AnnouncementsScreen({ navigation, route }) {
   const handleCloseDetail = () => {
     setSelectedItem(null);
     if (route?.params?.fromHome) {
-      navigation.goBack();
+      navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'Home' });
     }
   };
 
   const filteredItems = announcements.filter((item) => {
     const matchCategory = selectedCategory === 'ทั้งหมด' || item.category === selectedCategory;
     const matchSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.desc.toLowerCase().includes(searchQuery.toLowerCase());
+      String(item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(item.desc || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchCategory && matchSearch;
   });
 
   // If an announcement is selected, render full-screen detail view natively without Modal overlay
   if (selectedItem) {
     return (
-      <SafeAreaView testID="screen-announcement-detail" className="flex-1 bg-white" style={styles.fullModalSafeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView testID="screen-announcement-detail" style={[styles.fullModalSafeArea, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
         {/* Full Screen Header */}
-        <View style={styles.fullModalHeader} className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100">
+        <View style={[styles.fullModalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <TouchableOpacity
             testID="announcement-detail-back-btn"
-            style={styles.fullModalBackBtn}
-            className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center"
+            style={[styles.fullModalBackBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
             onPress={handleCloseDetail}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={styles.fullModalHeaderTitle} className="text-base font-bold text-slate-900" numberOfLines={1}>
-            รายละเอียดประกาศ
+          <Text style={[styles.fullModalHeaderTitle, { color: theme.text }]} numberOfLines={1}>
+            {language === 'en' ? 'Announcement Details' : 'รายละเอียดประกาศ'}
           </Text>
           <View style={{ width: 24 }} />
         </View>
 
         {/* Modal Content ScrollView */}
         <ScrollView
-          style={styles.fullModalScroll}
-          className="flex-1 bg-white p-6"
+          style={[styles.fullModalScroll, { backgroundColor: theme.background }]}
           contentContainerStyle={styles.fullModalContent}
           showsVerticalScrollIndicator={false}
         >
           {/* Category & Time Badge Row */}
-          <View style={styles.fullModalMetaBadgeRow} className="flex-row items-center justify-between mb-4">
-            <View style={[styles.badge, { backgroundColor: (selectedItem?.categoryColor || '#1F4C9C') + '18' }]} className="px-3 py-1 rounded-full">
-              <Text style={[styles.badgeText, { color: selectedItem?.categoryColor || '#1F4C9C' }]} className="text-xs font-bold">
+          <View style={styles.fullModalMetaBadgeRow}>
+            <View style={[styles.badge, { backgroundColor: (selectedItem?.categoryColor || '#1F4C9C') + '18' }]}>
+              <Text style={[styles.badgeText, { color: selectedItem?.categoryColor || '#1F4C9C' }]}>
                 {selectedItem?.category}
               </Text>
             </View>
-            <View style={styles.timeWrapper} className="flex-row items-center">
-              <Ionicons name="calendar-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
-              <Text style={styles.timeText} className="text-xs text-slate-500">{selectedItem?.time}</Text>
+            <View style={styles.timeWrapper}>
+              <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
+              <Text style={[styles.timeText, { color: theme.textSecondary }]}>{selectedItem?.time}</Text>
             </View>
           </View>
 
           {/* Title */}
-          <Text style={styles.fullModalTitle} className="text-xl font-bold text-slate-900 mb-4 leading-7">{selectedItem?.title}</Text>
+          <Text style={[styles.fullModalTitle, { color: theme.text }]}>{selectedItem?.title}</Text>
 
           {/* Author info card */}
-          <View style={styles.authorCard} className="flex-row items-center bg-slate-50 p-3 rounded-xl mb-4 border border-slate-100">
-            <View style={styles.authorAvatar} className="w-8 h-8 rounded-full bg-primary-light items-center justify-center mr-3">
-              <Ionicons name="person" size={18} color="#1F4C9C" />
+          <View style={[styles.authorCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.authorAvatar}>
+              <Ionicons name="person" size={18} color={colors.primary} />
             </View>
             <View style={styles.authorInfo}>
-              <Text style={styles.authorLabel} className="text-[10px] text-slate-400">ผู้ออกประกาศ</Text>
-              <Text style={styles.authorName} className="text-xs font-semibold text-slate-700">{selectedItem?.author}</Text>
+              <Text style={[styles.authorLabel, { color: theme.textSecondary }]}>{language === 'en' ? 'Announcer' : 'ผู้ออกประกาศ'}</Text>
+              <Text style={[styles.authorName, { color: theme.text }]}>{selectedItem?.author}</Text>
             </View>
           </View>
 
-          <View style={styles.fullModalDivider} className="h-px bg-slate-100 my-4" />
+          <View style={[styles.fullModalDivider, { backgroundColor: theme.border }]} />
 
           {/* Body Description */}
-          <Text style={styles.fullModalBodyText} className="text-base text-slate-700 leading-6">{selectedItem?.desc}</Text>
+          <Text style={[styles.fullModalBodyText, { color: theme.text }]}>{selectedItem?.desc || selectedItem?.content}</Text>
         </ScrollView>
 
         {/* Bottom Action Footer */}
-        <View style={styles.fullModalFooter} className="p-4 bg-white border-t border-slate-100">
+        <View style={[styles.fullModalFooter, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
           <TouchableOpacity
             testID="announcement-detail-close-btn"
             style={styles.fullModalConfirmBtn}
-            className="w-full bg-primary rounded-xl py-3.5 items-center justify-center"
             onPress={handleCloseDetail}
             activeOpacity={0.88}
           >
-            <Text style={styles.fullModalConfirmText} className="text-white font-bold text-base">รับทราบ / ปิดหน้าต่าง</Text>
+            <Text style={styles.fullModalConfirmText}>{language === 'en' ? 'Acknowledge & Close' : 'รับทราบ / ปิดหน้าต่าง'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -183,28 +171,27 @@ export default function AnnouncementsScreen({ navigation, route }) {
   }
 
   return (
-    <SafeAreaView testID="screen-announcements" className="flex-1 bg-white" style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView testID="screen-announcements" style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Top Navbar */}
-      <TopNavbar navigation={navigation} title="ประกาศ / โปรโมท" showBack />
+      <TopNavbar navigation={navigation} title={t('announcements')} showBack />
 
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]} className="flex-1 bg-slate-50">
+      <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: theme.background }]}>
         {/* Search Bar */}
-        <View style={styles.searchContainer} className="flex-row items-center bg-white m-4 px-4 py-3 rounded-xl border border-slate-200 shadow-sm">
-          <Ionicons name="search-outline" size={20} color="#64748B" style={styles.searchIcon} className="mr-3" />
+        <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Ionicons name="search-outline" size={20} color={theme.textSecondary} style={styles.searchIcon} />
           <TextInput
             testID="announcements-search-input"
-            style={styles.searchInput}
-            className="flex-1 text-base text-slate-900"
-            placeholder="ค้นหาประกาศ หรือ โปรโมชั่น..."
-            placeholderTextColor="#94A3B8"
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder={language === 'en' ? 'Search announcements...' : 'ค้นหาประกาศ หรือ โปรโมชั่น...'}
+            placeholderTextColor={theme.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery !== '' && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -215,7 +202,6 @@ export default function AnnouncementsScreen({ navigation, route }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.categoryScroll}
-          className="px-4 mb-3"
           contentContainerStyle={styles.categoryContent}
         >
           {categories.map((cat) => (
@@ -224,17 +210,15 @@ export default function AnnouncementsScreen({ navigation, route }) {
               key={cat}
               style={[
                 styles.categoryChip,
-                selectedCategory === cat && styles.categoryChipActive,
+                { backgroundColor: selectedCategory === cat ? colors.primary : theme.surface, borderColor: theme.border },
               ]}
-              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat ? 'bg-primary' : 'bg-white border border-slate-200'}`}
               onPress={() => setSelectedCategory(cat)}
             >
               <Text
                 style={[
                   styles.categoryChipText,
-                  selectedCategory === cat && styles.categoryChipTextActive,
+                  { color: selectedCategory === cat ? '#FFFFFF' : theme.text },
                 ]}
-                className={`text-xs font-semibold ${selectedCategory === cat ? 'text-white' : 'text-slate-600'}`}
               >
                 {cat}
               </Text>
@@ -246,52 +230,54 @@ export default function AnnouncementsScreen({ navigation, route }) {
         <ScrollView
           testID="announcements-list"
           ref={scrollViewRef}
-          style={styles.listScroll}
-          className="flex-1 bg-slate-50"
+          style={[styles.listScroll, { backgroundColor: theme.background }]}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         >
-          {filteredItems.length === 0 ? (
-            <View style={styles.emptyContainer} className="items-center justify-center py-12">
-              <Ionicons name="newspaper-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyText} className="text-sm font-medium text-slate-400">ไม่พบประกาศหรือโปรโมชั่นในหมวดหมู่นี้</Text>
+          {loading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="newspaper-outline" size={48} color={theme.textSecondary} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{t('noAnnouncements')}</Text>
             </View>
           ) : (
             filteredItems.map((item) => (
               <TouchableOpacity
                 testID={`announcement-item-${item.id}`}
                 key={item.id}
-                style={styles.card}
-                className="bg-white mx-4 my-2 p-4 rounded-2xl border border-slate-100 shadow-sm"
+                style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
                 activeOpacity={0.88}
                 onPress={() => setSelectedItem(item)}
               >
-                <View style={styles.cardHeader} className="flex-row items-center justify-between mb-2">
-                  <View style={[styles.badge, { backgroundColor: item.categoryColor + '18' }]} className="px-2.5 py-0.5 rounded-full">
-                    <Text style={[styles.badgeText, { color: item.categoryColor }]} className="text-[11px] font-bold">
+                <View style={styles.cardHeader}>
+                  <View style={[styles.badge, { backgroundColor: (item.categoryColor || '#1F4C9C') + '18' }]}>
+                    <Text style={[styles.badgeText, { color: item.categoryColor || '#1F4C9C' }]}>
                       {item.category}
                     </Text>
                   </View>
 
                   <View style={styles.timeWrapper}>
-                    <Ionicons name="calendar-outline" size={13} color="#64748B" style={{ marginRight: 4 }} />
-                    <Text style={styles.timeText}>{item.time}</Text>
+                    <Ionicons name="calendar-outline" size={13} color={theme.textSecondary} style={{ marginRight: 4 }} />
+                    <Text style={[styles.timeText, { color: theme.textSecondary }]}>{item.time}</Text>
                   </View>
                 </View>
 
-                <Text style={styles.cardTitle} numberOfLines={2}>
+                <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
                   {item.title}
                 </Text>
 
-                <Text style={styles.cardDesc} numberOfLines={3}>
-                  {item.desc}
+                <Text style={[styles.cardDesc, { color: theme.textSecondary }]} numberOfLines={3}>
+                  {item.desc || item.content}
                 </Text>
 
                 <View style={styles.cardFooter}>
-                  <Text style={styles.authorText}>โดย: {item.author}</Text>
+                  <Text style={[styles.authorText, { color: theme.textSecondary }]}>{language === 'en' ? 'By' : 'โดย'}: {item.author}</Text>
                   <View style={styles.readMoreBtn}>
-                    <Text style={styles.readMoreText}>อ่านเพิ่มเติม</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#1F4C9C" />
+                    <Text style={[styles.readMoreText, { color: colors.primary }]}>{language === 'en' ? 'Read more' : 'อ่านเพิ่มเติม'}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.primary} />
                   </View>
                 </View>
               </TouchableOpacity>

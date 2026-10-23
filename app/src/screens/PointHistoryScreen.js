@@ -23,6 +23,9 @@ export default function PointHistoryScreen({ navigation }) {
   const [transactions, setTransactions] = useState(pointsStorage.getTransactions());
 
   useEffect(() => {
+    if (pointsStorage && typeof pointsStorage.syncWithBackend === 'function') {
+      pointsStorage.syncWithBackend();
+    }
     let unsubscribe = () => {};
     if (pointsStorage && typeof pointsStorage.subscribe === 'function') {
       unsubscribe = pointsStorage.subscribe(({ userPoints: newPoints, transactions: newTxs }) => {

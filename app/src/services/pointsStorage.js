@@ -53,22 +53,36 @@ const saveState = () => {
   } catch (e) {}
 };
 
+// Map a backend point_transactions row { id, title, points (signed), type: 'earn'|'spend', category, date: 'YYYY-MM-DD' }
+// to the UI shape { type: 'in'|'out', points: positive number, date: Thai string }
+const normalizeBackendTxn = (t) => {
+  const rawPoints = Number(t.points) || 0;
+  const isOut = t.type === 'spend' || t.type === 'out' || t.type === 'redeem' || rawPoints < 0;
+  let dateLabel = t.date;
+  if (typeof t.date === 'string' && /^d{4}-d{2}-d{2}/.test(t.date)) {
+    const [y, m, d] = t.date.slice(0, 10).split('-').map(Number);
+    dateLabel = new Date(y, m - 1, d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  return {
+    id: t.id,
+    title: t.title,
+    points: Math.abs(rawPoints),
+    type: isOut ? 'out' : 'in',
+    date: dateLabel,
+    category: t.category || (isOut ? 'แลกของรางวัล' : 'ทั่วไป'),
+  };
+};
+
 const syncWithBackend = async () => {
   try {
     const res = await tryFetchApi('/points/history');
     if (res && res.ok) {
       const data = await res.json();
       if (data && data.success) {
-        // Backend returns { currentPoints, history } — map to local field names
-        const backendTxns = Array.isArray(data.transactions) ? data.transactions : (Array.isArray(data.history) ? data.history : []);
-        if (backendTxns.length > 0) {
-          const mergedTxns = [...backendTxns];
-          (globalTransactions || []).forEach((localItem) => {
-            if (localItem && !mergedTxns.some((b) => b.id === localItem.id)) {
-              mergedTxns.push(localItem);
-            }
-          });
-          globalTransactions = mergedTxns;
+        // Backend returns { currentPoints, history } — server is the source of truth (no local-only merge)
+        const backendTxns = Array.isArray(data.transactions) ? data.transactions : (Array.isArray(data.history) ? data.history : null);
+        if (backendTxns) {
+          globalTransactions = backendTxns.map(normalizeBackendTxn);
         }
         const backendPoints = typeof data.userPoints === 'number' ? data.userPoints : (typeof data.currentPoints === 'number' ? data.currentPoints : null);
         if (backendPoints !== null && backendPoints >= 0) {
@@ -127,12 +141,6 @@ export const pointsStorage = {
 
     globalTransactions = [newEntry, ...globalTransactions];
     saveState();
-
-    if (type === 'out') {
-      try {
-        tryFetchApi(`/rewards/${globalTransactions[0]?.rewardId || 'unknown'}/redeem`, { method: 'POST' });
-      } catch (e) {}
-    }
 
     // Notify all subscribers
     listeners.forEach((fn) => {

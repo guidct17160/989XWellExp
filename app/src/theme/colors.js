@@ -111,9 +111,6 @@ export const colors = {
   badgeRed: '#E93B81',
   badgeText: '#FFFFFF',
 
-  // 💵 16. Salary/Payslip
-  salaryGreen: '#10B981',
-  salaryRed: '#EF4444',
 };
 
 export default colors;

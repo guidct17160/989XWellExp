@@ -18,59 +18,26 @@ import { useScrollToTop } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { attendanceStorage } from '../services/attendanceStorage';
 import { notificationStorage } from '../services/notificationStorage';
-import { missionStorage } from '../services/missionStorage';
 import { tryFetchApi } from '../services/apiClient';
 import TopNavbar from '../components/TopNavbar';
+import PunchLocationModal from '../components/PunchLocationModal';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const quickActions = [
   { id: '1', icon: 'calendar-number-outline', label: 'ปฏิทิน', color: '#3B82F6' },
   { id: '2', icon: 'calendar-outline', label: 'ลางาน', color: '#10B981' },
-  { id: '3', icon: 'document-text-outline', label: 'สลิป\nเงินเดือน', color: '#F59E0B' },
   { id: '4', icon: 'people-outline', label: 'ทีมงาน', color: '#7C3AED' },
-];
-
-const announcements = [
-  {
-    id: 'ann_1',
-    category: 'ประกาศสำคัญ',
-    categoryColor: '#1F4C9C',
-    title: '📢 ประชุมทีม Q3 Planning & Strategy',
-    desc: 'ขอเชิญชวนทีมงานทุกคนเข้าร่วมประชุม Q3 Planning ในวันศุกร์ที่ 25 ก.ค. เวลา 10:00 น. ณ ห้อง Meeting A เพื่อร่วมวางแผนเป้าหมายและยุทธศาสตร์หลักสำหรับไตรมาสที่ 3',
-    time: '25 ก.ค. 2026',
-    isNew: true,
-    author: 'ฝ่ายบริหารและวางแผน',
-  },
-  {
-    id: 'ann_2',
-    category: 'โปรโมชั่น & กิจกรรม',
-    categoryColor: '#D93A8B',
-    title: '🎉 กิจกรรม Team Building พัทยา 2026',
-    desc: 'ขอเชิญชวนพนักงานทุกคนเข้าร่วมกิจกรรม Team Building ประจำปี ณ โรงแรมดุสิตธานี พัทยา วันที่ 15-16 ส.ค. นี้ ฟรีตลอดงาน! สามารถลงทะเบียนได้แล้ววันนี้',
-    time: '24 ก.ค. 2026',
-    isNew: false,
-    author: 'ฝ่ายทรัพยากรบุคคล (HR)',
-  },
-  {
-    id: 'ann_3',
-    category: 'อัปเดตระบบ',
-    categoryColor: '#3AAAE8',
-    title: '📢 ประกาศปิดปรับปรุงระบบประจำเดือน',
-    desc: 'ระบบจะทำการปิดปรับปรุงชั่วคราวเพื่ออัปเกรดประสิทธิภาพในวันเสาร์ที่ 2 สิงหาคม เวลา 22:00 - 02:00 น. กรุณาวางแผนการใช้งานล่วงหน้า',
-    time: '26 ก.ค. 2026',
-    isNew: false,
-    author: 'ฝ่ายไอทีและระบบ',
-  },
 ];
 
 const menuItems = [
   { icon: 'calendar-outline', label: 'ปฏิทิน', color: '#27AE60', screen: 'TimeAttendance' },
   { icon: 'calendar-outline', label: 'ลางาน', color: '#F5A623', screen: 'LeaveRequest' },
-  { icon: 'document-text-outline', label: 'สลิปเงินเดือน', color: '#9B59B6', screen: 'Payslip' },
   { icon: 'people-outline', label: 'ทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory' },
   { icon: 'sync-outline', label: 'ปรับเวลา', color: '#00B8D4', screen: 'TimeCorrection' },
+  { icon: 'trophy-outline', label: 'ภารกิจ', color: '#F59E0B', screen: 'Quests' },
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -80,20 +47,27 @@ export default function HomeScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const { theme, isDarkMode, t, language } = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [attendance, setAttendance] = useState(attendanceStorage.getState());
   const [unreadCount, setUnreadCount] = useState(notificationStorage.getUnreadCount());
+  const [announcements, setAnnouncements] = useState([]);
 
-  // Live mission data from shared storage — first 3 daily missions for home
-  const [liveMissions, setLiveMissions] = useState(
-    missionStorage.getMissions().filter((m) => m.category === 'daily').slice(0, 3)
-  );
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await tryFetchApi('/announcements');
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.announcements)) {
+          setAnnouncements(data.announcements);
+        }
+      }
+    } catch (e) {}
+  };
 
   useFocusEffect(
     useCallback(() => {
-      setLiveMissions(
-        missionStorage.getMissions().filter((m) => m.category === 'daily').slice(0, 3)
-      );
+      fetchAnnouncements();
     }, [])
   );
 
@@ -121,11 +95,6 @@ export default function HomeScreen({ navigation }) {
       setUnreadCount(notificationStorage.getUnreadCount());
     });
 
-    // Subscribe to mission storage
-    const unsubscribeMission = missionStorage.subscribe((list) => {
-      setLiveMissions((list || []).filter((m) => m.category === 'daily').slice(0, 3));
-    });
-
     // Update current time every second
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -134,7 +103,6 @@ export default function HomeScreen({ navigation }) {
     return () => {
       unsubscribeAttendance();
       unsubscribeNotif();
-      unsubscribeMission();
       clearInterval(timer);
     };
   }, []);
@@ -201,23 +169,20 @@ export default function HomeScreen({ navigation }) {
     const inMin = checkIn.getMinutes();
     const isLate = inHour > 9 || (inHour === 9 && inMin > 0);
 
-    // 4. Incomplete Hours Check (Must be at least 8 hours minus 15 min tolerance = 27,900 seconds)
-    const isIncompleteHours = diffInSeconds < (8 * 3600 - 900);
+    // 4. Incomplete Hours Check (Must work at least 9 hours = 32,400 seconds)
+    const isIncompleteHours = diffInSeconds < 9 * 3600;
 
     let status = 'ลงเวลาเข้า-ออกครบถ้วน';
     let isIncomplete = false;
     let statusColor = '#27AE60'; // Green
 
-    if (isLate && isIncompleteHours) {
-      status = 'เข้างานสาย และ ทำงานไม่ครบเวลา';
-      isIncomplete = true;
-      statusColor = '#EF4444'; // Red
-    } else if (isLate) {
+    // late is checked first; only when on time are the worked hours checked
+    if (isLate) {
       status = 'เข้างานสาย';
       isIncomplete = true;
       statusColor = '#EF4444'; // Red
     } else if (isIncompleteHours) {
-      status = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / น้อยกว่า 4 ชม.)';
+      status = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / น้อยกว่า 9 ชม.)';
       isIncomplete = true;
       statusColor = '#F5A623'; // Amber
     }
@@ -232,8 +197,36 @@ export default function HomeScreen({ navigation }) {
     };
   };
 
+  const isPunchingRef = useRef(false);
+
+  // กดเข้า/ออกงาน → เปิดหน้าเลือกสถานที่ (ค้นหาตำแหน่ง + แผนที่) แล้วค่อยบันทึกเวลาเมื่อเลือกสถานที่แล้ว
+  const [pickerKind, setPickerKind] = useState(null);
+
   const handleCheckInOut = () => {
+    if (isPunchingRef.current) return;
+    setPickerKind(attendanceStorage.getState().isCheckedIn ? 'clock-out' : 'clock-in');
+  };
+
+  const onLocationSelected = (selection) => {
+    setPickerKind(null);
+    performCheckInOut(selection || {});
+  };
+
+  const performCheckInOut = async (locationExtra) => {
+    if (isPunchingRef.current) return;
     const state = attendanceStorage.getState();
+
+    // บันทึกลงเซิร์ฟเวอร์ก่อน — ถ้าไม่สำเร็จจะไม่บันทึกเวลาในเครื่อง (ไม่มีข้อมูลค้างเฉพาะบนอุปกรณ์)
+    isPunchingRef.current = true;
+    try {
+      await attendanceStorage.punch(state.isCheckedIn ? 'clock-out' : 'clock-in', locationExtra);
+    } catch (e) {
+      Alert.alert(state.isCheckedIn ? 'บันทึกเวลาออกงานไม่สำเร็จ' : 'บันทึกเวลาเข้างานไม่สำเร็จ', e.message);
+      return;
+    } finally {
+      isPunchingRef.current = false;
+    }
+
     const now = new Date();
     const formattedTimeStr = formatTime(now) + ' น.';
     const formattedDateStr = now.toLocaleDateString('th-TH', {
@@ -254,17 +247,6 @@ export default function HomeScreen({ navigation }) {
         checkOutTime: null,
       });
 
-      try {
-        tryFetchApi('/attendance/clock-in', {
-          method: 'POST',
-          body: JSON.stringify({
-            latitude: 13.7563,
-            longitude: 100.5018,
-            locationName: 'อาคารสำนักงานใหญ่ WellX989',
-          }),
-        });
-      } catch (e) {}
-
       notificationStorage.addNotification({
         id: 'att_in_' + Date.now(),
         type: 'info',
@@ -276,6 +258,7 @@ export default function HomeScreen({ navigation }) {
         unread: true,
         screen: 'TimeAttendance',
       });
+      attendanceStorage.refresh();
     } else {
       // 🔴 กดออกงาน (Check Out -> บันทึกเวลาออกและสรุประยะเวลาทำงาน)
       const checkoutTimeVal = now;
@@ -311,17 +294,6 @@ export default function HomeScreen({ navigation }) {
         history: [newRecord, ...currentHistory],
       });
 
-      try {
-        tryFetchApi('/attendance/clock-out', {
-          method: 'POST',
-          body: JSON.stringify({
-            latitude: 13.7563,
-            longitude: 100.5018,
-            locationName: 'อาคารสำนักงานใหญ่ WellX989',
-          }),
-        });
-      } catch (e) {}
-
       notificationStorage.addNotification({
         id: 'att_out_' + Date.now(),
         type: 'success',
@@ -333,6 +305,7 @@ export default function HomeScreen({ navigation }) {
         unread: true,
         screen: 'TimeAttendance',
       });
+      attendanceStorage.refresh();
     }
   };
 
@@ -340,6 +313,9 @@ export default function HomeScreen({ navigation }) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    attendanceStorage.refresh();
+    notificationStorage.clearAndSync();
+    fetchAnnouncements();
     setAttendance(attendanceStorage.getState());
     setUnreadCount(notificationStorage.getUnreadCount());
     setCurrentTime(new Date());
@@ -370,7 +346,7 @@ export default function HomeScreen({ navigation }) {
       >
         {/* Header Section */}
         <View style={styles.headerContainer} className="bg-primary px-4 pt-4 pb-14 rounded-b-3xl items-center ">
-          {/* Mockup Attendance Card */}
+          {/* Attendance Card */}
           <View testID="home-attendance-card" style={styles.attendanceContainer} className="w-full bg-white rounded-2xl p-5 shadow-lg border border-slate-100 items-center ">
             {/* Top Card */}
             <View style={[
@@ -414,35 +390,35 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           {/* Three status indicators below */}
-          <View style={styles.statusMockRow} className="flex-row w-full justify-around mt-4 bg-white/10 rounded-2xl p-3 m-3">
-            <View style={styles.statusMockItem} className="items-center">
-              <View style={styles.statusMockIconCircle} className="w-10 h-10 rounded-full bg-emerald-500/20 items-center justify-center mb-1">
+          <View style={styles.statusRow} className="flex-row w-full justify-around mt-4 bg-white/10 rounded-2xl p-3 m-3">
+            <View style={styles.statusItem} className="items-center">
+              <View style={styles.statusIconCircle} className="w-10 h-10 rounded-full bg-emerald-500/20 items-center justify-center mb-1">
                 <Ionicons name="log-in-outline" size={20} color="#10B981" />
               </View>
-              <Text testID="home-checkin-time-text" style={styles.statusMockTime} className="text-sm font-bold text-slate-900">
+              <Text testID="home-checkin-time-text" style={styles.statusTime} className="text-sm font-bold text-slate-900">
                 {checkInTime ? formatTime(checkInTime) : '--:--'}
               </Text>
-              <Text style={styles.statusMockLabel} className="text-xs text-slate-500">เวลาเข้างาน</Text>
+              <Text style={styles.statusLabel} className="text-xs text-slate-500">เวลาเข้างาน</Text>
             </View>
 
-            <View style={styles.statusMockItem} className="items-center">
-              <View style={styles.statusMockIconCircle} className="w-10 h-10 rounded-full bg-rose-500/20 items-center justify-center mb-1">
+            <View style={styles.statusItem} className="items-center">
+              <View style={styles.statusIconCircle} className="w-10 h-10 rounded-full bg-rose-500/20 items-center justify-center mb-1">
                 <Ionicons name="log-out-outline" size={20} color="#EF4444" />
               </View>
-              <Text testID="home-checkout-time-text" style={styles.statusMockTime} className="text-sm font-bold text-slate-900">
+              <Text testID="home-checkout-time-text" style={styles.statusTime} className="text-sm font-bold text-slate-900">
                 {checkOutTime ? formatTime(checkOutTime) : '--:--'}
               </Text>
-              <Text style={styles.statusMockLabel} className="text-xs text-slate-500">เวลาออกงาน</Text>
+              <Text style={styles.statusLabel} className="text-xs text-slate-500">เวลาออกงาน</Text>
             </View>
 
-            <View style={styles.statusMockItem} className="items-center">
-              <View style={styles.statusMockIconCircle} className="w-10 h-10 rounded-full bg-sky-500/20 items-center justify-center mb-1">
+            <View style={styles.statusItem} className="items-center">
+              <View style={styles.statusIconCircle} className="w-10 h-10 rounded-full bg-sky-500/20 items-center justify-center mb-1">
                 <Ionicons name="timer-outline" size={20} color="#0074C4" />
               </View>
-              <Text testID="home-work-duration-text" style={styles.statusMockTime} className="text-sm font-bold text-[#0074C4]">
+              <Text testID="home-work-duration-text" style={styles.statusTime} className="text-sm font-bold text-[#0074C4]">
                 {checkInTime ? getDuration() : '--:--:--'}
               </Text>
-              <Text style={styles.statusMockLabel} className="text-xs text-slate-500">ระยะเวลาทำงาน</Text>
+              <Text style={styles.statusLabel} className="text-xs text-slate-500">ระยะเวลาทำงาน</Text>
             </View>
           </View>
         </View>
@@ -479,80 +455,47 @@ export default function HomeScreen({ navigation }) {
 
           {/* ประกาศ / โปรโมท */}
           <View testID="home-announcements-section" style={styles.sectionHeader} className="flex-row items-center justify-between mb-3 px-1">
-            <Text style={styles.sectionTitle} className="text-base font-bold text-slate-800">📌 ประกาศ / โปรโมท</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>📌 {t('announcements')}</Text>
             <TouchableOpacity testID="home-announcements-see-all-btn" onPress={() => navigation.navigate('Announcements', { selectedAnnouncement: null })}>
-              <Text style={styles.seeAll} className="text-xs font-semibold text-primary">ดูทั้งหมด</Text>
+              <Text style={styles.seeAll}>{language === 'en' ? 'See all' : 'ดูทั้งหมด'}</Text>
             </TouchableOpacity>
           </View>
 
-          {announcements.map((item) => (
-            <TouchableOpacity
-              testID={`home-announcement-item-${item.id}`}
-              key={item.id}
-              style={styles.announcementCard}
-              className="bg-white rounded-2xl p-4 mb-3 border border-slate-100 shadow-sm"
-              onPress={() => navigation.navigate('Announcements', { selectedAnnouncement: item, openTimestamp: Date.now(), fromHome: true })}
-              activeOpacity={0.85}
-            >
-              <View style={styles.announcementHeader} className="flex-row items-center justify-between mb-2">
-                <Text style={styles.announcementTitle} className="text-sm font-bold text-slate-900 flex-1 mr-2">{item.title}</Text>
-                {item.isNew && (
-                  <View style={styles.newBadge} className="bg-pink-light border border-pink px-2 py-0.5 rounded-full">
-                    <Text style={styles.newBadgeText} className="text-[10px] font-bold text-pink">ใหม่</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.announcementDesc} className="text-xs text-slate-500 mb-2 leading-4" numberOfLines={2}>{item.desc}</Text>
-              <Text style={styles.announcementTime} className="text-[11px] text-slate-400">{item.time}</Text>
-            </TouchableOpacity>
-          ))}
-
-          {/* 🎯 ภารกิจสะสมแต้มประจำวัน */}
-          <View testID="home-missions-section" style={[styles.sectionHeader, { marginTop: 16 }]} className="flex-row items-center justify-between mb-3 px-1 mt-4">
-            <Text style={styles.sectionTitle} className="text-base font-bold text-slate-800">🎯 ภารกิจสะสมแต้มประจำวัน</Text>
-            <TouchableOpacity testID="home-missions-see-all-btn" onPress={() => navigation.navigate('Missions')}>
-              <Text style={styles.seeAll} className="text-xs font-semibold text-primary">ดูทั้งหมด</Text>
-            </TouchableOpacity>
-          </View>
-
-          {liveMissions.map((item) => {
-            const isCompleted = item.status === 'completed';
-            const isReady = item.status === 'ready_to_claim';
-            const statusLabel = isCompleted ? 'เสร็จสิ้น' : isReady ? 'รับรางวัล' : 'เริ่มทำ';
-            const statusColor = isCompleted ? '#10B981' : isReady ? '#F5A623' : '#1F4C9C';
-            return (
+          {announcements.length === 0 ? (
+            <View style={[styles.announcementCard, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'center', paddingVertical: 18 }]}>
+              <Text style={{ fontSize: 13, color: theme.textSecondary }}>{t('noAnnouncements')}</Text>
+            </View>
+          ) : (
+            announcements.slice(0, 3).map((item) => (
               <TouchableOpacity
-                testID={`home-mission-item-${item.id}`}
+                testID={`home-announcement-item-${item.id}`}
                 key={item.id}
-                style={[styles.announcementCard, { paddingVertical: 12, opacity: isCompleted ? 0.7 : 1 }]}
-                className="bg-white rounded-2xl p-4 mb-3 border border-slate-100 shadow-sm"
-                onPress={() => {
-                  if (isCompleted) {
-                    navigation.navigate('Missions');
-                  } else {
-                    navigation.navigate('Missions', { targetMissionId: item.id, openTimestamp: Date.now() });
-                  }
-                }}
-                activeOpacity={isCompleted ? 0.9 : 0.85}
+                style={[styles.announcementCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => navigation.navigate('Announcements', { selectedAnnouncement: item, openTimestamp: Date.now(), fromHome: true })}
+                activeOpacity={0.85}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: item.bgColor, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                    <Ionicons name={item.icon} size={22} color={item.iconColor} />
-                  </View>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }}>{item.title}</Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }} numberOfLines={1}>{item.subtitle}</Text>
-                  </View>
-                  <View style={{ backgroundColor: statusColor + '18', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: statusColor + '40' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: statusColor }}>{statusLabel}</Text>
-                  </View>
+                <View style={styles.announcementHeader} className="flex-row items-center justify-between mb-2">
+                  <Text style={[styles.announcementTitle, { color: theme.text }]} className="text-sm font-bold flex-1 mr-2" numberOfLines={1}>{item.title}</Text>
+                  {(item.isPinned || item.isNew) && (
+                    <View style={styles.newBadge} className="bg-pink-light border border-pink px-2 py-0.5 rounded-full">
+                      <Text style={styles.newBadgeText} className="text-[10px] font-bold text-pink">{item.isPinned ? (language === 'en' ? 'Pinned' : 'ปักหมุด') : (language === 'en' ? 'New' : 'ใหม่')}</Text>
+                    </View>
+                  )}
                 </View>
+                <Text style={[styles.announcementDesc, { color: theme.textSecondary }]} className="text-xs mb-2 leading-4" numberOfLines={2}>{item.desc || item.content}</Text>
+                <Text style={[styles.announcementTime, { color: theme.textSecondary }]} className="text-[11px]">{item.time || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '')}</Text>
               </TouchableOpacity>
-            );
-          })}
+            ))
+          )}
 
         </Animated.View>
       </ScrollView>
+      <PunchLocationModal
+        visible={!!pickerKind}
+        kind={pickerKind}
+        onClose={() => setPickerKind(null)}
+        onSelect={onLocationSelected}
+      />
     </SafeAreaView>
   );
 }
@@ -660,7 +603,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 2,
   },
-  statusMockRow: {
+  statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -676,11 +619,11 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  statusMockItem: {
+  statusItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statusMockIconCircle: {
+  statusIconCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -712,13 +655,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusMockTime: {
+  statusTime: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.title,
     marginBottom: 2,
   },
-  statusMockLabel: {
+  statusLabel: {
     fontSize: 11,
     color: colors.textSecondary,
     fontWeight: '600',

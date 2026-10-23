@@ -11,6 +11,7 @@ import {
   Platform,
   RefreshControl,
   TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
@@ -20,10 +21,13 @@ import { attendanceStorage } from '../services/attendanceStorage';
 import { leaveStorage } from '../services/leaveStorage';
 import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
+import { useTheme } from '../context/ThemeContext';
+import { getPublicHolidayName, fetchHolidaysFromBackend } from '../utils/thaiHolidays';
 
 export default function TimeAttendanceScreen({ navigation }) {
   const scrollViewRef = useRef(null);
   useScrollToTop(scrollViewRef);
+  const { theme, t } = useTheme();
 
   const [attendance, setAttendance] = useState(attendanceStorage.getState());
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
@@ -113,14 +117,19 @@ export default function TimeAttendanceScreen({ navigation }) {
     setIsCorrectionModalVisible(true);
   };
 
-  const handleConfirmCorrection = () => {
+  const handleConfirmCorrection = async () => {
     const targetDateStr = modalDateText || formatThaiDate(selectedDate);
     const inVal = modalInTime || '09:00';
     const outVal = modalOutTime || '18:00';
     const reasonVal = modalReason || 'ขอปรับปรุงเวลาเข้า-ออกงาน';
 
     // 1. Record into "สถานะคำขอ"
-    leaveStorage.addTimeCorrectionRequest(targetDateStr, inVal, outVal, reasonVal);
+    try {
+      await leaveStorage.addTimeCorrectionRequest(targetDateStr, inVal, outVal, reasonVal, null, targetDateStr);
+    } catch (error) {
+      Alert.alert('ส่งคำขอไม่สำเร็จ', error.message);
+      return;
+    }
 
     // 2. Update attendance log for that specific date
     attendanceStorage.updateCorrection(targetDateStr, inVal, outVal, reasonVal);
@@ -473,7 +482,7 @@ export default function TimeAttendanceScreen({ navigation }) {
 
       const lateCheck = isCheckInLate(checkInStr, inPunch?.timestamp);
       const totalDurationSec = parseDurSec(durationStr);
-      const isShortShift = totalDurationSec > 0 && totalDurationSec < 14400; // < 4 hours
+      const isShortShift = totalDurationSec > 0 && totalDurationSec < 32400; // < 9 hours
 
       let currentStatus = 'เข้างานตรงเวลา';
       let currentStatusColor = '#27AE60'; // Green
@@ -490,15 +499,14 @@ export default function TimeAttendanceScreen({ navigation }) {
           currentStatusColor = '#27AE60';
         }
       } else if (checkInStr !== '--:--' && checkOutStr !== '--:--') {
-        if (lateCheck && isShortShift) {
-          currentStatus = 'เข้างานสาย และ ทำงานไม่ครบเวลา';
-          currentStatusColor = '#EF4444';
-        } else if (isShortShift) {
-          currentStatus = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 4 ชม.)';
-          currentStatusColor = '#F5A623';
-        } else if (lateCheck) {
+        // 1) late is checked first: a late check-in stays "late" even when the hours are complete
+        // 2) only when on time, check the worked hours (9 hours)
+        if (lateCheck) {
           currentStatus = 'เข้างานสาย';
           currentStatusColor = '#EF4444';
+        } else if (isShortShift) {
+          currentStatus = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 9 ชม.)';
+          currentStatusColor = '#F5A623';
         } else {
           currentStatus = 'ลงเวลาเข้า-ออกครบถ้วน';
           currentStatusColor = '#27AE60';
@@ -508,7 +516,7 @@ export default function TimeAttendanceScreen({ navigation }) {
         currentStatusColor = '#EF4444';
       }
 
-      const isComplete = checkInStr !== '--:--' && checkOutStr !== '--:--' && !isWorkingNow && !isShortShift;
+      const isComplete = checkInStr !== '--:--' && checkOutStr !== '--:--' && !isWorkingNow && !isShortShift && !lateCheck;
 
       return {
         id: 'session_' + (inPunch ? inPunch.id : (outPunch ? outPunch.id : Date.now() + '_' + idx)),
@@ -574,20 +582,10 @@ export default function TimeAttendanceScreen({ navigation }) {
     });
   };
 
-  const publicHolidays = {
-    '2026-07-27': 'วันหยุดชดเชยวันอาสาฬหบูชา',
-    '2026-07-28': 'วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว',
-    '2026-07-29': 'วันหยุดพิเศษ (เพิ่มเติม)',
-  };
-
-  const getPublicHolidayName = (date) => {
-    if (!date) return null;
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${y}-${m}-${d}`;
-    return publicHolidays[dateStr] || null;
-  };
+  useEffect(() => {
+    fetchHolidaysFromBackend();
+    attendanceStorage.refresh();
+  }, []);
 
   const formatThaiDate = (date) => {
     return date.toLocaleDateString('th-TH', {
@@ -601,6 +599,8 @@ export default function TimeAttendanceScreen({ navigation }) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    attendanceStorage.refresh();
+    leaveStorage.clearAndSync();
     setAttendance(attendanceStorage.getState());
     setLeaveState(leaveStorage.getState());
     setTimeout(() => {
@@ -609,16 +609,16 @@ export default function TimeAttendanceScreen({ navigation }) {
   }, []);
 
   return (
-    <SafeAreaView testID="screen-time-attendance" className="flex-1 bg-white" style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
+    <SafeAreaView testID="screen-time-attendance" className="flex-1" style={[styles.safeArea, { backgroundColor: theme.card }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
 
       {/* Header */}
-      <TopNavbar navigation={navigation} />
+      <TopNavbar navigation={navigation} title={t('calendar', 'ปฏิทิน')} />
 
       <ScrollView
         ref={scrollViewRef}
-        style={styles.scrollView}
-        className="flex-1 bg-slate-50"
+        style={[styles.scrollView, { backgroundColor: theme.background }]}
+        className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
@@ -867,10 +867,10 @@ export default function TimeAttendanceScreen({ navigation }) {
                       return 0;
                     };
                     const durSec = parseSec(log.duration);
-                    const isShortShift = hasBothPunches && durSec > 0 && durSec < 14400; // < 4 hours
+                    const isShortShift = hasBothPunches && durSec > 0 && durSec < 32400; // < 9 hours
 
-                    const isCompleted = (log.status === 'ลงเวลาเข้า-ออกครบถ้วน' || log.isComplete) && !isShortShift;
                     const isLate = typeof log.isLate === 'boolean' ? log.isLate : (log.status?.includes('เข้างานสาย') || false);
+                    const isCompleted = (log.status === 'ลงเวลาเข้า-ออกครบถ้วน' || log.isComplete) && !isShortShift && !isLate;
 
                     let cardBorderColor = '#E2E8F0';
                     let statusColor = '#27AE60';
@@ -884,17 +884,19 @@ export default function TimeAttendanceScreen({ navigation }) {
                       cardBorderColor = '#27AE60';
                       statusColor = isLate ? '#EF4444' : '#27AE60';
                       statusTitle = isLate ? 'เข้างานสาย (กำลังทำงาน)' : 'เข้างานตรงเวลา (กำลังทำงาน)';
+                    } else if (isLate) {
+                      // late is checked first, whatever the worked hours are
+                      cardBorderColor = '#EF4444';
+                      statusColor = '#EF4444';
+                      statusTitle = 'เข้างานสาย';
                     } else if (isShortShift) {
                       cardBorderColor = '#F5A623';
                       statusColor = '#F5A623';
-                      statusTitle = isLate ? 'เข้างานสาย และ ทำงานไม่ครบเวลา' : 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 4 ชม.)';
+                      statusTitle = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 9 ชม.)';
                     } else if (isCompleted) {
                       cardBorderColor = '#27AE60';
                       statusColor = '#27AE60';
                       statusTitle = 'ลงเวลาเข้า-ออกครบถ้วน';
-                    } else if (isLate) {
-                      cardBorderColor = '#EF4444';
-                      statusColor = '#EF4444';
                     }
 
                     // 🟢 CHECK-OUT TIME: DO NOT WRITE "กำลังทำงาน..."! Just show '--:--'
@@ -1161,7 +1163,7 @@ export default function TimeAttendanceScreen({ navigation }) {
                       </View>
                       <View>
                         <Text style={styles.historyDetailLabel}>เข้างาน</Text>
-                        <Text style={styles.historyDetailValue}>{item.checkIn.split(' ')[0]}</Text>
+                        <Text style={styles.historyDetailValue}>{(item.checkIn || '--:--').split(' ')[0]}</Text>
                       </View>
                     </View>
 
@@ -1173,7 +1175,7 @@ export default function TimeAttendanceScreen({ navigation }) {
                       </View>
                       <View>
                         <Text style={styles.historyDetailLabel}>ออกงาน</Text>
-                        <Text style={styles.historyDetailValue}>{item.checkOut.split(' ')[0]}</Text>
+                        <Text style={styles.historyDetailValue}>{(item.checkOut || '--:--').split(' ')[0]}</Text>
                       </View>
                     </View>
                   </View>

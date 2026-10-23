@@ -15,80 +15,38 @@ import { Ionicons } from '@expo/vector-icons';
 import { useScrollToTop } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
-import { tryFetchApi } from '../services/apiClient';
+import { authService } from '../services/authService';
+
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const hrMenuItems = [
-  { icon: 'shield-checkmark-outline', label: 'อนุมัติคำขอ', color: '#3B82F6', screen: 'ManagerApproval', badge: 'อนุมัติ' },
-  { icon: 'checkmark-circle-outline', label: 'สถานะคำขอ', color: '#F5A623', screen: 'RequestStatus' },
-  { icon: 'people-outline', label: 'สมุดรายชื่อทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory', badge: 'ใหม่' },
-  { icon: 'time-outline', label: 'เวลาของทีม', color: '#0EA5E9', screen: 'TeamAttendance', badge: 'สด' },
-  { icon: 'calendar-outline', label: 'ลางาน', color: '#27AE60', screen: 'LeaveRequest' },
-  { icon: 'document-text-outline', label: 'สลิปเงินเดือน', color: '#9B59B6', screen: 'Payslip' },
-  { icon: 'heart-outline', label: 'ขอ OT / สวัสดิการ', color: '#E24C4B', screen: 'OtRequest' },
-  { icon: 'sync-outline', label: 'ปรับปรุงเวลา', color: '#27AE60', screen: 'TimeCorrection' },
+  { icon: 'shield-checkmark-outline', labelKey: 'approval', label: 'อนุมัติคำขอ', color: '#3B82F6', screen: 'ManagerApproval', badge: 'อนุมัติ' },
+  { icon: 'checkmark-circle-outline', labelKey: 'requestStatus', label: 'สถานะคำขอ', color: '#F5A623', screen: 'RequestStatus' },
+  { icon: 'people-outline', labelKey: 'team', label: 'สมุดรายชื่อทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory', badge: 'ใหม่' },
+  { icon: 'calendar-outline', labelKey: 'leave', label: 'ลางาน', color: '#27AE60', screen: 'LeaveRequest' },
+  { icon: 'sync-outline', labelKey: 'timeCorrection', label: 'ปรับปรุงเวลา', color: '#27AE60', screen: 'TimeCorrection' },
 ];
+
+// Mirrors backend requireApprover roles (backend/src/middlewares/authMiddleware.js)
+const APPROVER_ROLES = new Set([
+  'admin', 'super admin', 'superadmin', 'hr admin', 'system admin', 'sys admin',
+  'hr', 'manager', 'boss', 'superboss', 'super boss', 'supervisor', 'head', 'ceo', 'director',
+]);
+const isApprover = (role) => APPROVER_ROLES.has(String(role || '').trim().toLowerCase().replace(/[s_-]+/g, ' '));
 
 export default function HRDashboardScreen({ navigation }) {
   const scrollViewRef = useRef(null);
   useScrollToTop(scrollViewRef);
+  const { theme, t } = useTheme();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({
-    totalEmployees: 6,
-    onTimeRate: '98%',
-    pendingCount: 0,
-    leaveBalance: 12,
-  });
-
-  const fetchLiveStats = async () => {
-    try {
-      const [dashRes, leaveRes, pendingRes] = await Promise.all([
-        tryFetchApi('/hr/dashboard/stats'),
-        tryFetchApi('/leaves/balances'),
-        tryFetchApi('/approvals/pending'),
-      ]);
-
-      const updates = {};
-
-      if (dashRes && dashRes.ok) {
-        const dData = await dashRes.json();
-        if (dData && dData.stats) {
-          if (dData.stats.totalEmployees) updates.totalEmployees = dData.stats.totalEmployees;
-          if (dData.stats.onTimeRate) updates.onTimeRate = dData.stats.onTimeRate;
-        }
-      }
-
-      if (leaveRes && leaveRes.ok) {
-        const lData = await leaveRes.json();
-        if (lData && lData.balances) {
-          const annual = lData.balances.find((b) => b.type === 'annual' || b.type === 'พักร้อน');
-          if (annual) updates.leaveBalance = annual.remaining || annual.quota || 12;
-        }
-      }
-
-      if (pendingRes && pendingRes.ok) {
-        const pData = await pendingRes.json();
-        if (pData && Array.isArray(pData.approvals)) {
-          updates.pendingCount = pData.approvals.length;
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        setStats((prev) => ({ ...prev, ...updates }));
-      }
-    } catch (e) {
-      console.log('Error fetching HR live stats:', e);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchLiveStats();
+    setTimeout(() => setRefreshing(false), 500);
   }, []);
 
   useEffect(() => {
@@ -97,18 +55,17 @@ export default function HRDashboardScreen({ navigation }) {
       duration: 500,
       useNativeDriver: true,
     }).start();
-    fetchLiveStats();
   }, []);
 
   return (
-    <SafeAreaView testID="screen-hr-dashboard" className="flex-1 bg-white" style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
+    <SafeAreaView testID="screen-hr-dashboard" className="flex-1" style={[styles.safeArea, { backgroundColor: theme.card }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
       {/* Top Navbar */}
-      <TopNavbar navigation={navigation} />
+      <TopNavbar navigation={navigation} title={t('hr', 'HR Suite')} />
       <ScrollView
         ref={scrollViewRef}
-        style={styles.scrollView}
-        className="flex-1 bg-slate-50"
+        style={[styles.scrollView, { backgroundColor: theme.background }]}
+        className="flex-1"
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -122,53 +79,21 @@ export default function HRDashboardScreen({ navigation }) {
         }
       >
         <Animated.View style={[styles.body, { opacity: fadeAnim }]} className="p-4">
-          {/* HR Live Overview Stats Header */}
-          <Text style={styles.sectionHeaderTitle}>📊 สรุปภาพรวม HR & สถิติ</Text>
-          <View testID="hr-live-stats-row" style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <View style={[styles.statIconBadge, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name="people" size={18} color="#2563EB" />
-              </View>
-              <Text style={styles.statValue}>{stats.totalEmployees}</Text>
-              <Text style={styles.statLabel}>พนักงานทั้งหมด</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={[styles.statIconBadge, { backgroundColor: '#ECFDF5' }]}>
-                <Ionicons name="checkmark-done" size={18} color="#10B981" />
-              </View>
-              <Text style={[styles.statValue, { color: '#10B981' }]}>{stats.onTimeRate}</Text>
-              <Text style={styles.statLabel}>ตรงเวลาวันนี้</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={[styles.statIconBadge, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="hourglass" size={18} color="#D97706" />
-              </View>
-              <Text style={[styles.statValue, { color: '#D97706' }]}>{stats.pendingCount}</Text>
-              <Text style={styles.statLabel}>รอการอนุมัติ</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <View style={[styles.statIconBadge, { backgroundColor: '#FDF4FF' }]}>
-                <Ionicons name="calendar" size={18} color="#A855F7" />
-              </View>
-              <Text style={[styles.statValue, { color: '#A855F7' }]}>{stats.leaveBalance}</Text>
-              <Text style={styles.statLabel}>วันลาพักร้อน</Text>
-            </View>
-          </View>
-
           {/* Section Divider & Menu Title */}
-          <Text style={[styles.sectionHeaderTitle, { marginTop: 12 }]}>⚡ บริการและฟังก์ชันการจัดการ</Text>
+          <Text style={[styles.sectionHeaderTitle, { color: theme.text, marginTop: 4, marginBottom: 12 }]}>
+            ⚡ {t('quickActions', 'บริการและฟังก์ชันการจัดการ')}
+          </Text>
 
           {/* HR Menu Grid */}
           <View testID="hr-menu-grid" style={styles.menuGrid} className="flex-row flex-wrap justify-between">
-            {hrMenuItems.map((item, index) => (
+            {hrMenuItems
+              .filter((item) => item.screen !== 'ManagerApproval' || isApprover(authService.getUser()?.role))
+              .map((item, index) => (
               <TouchableOpacity
                 testID={`hr-menu-item-${item.screen}`}
                 key={index}
-                style={styles.menuCard}
-                className="w-[48%] bg-white rounded-2xl p-4 mb-4 items-center justify-center border border-slate-100 shadow-sm"
+                style={[styles.menuCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+                className="w-[48%] rounded-2xl p-4 mb-4 items-center justify-center border shadow-sm"
                 onPress={() => item.screen && navigation.navigate(item.screen, item.params)}
               >
                 <View style={[styles.menuIconBg, { backgroundColor: item.color + '15' }]} className="w-16 h-16 rounded-2xl items-center justify-center mb-3">
@@ -179,7 +104,9 @@ export default function HRDashboardScreen({ navigation }) {
                     </View>
                   )}
                 </View>
-                <Text style={styles.menuLabel} className="text-sm font-bold text-slate-800 text-center">{item.label}</Text>
+                <Text style={[styles.menuLabel, { color: theme.text }]} className="text-sm font-bold text-center">
+                  {t(item.labelKey, item.label)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
