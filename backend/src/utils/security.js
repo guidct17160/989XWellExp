@@ -111,6 +111,31 @@ function verifyRefreshToken(token) {
   }
 }
 
+/**
+ * Password setup/reset token (stateless, single-use, 15m expiration).
+ * Secret is bound to the current password hash → token auto-invalidates after password change.
+ */
+const setupSecret = (currentPasswordHash) => `${JWT_SECRET}:setup:${currentPasswordHash || ''}`;
+
+function signSetupToken(email, currentPasswordHash) {
+  return jwt.sign(
+    { email: String(email).trim().toLowerCase(), purpose: 'password_setup' },
+    setupSecret(currentPasswordHash),
+    { expiresIn: '15m' }
+  );
+}
+
+function verifySetupToken(token, email, currentPasswordHash) {
+  if (!token || !email) return false;
+  try {
+    const decoded = jwt.verify(String(token), setupSecret(currentPasswordHash));
+    return decoded.purpose === 'password_setup' &&
+      decoded.email === String(email).trim().toLowerCase();
+  } catch (err) {
+    return false;
+  }
+}
+
 module.exports = {
   hashPassword,
   comparePassword,
@@ -118,5 +143,7 @@ module.exports = {
   signRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
+  signSetupToken,
+  verifySetupToken,
   // NOTE: JWT_SECRET is NOT exported — prevents accidental exposure in controllers
 };

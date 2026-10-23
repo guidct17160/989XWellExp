@@ -19,18 +19,23 @@ module.exports = function createSystemStore(storeRef) {
     },
 
     updateSettings: async (newSettings) => {
-      memoryStore.memorySettings = { ...memoryStore.memorySettings, ...newSettings };
+      // Merge onto the CURRENT stored settings (PostgreSQL), not just the in-memory defaults,
+      // otherwise a partial update after a restart would wipe every other saved key.
+      const current = await (storeRef ? storeRef.getSettings() : { ...memoryStore.memorySettings });
+      const merged = { ...current, ...newSettings };
       if (db.isPgConnected()) {
         try {
           await db.query(
             `INSERT INTO system_settings (key, value) VALUES ('app_settings', $1)
              ON CONFLICT (key) DO UPDATE SET value = $1`,
-            [JSON.stringify(memoryStore.memorySettings)]
+            [JSON.stringify(merged)]
           );
         } catch (e) {
           console.error('PG update error in updateSettings:', e);
+          throw new Error('ไม่สามารถบันทึกการตั้งค่าระบบลงฐานข้อมูลได้');
         }
       }
+      memoryStore.memorySettings = merged;
       return memoryStore.memorySettings;
     },
 
@@ -39,23 +44,25 @@ module.exports = function createSystemStore(storeRef) {
       if (db.isPgConnected()) {
         try {
           const res = await db.query('SELECT * FROM announcements ORDER BY is_pinned DESC, created_at DESC');
-          if (res.rows && res.rows.length > 0) {
+          if (res.rows) {
             return res.rows.map((r) => ({
               id: r.id,
               title: r.title,
               content: r.content,
+              desc: r.content,
               category: r.category,
               author: r.author,
               isPinned: r.is_pinned,
               imageUrl: r.image_url,
               createdAt: r.created_at,
+              time: r.created_at ? new Date(r.created_at).toLocaleDateString('th-TH') : '',
             }));
           }
         } catch (e) {
           console.error('PG query error in getAnnouncements:', e);
         }
       }
-      return memoryStore.memoryAnnouncements;
+      return [];
     },
 
     getAnnouncementById: async (id) => {
@@ -84,7 +91,7 @@ module.exports = function createSystemStore(storeRef) {
 
     addAnnouncement: async (data) => {
       const newAnno = {
-        id: `anno-${Date.now()}`,
+        id: `anno-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         title: data.title,
         content: data.content,
         category: data.category || 'ประกาศทั่วไป',
@@ -93,8 +100,6 @@ module.exports = function createSystemStore(storeRef) {
         imageUrl: data.imageUrl || null,
         createdAt: new Date().toISOString().split('T')[0],
       };
-      memoryStore.memoryAnnouncements.unshift(newAnno);
-
       if (db.isPgConnected()) {
         try {
           await db.query(
@@ -105,8 +110,10 @@ module.exports = function createSystemStore(storeRef) {
           );
         } catch (e) {
           console.error('PG insert error in addAnnouncement:', e);
+          throw new Error('ไม่สามารถบันทึกประกาศลงฐานข้อมูลได้');
         }
       }
+      memoryStore.memoryAnnouncements.unshift(newAnno);
 
       return newAnno;
     },
@@ -118,12 +125,41 @@ module.exports = function createSystemStore(storeRef) {
           await db.query('DELETE FROM announcements WHERE id = $1', [id]);
         } catch (e) {
           console.error('PG delete error in deleteAnnouncement:', e);
+          throw new Error('ไม่สามารถลบประกาศออกจากฐานข้อมูลได้');
         }
       }
       return true;
     },
 
     // NOTIFICATIONS
+    addNotification: async (data) => {
+      const newNotif = {
+        id: `${data.id || 'notif'}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        employeeId: data.employeeId,
+        title: data.title,
+        message: data.message,
+        type: data.type || 'info',
+        isRead: false,
+        createdAt: data.createdAt || new Date().toISOString(),
+      };
+      memoryStore.memoryNotifications.unshift(newNotif);
+
+      if (db.isPgConnected()) {
+        try {
+          await db.query(
+            `INSERT INTO notifications (id, employee_id, title, message, type, is_read, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+             ON CONFLICT (id) DO NOTHING`,
+            [newNotif.id, newNotif.employeeId, newNotif.title, newNotif.message, newNotif.type, false]
+          );
+        } catch (e) {
+          console.error('PG insert error in addNotification:', e);
+        }
+      }
+
+      return newNotif;
+    },
+
     getNotifications: async (employeeId) => {
       if (db.isPgConnected()) {
         try {
@@ -157,12 +193,16 @@ module.exports = function createSystemStore(storeRef) {
       return memoryStore.memoryNotifications.filter((n) => n.employeeId === employeeId || !employeeId);
     },
 
-    markNotificationRead: async (id) => {
-      const n = memoryStore.memoryNotifications.find((x) => x.id === id);
+    markNotificationRead: async (id, employeeId) => {
+      const n = memoryStore.memoryNotifications.find((x) => x.id === id && (!employeeId || x.employeeId === employeeId));
       if (n) n.isRead = true;
       if (db.isPgConnected()) {
         try {
-          await db.query('UPDATE notifications SET is_read = true WHERE id = $1', [id]);
+          if (employeeId) {
+            await db.query('UPDATE notifications SET is_read = true WHERE id = $1 AND employee_id = $2', [id, employeeId]);
+          } else {
+            await db.query('UPDATE notifications SET is_read = true WHERE id = $1', [id]);
+          }
         } catch (e) {
           console.error('PG update error in markNotificationRead:', e);
         }

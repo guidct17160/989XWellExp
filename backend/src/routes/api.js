@@ -10,17 +10,28 @@ const adminController = require('../controllers/adminController');
 const attendanceController = require('../controllers/attendanceController');
 const leaveController = require('../controllers/leaveController');
 const leavePolicyController = require('../controllers/leavePolicyController');
-const otController = require('../controllers/otController');
-const payslipController = require('../controllers/payslipController');
-const missionController = require('../controllers/missionController');
+const questController = require('../controllers/questController');
+const workLocationController = require('../controllers/workLocationController');
+const uploadController = require('../controllers/uploadController');
 const rewardController = require('../controllers/rewardController');
 const announcementController = require('../controllers/announcementController');
 const notificationController = require('../controllers/notificationController');
 const hrController = require('../controllers/hrController');
 const approvalController = require('../controllers/approvalController');
 const auditController = require('../controllers/auditController');
-const kpiController = require('../controllers/kpiController');
-const { authenticate, requireAuth, requireAdmin } = require('../middlewares/authMiddleware');
+const holidayController = require('../controllers/holidayController');
+const { authenticate, requireAuth, requireAdmin, requireSuperAdmin, requireApprover } = require('../middlewares/authMiddleware');
+const rateLimit = require('express-rate-limit');
+
+// Strict limiter for brute-forceable public auth endpoints (PIN / reset / set-password)
+const sensitiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'ลองหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
 
 // -------------------------------------------------------------
 // Global Token Parsing Middleware
@@ -40,24 +51,27 @@ router.get('/health', (req, res) => {
 router.post('/auth/login', authController.login);
 router.post('/login', authController.login);
 router.get('/auth/profile', requireAuth, authController.getProfile);
+router.put('/auth/profile/avatar', requireAuth, authController.updateMyAvatar);
 router.post('/auth/change-password', requireAuth, settingsController.changePassword);
-router.post('/auth/forgot-password', authController.forgotPassword);
-router.post('/forgot-password', authController.forgotPassword);
+router.post('/auth/forgot-password', sensitiveLimiter, authController.forgotPassword);
 // MED-7 FIX: Server-side refresh token endpoint
 router.post('/auth/refresh', authController.refreshToken);
+router.post('/auth/logout', authController.logout);
 // PIN Feature Routes (6-digit PIN Authentication & Setup)
 router.post('/auth/set-pin', requireAuth, authController.setPin);
-router.post('/auth/verify-pin', authController.verifyPin);
+router.post('/auth/verify-pin', sensitiveLimiter, authController.verifyPin);
 router.post('/auth/remove-pin', requireAuth, authController.removePin);
 router.get('/auth/pin-status', requireAuth, authController.getPinStatus);
 
 // -------------------------------------------------------------
-// 3. Admin Routes (requireAdmin = requireAuth + role check)
+// 3. Admin Routes (Strictly Super Admin access)
 // -------------------------------------------------------------
-router.get('/admins', requireAdmin, adminController.getAdmins);
-router.post('/admins', requireAdmin, adminController.createAdmin);
-router.put('/admins/:id', requireAdmin, adminController.updateAdmin);
-router.delete('/admins/:id', requireAdmin, adminController.deleteAdmin);
+router.get('/admins', requireSuperAdmin, adminController.getAdmins);
+router.post('/admins', requireSuperAdmin, adminController.createAdmin);
+router.post('/admins/set-password', sensitiveLimiter, adminController.setPassword);
+router.post('/admins/:id/resend-invite', requireSuperAdmin, adminController.resendInvite);
+router.put('/admins/:id', requireSuperAdmin, adminController.updateAdmin);
+router.delete('/admins/:id', requireSuperAdmin, adminController.deleteAdmin);
 
 // -------------------------------------------------------------
 // 4. Employee Routes
@@ -65,38 +79,18 @@ router.delete('/admins/:id', requireAdmin, adminController.deleteAdmin);
 router.get('/employees', requireAuth, employeeController.getAllEmployees);
 router.get('/employees/:id', requireAuth, employeeController.getEmployeeById);
 router.post('/employees', requireAdmin, employeeController.createEmployee);
-router.post('/employees/set-password', employeeController.setPassword);
+router.post('/employees/set-password', sensitiveLimiter, employeeController.setPassword);
+router.post('/employees/:id/reset-password', requireAdmin, employeeController.resetEmployeePassword);
 router.put('/employees/:id', requireAdmin, employeeController.updateEmployee);
 router.delete('/employees/:id', requireAdmin, employeeController.deleteEmployee);
 
 // -------------------------------------------------------------
-// 5. Organization Structure Routes (Departments, Positions)
+// 5. Organization Structure Routes (Departments)
 // -------------------------------------------------------------
 router.get('/departments', requireAuth, departmentController.getDepartments);
 router.post('/departments', requireAdmin, departmentController.createDepartment);
 router.put('/departments/:id', requireAdmin, departmentController.updateDepartment);
 router.delete('/departments/:id', requireAdmin, departmentController.deleteDepartment);
-
-router.get('/positions', requireAuth, departmentController.getPositions);
-router.post('/positions', requireAdmin, departmentController.createPosition);
-router.put('/positions/:id', requireAdmin, departmentController.updatePosition);
-router.delete('/positions/:id', requireAdmin, departmentController.deletePosition);
-router.get('/departments/positions', requireAuth, departmentController.getPositions);
-router.post('/departments/positions', requireAdmin, departmentController.createPosition);
-router.put('/departments/positions/:id', requireAdmin, departmentController.updatePosition);
-router.delete('/departments/positions/:id', requireAdmin, departmentController.deletePosition);
-
-router.get('/departments/sections', requireAuth, departmentController.getSections);
-router.post('/departments/sections', requireAdmin, departmentController.createSection);
-router.put('/departments/sections/:id', requireAdmin, departmentController.updateSection);
-router.delete('/departments/sections/:id', requireAdmin, departmentController.deleteSection);
-router.get('/sections', requireAuth, departmentController.getSections);
-
-router.get('/departments/groups', requireAuth, departmentController.getGroups);
-router.post('/departments/groups', requireAdmin, departmentController.createGroup);
-router.put('/departments/groups/:id', requireAdmin, departmentController.updateGroup);
-router.delete('/departments/groups/:id', requireAdmin, departmentController.deleteGroup);
-router.get('/employee-groups', requireAuth, departmentController.getGroups);
 
 // -------------------------------------------------------------
 // 6. Time & Attendance Routes (MED-1 FIX: requireAuth added)
@@ -104,14 +98,21 @@ router.get('/employee-groups', requireAuth, departmentController.getGroups);
 router.post('/attendance/clock-in', requireAuth, attendanceController.clockIn);
 router.post('/attendance/clock-out', requireAuth, attendanceController.clockOut);
 router.get('/attendance/today', requireAuth, attendanceController.getTodayStatus);
+// Work locations: the app lists the ones the employee may use; admins manage them from the web
+router.get('/attendance/locations', requireAuth, workLocationController.getMyWorkLocations);
+// Leave attachments: upload (employee), get a short-lived link (owner / approver), open the file with that link
+router.post('/uploads/leave-attachment', requireAuth, uploadController.uploadLeaveAttachment);
+router.get('/uploads/leave/:id/link', requireAuth, uploadController.getLeaveAttachmentLink);
+router.get('/uploads/leave/:id/file', uploadController.downloadLeaveAttachment);
+router.get('/work-locations', requireAdmin, workLocationController.getWorkLocations);
+router.post('/work-locations', requireAdmin, workLocationController.createWorkLocation);
+router.put('/work-locations/:id', requireAdmin, workLocationController.updateWorkLocation);
+router.delete('/work-locations/:id', requireAdmin, workLocationController.deleteWorkLocation);
 router.get('/attendance/history', requireAuth, attendanceController.getHistory);
 router.get('/attendance/summary', requireAuth, attendanceController.getSummary);
-router.get('/attendance/corrections', requireAuth, attendanceController.getCorrections);
-router.get('/time-corrections', requireAuth, attendanceController.getCorrections);
+router.get('/attendance/corrections', requireApprover, attendanceController.getCorrections);
 router.post('/attendance/corrections', requireAuth, attendanceController.addCorrection);
-router.post('/time-corrections', requireAuth, attendanceController.addCorrection);
 router.get('/attendance/corrections/my-requests', requireAuth, attendanceController.getMyCorrections);
-router.get('/time-corrections/my-requests', requireAuth, attendanceController.getMyCorrections);
 
 // -------------------------------------------------------------
 // 7. Leave Management & Policy Routes (MED-1 FIX: requireAuth added)
@@ -129,37 +130,25 @@ router.put('/leave-policies/:id', requireAdmin, leavePolicyController.updateLeav
 router.delete('/leave-policies/:id', requireAdmin, leavePolicyController.deleteLeavePolicy);
 
 // -------------------------------------------------------------
-// 8. Overtime (OT) Routes (MED-1 FIX: requireAuth added)
+// 10. Quests (admin builds quests; employee-side flow comes later)
 // -------------------------------------------------------------
-router.get('/attendance/overtime', requireAuth, otController.getAllOtRequests);
-router.get('/overtime', requireAuth, otController.getAllOtRequests);
-router.post('/overtime', requireAuth, otController.createOtRequest);
-router.get('/overtime/my-requests', requireAuth, otController.getMyOtRequests);
-router.get('/overtime/:id', requireAuth, otController.getOtById);
-router.delete('/overtime/:id/cancel', requireAuth, otController.cancelOt);
-
-// -------------------------------------------------------------
-// 9. Payslips & Payroll Routes (MED-1 FIX: requireAuth added)
-// -------------------------------------------------------------
-router.get('/payslips', requireAuth, payslipController.getPayslips);
-router.get('/payslips/my-payslips', requireAuth, payslipController.getMyPayslips);
-router.get('/payslips/my-slips', requireAuth, payslipController.getMyPayslips);
-router.post('/payslips/generate', requireAdmin, payslipController.generatePayslip);
-router.get('/payslips/:id', requireAuth, payslipController.getPayslipById);
-
-// -------------------------------------------------------------
-// 10. Wellness & Missions Routes (MED-1 FIX: requireAuth added)
-// -------------------------------------------------------------
-router.get('/missions', requireAuth, missionController.getMissions);
-router.post('/missions', requireAdmin, missionController.createMission);
-router.delete('/missions/:id', requireAdmin, missionController.deleteMission);
-router.post('/missions/sync-steps', requireAuth, missionController.syncSteps);
-router.post('/missions/:id/progress', requireAuth, missionController.updateProgress);
-router.post('/missions/:id/claim', requireAuth, missionController.claimMission);
+router.get('/quests', requireAdmin, questController.getQuests);
+// Employee side: quests assigned to me, take the quiz, submit (auto graded and approved)
+router.get('/my-quests', requireAuth, questController.getMyQuests);
+router.get('/my-quests/:id', requireAuth, questController.getMyQuest);
+router.post('/my-quests/:id/submit', requireAuth, questController.submitMyQuest);
+router.get('/quests/:id', requireAdmin, questController.getQuestById);
+router.post('/quests', requireAdmin, questController.createQuest);
+router.put('/quests/:id', requireAdmin, questController.updateQuest);
+router.delete('/quests/:id', requireAdmin, questController.deleteQuest);
 
 // -------------------------------------------------------------
 // 11. Rewards & Points System Routes (MED-1 FIX: requireAuth added)
 // -------------------------------------------------------------
+router.get('/reward-categories', requireAdmin, rewardController.getRewardCategories);
+router.post('/reward-categories', requireAdmin, rewardController.createRewardCategory);
+router.put('/reward-categories/:id', requireAdmin, rewardController.updateRewardCategory);
+router.delete('/reward-categories/:id', requireAdmin, rewardController.deleteRewardCategory);
 router.get('/rewards', requireAuth, rewardController.getRewards);
 router.post('/rewards', requireAdmin, rewardController.createReward);
 router.delete('/rewards/:id', requireAdmin, rewardController.deleteReward);
@@ -167,6 +156,7 @@ router.get('/rewards/my-coupons', requireAuth, rewardController.getMyCoupons);
 router.get('/rewards/:id', requireAuth, rewardController.getRewardById);
 router.post('/rewards/:id/redeem', requireAuth, rewardController.redeemReward);
 router.get('/points/history', requireAuth, rewardController.getPointHistory);
+router.get('/leaderboard', requireAuth, rewardController.getLeaderboard);
 
 // -------------------------------------------------------------
 // 12. Announcements & News Routes (GET is public for visibility)
@@ -187,8 +177,8 @@ router.post('/notifications/push-token', requireAuth, notificationController.reg
 // -------------------------------------------------------------
 // 14. HR Dashboard & Reports Routes (MED-1 FIX: requireAuth added)
 // -------------------------------------------------------------
-router.get('/hr/dashboard/stats', requireAuth, hrController.getDashboardStats);
-router.get('/hr/reports/attendance', requireAuth, hrController.getAttendanceReport);
+router.get('/hr/dashboard/stats', requireApprover, hrController.getDashboardStats);
+router.get('/hr/reports/attendance', requireApprover, hrController.getAttendanceReport);
 
 // -------------------------------------------------------------
 // 15. System Settings
@@ -199,20 +189,19 @@ router.put('/settings', requireAdmin, settingsController.updateSettings);
 // -------------------------------------------------------------
 // 16. Employee & Boss Approval Workflow Routes (MED-1 FIX: requireAuth added)
 // -------------------------------------------------------------
-router.get('/approvals/pending', requireAuth, approvalController.getPendingApprovals);
-router.patch('/approvals/:requestType/:id', requireAuth, approvalController.processApproval);
+router.get('/approvals/pending', requireApprover, approvalController.getPendingApprovals);
+router.get('/approvals/history', requireApprover, approvalController.getApprovalHistory);
+router.patch('/approvals/:requestType/:id', requireApprover, approvalController.processApproval);
 
 // -------------------------------------------------------------
 // 17. Enterprise Audit Trail & Logs (PDPA Compliance)
 // -------------------------------------------------------------
 router.get('/audit-logs', requireAdmin, auditController.getLogs);
-router.get('/admin/audit-logs', requireAdmin, auditController.getLogs);
 
 // -------------------------------------------------------------
-// 18. KPI & OKR Evaluation Engine (100% Real DB Data)
+// 18. Official Calendar & Public Holidays (Real Calendar)
 // -------------------------------------------------------------
-router.get('/kpi/evaluations', requireAuth, kpiController.getEvaluations);
-router.post('/kpi/evaluations', requireAuth, kpiController.addEvaluation);
+router.get('/holidays', holidayController.getHolidays);
 
 module.exports = router;
 

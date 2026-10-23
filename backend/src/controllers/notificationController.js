@@ -1,5 +1,7 @@
 const dbStore = require('../services/dbStore');
+const { send: sendError } = require('../utils/httpError');
 const getEmpId = require('../helpers/getEmployeeId');
+const { isAdminRole } = require('../middlewares/authMiddleware');
 
 // GET /api/notifications
 exports.getNotifications = async (req, res) => {
@@ -14,20 +16,21 @@ exports.getNotifications = async (req, res) => {
       notifications: list,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
 // PATCH /api/notifications/:id/read
 exports.markAsRead = async (req, res) => {
   try {
-    const updated = await dbStore.markNotificationRead(req.params.id);
+    // SECURITY: a user may only mark THEIR OWN notifications as read
+    const updated = await dbStore.markNotificationRead(req.params.id, getEmpId(req));
     return res.status(200).json({
       success: true,
       notification: updated,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -42,7 +45,7 @@ exports.markAllRead = async (req, res) => {
       message: 'ทำรายการอ่านทั้งหมดเรียบร้อยแล้ว',
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -50,7 +53,8 @@ exports.markAllRead = async (req, res) => {
 exports.registerPushToken = async (req, res) => {
   try {
     const { token, employeeId } = req.body;
-    const empId = employeeId || req.user?.id || 'EMP-IT-DEV';
+    // SECURITY: Non-admin users cannot overwrite another employee's push token
+    const empId = (isAdminRole(req.user?.role) && employeeId) ? employeeId : getEmpId(req);
 
     if (!token) {
       return res.status(400).json({ success: false, message: 'กรุณาระบุ Push Token' });
@@ -63,6 +67,6 @@ exports.registerPushToken = async (req, res) => {
       message: 'ลงทะเบียน Expo Push Token เรียบร้อยแล้ว',
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };

@@ -102,7 +102,6 @@ const seedRealDatabase = async () => {
         code VARCHAR(50) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
         manager VARCHAR(255),
-        employee_count INT DEFAULT 0,
         status VARCHAR(50) DEFAULT 'Active'
       );
     `);
@@ -117,15 +116,14 @@ const seedRealDatabase = async () => {
 
     for (const d of deptSeeds) {
       await client.query(
-        `INSERT INTO departments (id, code, name, manager, employee_count, status)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO departments (id, code, name, manager, status)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (id) DO UPDATE SET
            code = EXCLUDED.code,
            name = EXCLUDED.name,
            manager = EXCLUDED.manager,
-           employee_count = EXCLUDED.employee_count,
            status = EXCLUDED.status`,
-        [d.id, d.code, d.name, d.manager, d.employeeCount, d.status]
+        [d.id, d.code, d.name, d.manager, d.status]
       );
     }
     console.log('✅ Departments table seeded successfully into PostgreSQL!');

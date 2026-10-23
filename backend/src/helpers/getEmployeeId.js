@@ -3,13 +3,9 @@
  * Used across all controllers to avoid duplicate getEmpId() functions
  */
 const getEmployeeId = (req, fallback = null) => {
-  return (
-    req.user?.id ||
-    req.headers['x-employee-id'] ||
-    req.query?.employeeId ||
-    req.body?.employeeId ||
-    fallback
-  );
+  // SECURITY: identity comes ONLY from the verified JWT.
+  // x-employee-id header / query / body fallbacks were removed (IDOR).
+  return req.user?.id || fallback;
 };
 
 module.exports = getEmployeeId;

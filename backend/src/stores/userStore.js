@@ -1,5 +1,46 @@
 const db = require('../config/database');
 const memoryStore = require('./memoryStore');
+const { todayIso } = require('../utils/time');
+
+// Single source of truth: PostgreSQL employees row -> client object (snake_case -> camelCase)
+const mapEmployeeRow = (r) => {
+  const firstName = r.first_name || (r.name ? r.name.split(' ')[0] : '');
+  const lastName = r.last_name || (r.name ? r.name.split(' ').slice(1).join(' ') : '');
+  const fullName = `${firstName} ${lastName}`.trim() || r.name;
+  return {
+    id: r.id,
+    code: r.code,
+    username: r.username || r.code,
+    password: r.password || '',
+    name: fullName,
+    firstName: firstName,
+    lastName: lastName,
+    email: r.email,
+    phone: r.phone,
+    department: r.department,
+    role: r.role || 'Employee',
+    status: r.status,
+    startDate: r.start_date,
+    resignDate: r.resign_date || null,
+    avatarUrl: r.avatar_url,
+    gender: r.gender || 'Male',
+    pinHash: r.pin_hash || null,
+    points: parseInt(r.points, 10) || 0,
+    birthDate: r.birth_date || null,
+    dob: r.birth_date || null,
+    createdAt: r.created_at,
+  };
+};
+
+// Translate common PG errors into user-facing messages
+const pgFriendlyError = (e, fallback) => {
+  if (e && e.code === '23505') {
+    const err = new Error('ข้อมูลซ้ำในระบบ (อีเมล / รหัสพนักงาน / ชื่อผู้ใช้ ถูกใช้งานแล้ว)');
+    err.status = 409;
+    return err;
+  }
+  return new Error(fallback || (e && e.message) || 'Database error');
+};
 
 module.exports = function createUserStore(storeRef) {
   return {
@@ -8,32 +49,8 @@ module.exports = function createUserStore(storeRef) {
       if (db.isPgConnected()) {
         try {
           const res = await db.query('SELECT * FROM employees ORDER BY created_at DESC');
-          if (res.rows && res.rows.length > 0) {
-            return res.rows.map((r) => {
-              const firstName = r.first_name || (r.name ? r.name.split(' ')[0] : '');
-              const lastName = r.last_name || (r.name ? r.name.split(' ').slice(1).join(' ') : '');
-              const fullName = `${firstName} ${lastName}`.trim() || r.name;
-              return {
-                id: r.id,
-                code: r.code,
-                username: r.username || r.code,
-                password: r.password || '1234',
-                name: fullName,
-                firstName: firstName,
-                lastName: lastName,
-                email: r.email,
-                phone: r.phone,
-                department: r.department,
-                role: r.role || 'Employee',
-                status: r.status,
-                startDate: r.start_date,
-                salary: Number(r.salary),
-                avatarUrl: r.avatar_url,
-                gender: r.gender || 'Male',
-                pinHash: r.pin_hash || null,
-                points: parseInt(r.points, 10) || 0,
-              };
-            });
+          if (res.rows) {
+            return res.rows.map(mapEmployeeRow);
           }
         } catch (e) {
           console.error('PG query error in getEmployees:', e);
@@ -47,32 +64,12 @@ module.exports = function createUserStore(storeRef) {
         try {
           const res = await db.query('SELECT * FROM employees WHERE id = $1 OR code = $1 OR username = $1', [id]);
           if (res.rows.length > 0) {
-            const r = res.rows[0];
-            const firstName = r.first_name || (r.name ? r.name.split(' ')[0] : '');
-            const lastName = r.last_name || (r.name ? r.name.split(' ').slice(1).join(' ') : '');
-            const fullName = `${firstName} ${lastName}`.trim() || r.name;
-            return {
-              id: r.id,
-              code: r.code,
-              username: r.username || r.code,
-              password: r.password || '1234',
-              name: fullName,
-              firstName: firstName,
-              lastName: lastName,
-              email: r.email,
-              phone: r.phone,
-              department: r.department,
-              role: r.role || 'Employee',
-              status: r.status,
-              startDate: r.start_date,
-              salary: Number(r.salary),
-              avatarUrl: r.avatar_url,
-              gender: r.gender || 'Male',
-              pinHash: r.pin_hash || null,
-              points: parseInt(r.points, 10) || 0,
-            };
+            return mapEmployeeRow(res.rows[0]);
           }
-        } catch (e) { }
+          return undefined;
+        } catch (e) {
+          console.error('PG query error in getEmployeeById:', e);
+        }
       }
       return memoryStore.memoryEmployees.find((e) => e.id === id || e.code === id || e.username === id);
     },
@@ -101,7 +98,6 @@ module.exports = function createUserStore(storeRef) {
       memoryStore.memoryLeaves = memoryStore.memoryLeaves.filter((l) => l.employeeId !== inputEmail && l.employeeId !== finalCode && l.employeeId !== newId);
       memoryStore.memoryNotifications = memoryStore.memoryNotifications.filter((n) => n.employeeId !== inputEmail && n.employeeId !== finalCode && n.employeeId !== newId);
       delete memoryStore.memoryPointHistory[inputEmail];
-      delete memoryStore.memoryUserMissions[inputEmail];
 
       const newEmp = {
         id: newId,
@@ -113,11 +109,10 @@ module.exports = function createUserStore(storeRef) {
         lastName: inputLastName,
         email: inputEmail,
         phone: empData.phone || '-',
-        department: empData.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
+        department: empData.department || '',
         role: empData.role || 'Employee',
         status: empData.status || 'Pending Password',
-        startDate: empData.startDate || new Date().toISOString().split('T')[0],
-        salary: Number(empData.salary) || 30000,
+        startDate: empData.startDate || todayIso(),
         avatarUrl:
           empData.avatarUrl ||
           (finalGender === 'Female'
@@ -125,13 +120,19 @@ module.exports = function createUserStore(storeRef) {
             : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'),
         gender: finalGender,
         pinHash: empData.pinHash || null,
+        points: parseInt(empData.points, 10) || 0,
+        birthDate: empData.birthDate || empData.birth_date || empData.dob || null,
+        dob: empData.birthDate || empData.birth_date || empData.dob || null,
+        resignDate: null,
+        createdAt: new Date().toISOString(),
       };
 
       if (db.isPgConnected()) {
         try {
           await db.query(
-            `INSERT INTO employees (id, code, username, password, name, first_name, last_name, email, phone, department, role, status, start_date, salary, avatar_url, gender, pin_hash)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+            `INSERT INTO employees (id, code, username, password, name, first_name, last_name, email, phone, department, role, status, start_date, avatar_url, gender, pin_hash, birth_date, points, department_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text, $11, $12, $13, $14, $15, $16, $17, $18,
+               (SELECT id FROM departments WHERE name = $10::text LIMIT 1))`,
             [
               newEmp.id,
               newEmp.code,
@@ -146,14 +147,17 @@ module.exports = function createUserStore(storeRef) {
               newEmp.role,
               newEmp.status,
               newEmp.startDate,
-              newEmp.salary,
               newEmp.avatarUrl,
               newEmp.gender,
               newEmp.pinHash,
+              newEmp.birthDate,
+              newEmp.points,
             ]
           );
         } catch (e) {
+          // PostgreSQL is the source of truth - never report success if the row was not saved
           console.error('PG insert error in addEmployee:', e);
+          throw pgFriendlyError(e, 'ไม่สามารถบันทึกข้อมูลพนักงานลงฐานข้อมูลได้');
         }
       }
 
@@ -168,67 +172,75 @@ module.exports = function createUserStore(storeRef) {
             'SELECT * FROM employees WHERE id = $1 OR code = $1 OR email = $1 OR username = $1',
             [id]
           );
-          if (res.rows.length > 0) {
-            const r = res.rows[0];
-            const existing = {
-              id: r.id,
-              code: r.code,
-              username: r.username || r.code,
-              password: r.password || '1234',
-              name: r.name,
-              firstName: r.first_name || (r.name ? r.name.split(' ')[0] : ''),
-              lastName: r.last_name || (r.name ? r.name.split(' ').slice(1).join(' ') : ''),
-              email: r.email,
-              phone: r.phone,
-              department: r.department,
-              role: r.role || 'Employee',
-              status: r.status,
-              startDate: r.start_date,
-              salary: Number(r.salary),
-              avatarUrl: r.avatar_url,
-              gender: r.gender || 'Male',
-              pinHash: r.pin_hash || null,
-            };
-            const updated = { ...existing, ...updateData };
-            if (updateData.firstName || updateData.lastName) {
-              updated.firstName = updateData.firstName || existing.firstName;
-              updated.lastName = updateData.lastName || existing.lastName;
-              updated.name = `${updated.firstName} ${updated.lastName}`.trim();
-            }
-            await db.query(
-              `UPDATE employees 
-               SET name=$1, first_name=$2, last_name=$3, email=$4, phone=$5, department=$6, role=$7, status=$8, password=$9, username=$10, avatar_url=$11, gender=$12, pin_hash=$13 
-               WHERE id=$14 OR code=$14 OR email=$14 OR username=$14`,
-              [
-                updated.name,
-                updated.firstName,
-                updated.lastName,
-                updated.email,
-                updated.phone,
-                updated.department,
-                updated.role,
-                updated.status,
-                updated.password,
-                updated.username,
-                updated.avatarUrl,
-                updated.gender || 'Male',
-                updated.pinHash !== undefined ? updated.pinHash : existing.pinHash,
-                id,
-              ]
-            );
+          if (res.rows.length === 0) return null;
 
-            const idx = memoryStore.memoryEmployees.findIndex(
-              (e) => e.id === id || e.code === id || e.email === id || e.username === id
-            );
-            if (idx !== -1) {
-              memoryStore.memoryEmployees[idx] = updated;
-            } else {
-              memoryStore.memoryEmployees.push(updated);
-            }
-            return updated;
+          const r = res.rows[0];
+          const existing = mapEmployeeRow(r);
+          const updated = { ...existing, ...updateData };
+          if (updateData.firstName || updateData.lastName) {
+            updated.firstName = updateData.firstName || existing.firstName;
+            updated.lastName = updateData.lastName || existing.lastName;
+            updated.name = `${updated.firstName} ${updated.lastName}`.trim();
+          } else if (updateData.name && updateData.name !== existing.name) {
+            const parts = String(updateData.name).trim().split(/\s+/);
+            updated.firstName = parts[0] || '';
+            updated.lastName = parts.slice(1).join(' ');
           }
+          if (updateData.startDate || updateData.start_date) {
+            updated.startDate = updateData.startDate || updateData.start_date;
+          }
+          if (updateData.birthDate || updateData.birth_date || updateData.dob) {
+            updated.birthDate = updateData.birthDate || updateData.birth_date || updateData.dob;
+            updated.dob = updated.birthDate;
+          }
+          if (updateData.points !== undefined) {
+            updated.points = parseInt(updateData.points, 10) || 0;
+          }
+          if (updateData.resignDate || updateData.resign_date) {
+            updated.resignDate = updateData.resignDate || updateData.resign_date;
+          } else if ((updateData.status === 'Resign' || updateData.status === 'Resigned') && !existing.resignDate) {
+            // Resign date defaults to today (NOT the hire date)
+            updated.resignDate = todayIso();
+          } else {
+            updated.resignDate = existing.resignDate;
+          }
+          await db.query(
+            `UPDATE employees
+             SET name=$1, first_name=$2, last_name=$3, email=$4, phone=$5, department=$6::text, role=$7, status=$8, password=$9, username=$10, avatar_url=$11, gender=$12, pin_hash=$13, start_date=$14, birth_date=$15, points=$16, resign_date=$17,
+                 department_id=(SELECT id FROM departments WHERE name = $6::text LIMIT 1)
+             WHERE id=$18`,
+            [
+              updated.name,
+              updated.firstName,
+              updated.lastName,
+              updated.email,
+              updated.phone,
+              updated.department,
+              updated.role,
+              updated.status,
+              updated.password,
+              updated.username,
+              updated.avatarUrl,
+              updated.gender || 'Male',
+              updated.pinHash !== undefined ? updated.pinHash : existing.pinHash,
+              updated.startDate,
+              updated.birthDate,
+              updated.points,
+              updated.resignDate || null,
+              r.id,
+            ]
+          );
+
+          const idx = memoryStore.memoryEmployees.findIndex((e) => e.id === r.id);
+          if (idx !== -1) {
+            memoryStore.memoryEmployees[idx] = updated;
+          } else {
+            memoryStore.memoryEmployees.push(updated);
+          }
+          return updated;
         } catch (e) {
-          console.error('PG update error', e);
+          console.error('PG update error in updateEmployee:', e);
+          throw pgFriendlyError(e, 'ไม่สามารถบันทึกการแก้ไขข้อมูลพนักงานลงฐานข้อมูลได้');
         }
       }
 
@@ -249,17 +261,13 @@ module.exports = function createUserStore(storeRef) {
         (e) => e && (e.id === id || e.code === id || e.email === id || e.username === id)
       );
 
-      if (!emp && db.isPgConnected()) {
-        try {
-          const res = await db.query(
-            'SELECT * FROM employees WHERE id = $1 OR code = $1 OR email = $1 OR username = $1',
-            [id]
-          );
-          if (res.rows && res.rows.length > 0) {
-            emp = res.rows[0];
-          }
-        } catch (e) {
-          console.error('PG query error in deleteEmployee lookup:', e);
+      if (db.isPgConnected()) {
+        const res = await db.query(
+          'SELECT id, code, email FROM employees WHERE id = $1 OR code = $1 OR email = $1 OR username = $1',
+          [id]
+        );
+        if (res.rows && res.rows.length > 0) {
+          emp = res.rows[0];
         }
       }
 
@@ -267,9 +275,35 @@ module.exports = function createUserStore(storeRef) {
       const empCode = emp ? emp.code : id;
       const empEmail = emp ? emp.email : id;
 
+      if (db.isPgConnected()) {
+        // One transaction: remove the employee together with ALL rows that reference them
+        const client = await db.pool.connect();
+        try {
+          await client.query('BEGIN');
+          const ids = [empId, empCode, empEmail];
+          await client.query('DELETE FROM attendance WHERE employee_id = ANY($1)', [ids]);
+          await client.query('DELETE FROM leave_requests WHERE employee_id = ANY($1)', [ids]);
+          await client.query('DELETE FROM time_corrections WHERE employee_id = ANY($1)', [ids]);
+          await client.query('DELETE FROM notifications WHERE employee_id = ANY($1)', [ids]);
+          await client.query('DELETE FROM point_transactions WHERE employee_id = ANY($1)', [ids]);
+          await client.query('DELETE FROM redemptions WHERE employee_id = ANY($1)', [ids]);
+          const delRes = await client.query('DELETE FROM employees WHERE id = $1', [empId]);
+          await client.query('COMMIT');
+          if (delRes.rowCount > 0) {
+            isDeleted = true;
+          }
+        } catch (e) {
+          try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+          console.error('PG delete error in deleteEmployee:', e);
+          throw new Error('ไม่สามารถลบข้อมูลพนักงานออกจากฐานข้อมูลได้');
+        } finally {
+          client.release();
+        }
+      }
+
       const prevLen = memoryStore.memoryEmployees.length;
       memoryStore.memoryEmployees = memoryStore.memoryEmployees.filter(
-        (e) => e && e.id !== id && e.code !== id && e.email !== id && e.username !== id
+        (e) => e && e.id !== id && e.code !== id && e.email !== id && e.username !== id && e.id !== empId
       );
       if (memoryStore.memoryEmployees.length < prevLen) {
         isDeleted = true;
@@ -281,11 +315,8 @@ module.exports = function createUserStore(storeRef) {
       memoryStore.memoryLeaves = memoryStore.memoryLeaves.filter(
         (l) => l && l.employeeId !== empId && l.employeeId !== empCode && l.employeeId !== empEmail
       );
-      memoryStore.memoryOt = memoryStore.memoryOt.filter(
-        (o) => o && o.employeeId !== empId && o.employeeId !== empCode
-      );
-      memoryStore.memoryPayslips = memoryStore.memoryPayslips.filter(
-        (p) => p && p.employeeId !== empId && p.employeeId !== empCode
+      memoryStore.memoryTimeCorrections = memoryStore.memoryTimeCorrections.filter(
+        (c) => c && c.employeeId !== empId && c.employeeId !== empCode
       );
       memoryStore.memoryRedemptions = memoryStore.memoryRedemptions.filter(
         (r) => r && r.employeeId !== empId && r.employeeId !== empCode
@@ -298,34 +329,12 @@ module.exports = function createUserStore(storeRef) {
       delete memoryStore.memoryPointHistory[empCode];
       delete memoryStore.memoryPointHistory[empEmail];
 
-      delete memoryStore.memoryUserMissions[empId];
-      delete memoryStore.memoryUserMissions[empCode];
-      delete memoryStore.memoryUserMissions[empEmail];
 
       delete memoryStore.memoryPushTokens[empId];
       delete memoryStore.memoryPushTokens[empCode];
       delete memoryStore.memoryPushTokens[empEmail];
 
-      if (db.isPgConnected()) {
-        try {
-          await db.query('DELETE FROM attendance WHERE employee_id = $1 OR employee_id = $2 OR employee_id = $3', [empId, empCode, empEmail]);
-          await db.query('DELETE FROM leave_requests WHERE employee_id = $1 OR employee_id = $2 OR employee_id = $3', [empId, empCode, empEmail]);
-          await db.query('DELETE FROM ot_requests WHERE employee_id = $1 OR employee_id = $2', [empId, empCode]);
-          await db.query('DELETE FROM payslips WHERE employee_id = $1 OR employee_id = $2', [empId, empCode]);
-          await db.query('DELETE FROM notifications WHERE employee_id = $1 OR employee_id = $2', [empId, empCode]);
-
-          const res = await db.query(
-            'DELETE FROM employees WHERE id = $1 OR code = $1 OR email = $2 OR username = $2',
-            [empId, empEmail]
-          );
-          if (res.rowCount > 0) {
-            isDeleted = true;
-          }
-        } catch (e) {
-          console.error('PG delete error in deleteEmployee:', e);
-        }
-      }
-      return isDeleted || true;
+      return isDeleted;
     },
 
     // DEPARTMENTS
@@ -340,7 +349,7 @@ module.exports = function createUserStore(storeRef) {
               code: r.code,
               name: r.name,
               manager: r.manager || 'ไม่ระบุ',
-              employeeCount: r.employee_count || 0,
+              employeeCount: 0, // replaced by the live count below
               status: r.status || 'Active',
             }));
           }
@@ -382,46 +391,58 @@ module.exports = function createUserStore(storeRef) {
     },
 
     addDepartment: async (deptData) => {
-      const newId = deptData.id || `DEP-${String(memoryStore.memoryDepartments.length + 1).padStart(2, '0')}`;
+      // Unique id/code (never derived from the in-memory array length: it is empty after a restart
+      // and would collide with / overwrite an existing DEP-01 row)
+      const uniq = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
+      const newId = deptData.id || `DEP-${uniq}`;
       const newDept = {
         id: newId,
-        code: deptData.code || `DEP-${memoryStore.memoryDepartments.length + 1}`,
+        code: deptData.code || `DEP-${uniq}`,
         name: deptData.name ? deptData.name.trim() : 'ฝ่ายงานใหม่',
         manager: deptData.manager || 'ไม่ระบุ',
         employeeCount: 0,
-        status: 'Active',
+        status: deptData.status || 'Active',
       };
+
+      if (db.isPgConnected()) {
+        try {
+          const check = await db.query('SELECT * FROM departments WHERE id = $1 OR (name = $2 AND $3::boolean = FALSE)', [newDept.id, newDept.name, !!deptData.id]);
+          if (check.rows && check.rows.length > 0) {
+            const old = check.rows[0];
+            await db.query(
+              `UPDATE departments SET
+                 code = $1,
+                 name = $2,
+                 manager = COALESCE($3, manager),
+                 status = $4
+               WHERE id = $5`,
+              [newDept.code, newDept.name, deptData.manager || null, newDept.status, old.id]
+            );
+            newDept.id = old.id;
+            // Employees / admins reference the department by NAME -> keep them in sync on rename
+            if (old.name && old.name !== newDept.name) {
+              await db.query('UPDATE employees SET department = $1 WHERE department = $2', [newDept.name, old.name]);
+              await db.query('UPDATE admins SET department = $1 WHERE department = $2', [newDept.name, old.name]);
+              memoryStore.memoryEmployees.forEach((e) => { if (e.department === old.name) e.department = newDept.name; });
+            }
+          } else {
+            await db.query(
+              `INSERT INTO departments (id, code, name, manager, status)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [newDept.id, newDept.code, newDept.name, newDept.manager, newDept.status]
+            );
+          }
+        } catch (e) {
+          console.error('PG insert/update error in addDepartment:', e);
+          throw pgFriendlyError(e, 'ไม่สามารถบันทึกข้อมูลแผนกลงฐานข้อมูลได้');
+        }
+      }
 
       const idx = memoryStore.memoryDepartments.findIndex((d) => d.id === newDept.id || d.name === newDept.name);
       if (idx >= 0) {
         memoryStore.memoryDepartments[idx] = newDept;
       } else {
         memoryStore.memoryDepartments.push(newDept);
-      }
-
-      if (db.isPgConnected()) {
-        try {
-          const check = await db.query('SELECT * FROM departments WHERE id = $1 OR name = $2', [newDept.id, newDept.name]);
-          if (check.rows && check.rows.length > 0) {
-            await db.query(
-              `UPDATE departments SET
-                 code = $1,
-                 name = $2,
-                 manager = $3,
-                 status = $4
-               WHERE id = $5 OR name = $6`,
-              [newDept.code, newDept.name, newDept.manager, newDept.status, check.rows[0].id, newDept.name]
-            );
-          } else {
-            await db.query(
-              `INSERT INTO departments (id, code, name, manager, employee_count, status)
-               VALUES ($1, $2, $3, $4, $5, $6)`,
-              [newDept.id, newDept.code, newDept.name, newDept.manager, 0, newDept.status]
-            );
-          }
-        } catch (e) {
-          console.error('PG insert/update error in addDepartment:', e);
-        }
       }
 
       return newDept;
@@ -433,91 +454,16 @@ module.exports = function createUserStore(storeRef) {
           await db.query('DELETE FROM departments WHERE id = $1 OR code = $1 OR name = $1', [id]);
         } catch (e) {
           console.error('PG delete error in deleteDepartment:', e);
+          throw new Error('ไม่สามารถลบแผนกออกจากฐานข้อมูลได้');
         }
       }
       memoryStore.memoryDepartments = memoryStore.memoryDepartments.filter((d) => d.id !== id && d.code !== id && d.name !== id);
       return true;
     },
 
-    // POSITIONS
-    getPositions: async () => {
-      let finalPositions = [];
-      if (db.isPgConnected()) {
-        try {
-          const res = await db.query('SELECT * FROM positions ORDER BY id ASC');
-          if (res.rows) {
-            finalPositions = res.rows.map((r) => ({
-              id: r.id,
-              code: r.code,
-              title: r.title,
-              department: r.department,
-              level: r.level,
-              status: r.status,
-            }));
-          }
-        } catch (e) {
-          console.error('PG error in getPositions:', e);
-          finalPositions = memoryStore.memoryPositions;
-        }
-      } else {
-        finalPositions = memoryStore.memoryPositions;
-      }
-      const employees = await storeRef.getEmployees();
-      return finalPositions.map((p) => {
-        const count = employees.filter((e) => {
-          if (!e.position) return false;
-          const posStr = e.position.trim().toLowerCase();
-          const pTitle = p.title ? p.title.trim().toLowerCase() : '';
-          const pCode = p.code ? p.code.trim().toLowerCase() : '';
-          return posStr === pTitle || posStr === pCode || posStr.includes(pTitle) || pTitle.includes(posStr);
-        }).length;
-        return { ...p, employeeCount: count, memberCount: count };
-      });
-    },
-
-    addPosition: async (posData) => {
-      const newId = posData.id || `POS-${String(memoryStore.memoryPositions.length + 1).padStart(2, '0')}`;
-      const newPos = {
-        id: newId,
-        code: posData.code || posData.id || `POS-${memoryStore.memoryPositions.length + 1}`,
-        title: posData.title || posData.name || 'ตำแหน่งงานใหม่',
-        department: posData.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-        level: posData.level || 'Mid-Level',
-        status: 'Active',
-      };
-      const idx = memoryStore.memoryPositions.findIndex((p) => p.id === newPos.id);
-      if (idx >= 0) {
-        memoryStore.memoryPositions[idx] = { ...memoryStore.memoryPositions[idx], ...newPos };
-      } else {
-        memoryStore.memoryPositions.push(newPos);
-      }
-      if (db.isPgConnected()) {
-        try {
-          await db.query(
-            `INSERT INTO positions (id, code, title, department, level, status)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, department = EXCLUDED.department, level = EXCLUDED.level, status = EXCLUDED.status`,
-            [newPos.id, newPos.code, newPos.title, newPos.department, newPos.level, newPos.status]
-          );
-        } catch (e) {
-          console.error('PG insert/update error in addPosition:', e);
-        }
-      }
-      return newPos;
-    },
-
-    deletePosition: async (id) => {
-      if (db.isPgConnected()) {
-        try {
-          await db.query('DELETE FROM positions WHERE id = $1', [id]);
-        } catch (e) {}
-      }
-      memoryStore.memoryPositions = memoryStore.memoryPositions.filter((p) => p.id !== id);
-      return true;
-    },
-
     // ADMINS
     getAdmins: async () => {
+
       if (db.isPgConnected()) {
         try {
           const res = await db.query('SELECT * FROM admins ORDER BY created_at DESC');
@@ -586,8 +532,8 @@ module.exports = function createUserStore(storeRef) {
         name: adminData.name ? adminData.name.trim() : 'Web Admin',
         email: finalEmail,
         phone: adminData.phone || '-',
-        department: adminData.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-        role: adminData.role || 'Admin',
+        department: adminData.department || '-',
+        role: adminData.role || 'HR Admin',
         status: adminData.status || 'Active',
         startDate: adminData.startDate || new Date().toISOString().split('T')[0],
         avatarUrl: adminData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
@@ -652,6 +598,7 @@ module.exports = function createUserStore(storeRef) {
           }
         } catch (e) {
           console.error('PG insert/update error in addAdmin:', e);
+          throw pgFriendlyError(e, 'ไม่สามารถบันทึกข้อมูลผู้ดูแลระบบลงฐานข้อมูลได้');
         }
       }
 
@@ -663,6 +610,8 @@ module.exports = function createUserStore(storeRef) {
       if (!existing) return null;
 
       const updated = { ...existing, ...updateData };
+      // pinHash: undefined = keep, null = clear, string = set
+      const pinProvided = updateData.pinHash !== undefined;
 
       if (db.isPgConnected()) {
         try {
@@ -676,8 +625,10 @@ module.exports = function createUserStore(storeRef) {
                department = COALESCE($6, department),
                role = COALESCE($7, role),
                status = COALESCE($8, status),
-               pin_hash = COALESCE($9, pin_hash)
-             WHERE id = $10`,
+               avatar_url = COALESCE($9, avatar_url),
+               start_date = COALESCE($10, start_date),
+               pin_hash = CASE WHEN $11::boolean THEN $12 ELSE pin_hash END
+             WHERE id = $13`,
             [
               updateData.username,
               updateData.password,
@@ -687,16 +638,20 @@ module.exports = function createUserStore(storeRef) {
               updateData.department,
               updateData.role,
               updateData.status,
-              updateData.pinHash !== undefined ? updateData.pinHash : null,
-              id,
+              updateData.avatarUrl,
+              updateData.startDate,
+              pinProvided,
+              pinProvided ? updateData.pinHash : null,
+              existing.id,
             ]
           );
         } catch (e) {
           console.error('PG update error in updateAdmin:', e);
+          throw pgFriendlyError(e, 'ไม่สามารถบันทึกการแก้ไขผู้ดูแลระบบลงฐานข้อมูลได้');
         }
       }
 
-      const idx = memoryStore.memoryAdmins.findIndex((a) => a.id === id);
+      const idx = memoryStore.memoryAdmins.findIndex((a) => a.id === existing.id);
       if (idx >= 0) {
         memoryStore.memoryAdmins[idx] = updated;
       }
@@ -709,6 +664,7 @@ module.exports = function createUserStore(storeRef) {
           await db.query('DELETE FROM admins WHERE id = $1', [id]);
         } catch (e) {
           console.error('PG delete error in deleteAdmin:', e);
+          throw new Error('ไม่สามารถลบผู้ดูแลระบบออกจากฐานข้อมูลได้');
         }
       }
       memoryStore.memoryAdmins = memoryStore.memoryAdmins.filter((a) => a.id !== id);

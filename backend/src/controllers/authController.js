@@ -10,12 +10,49 @@ const {
 const { logAudit } = require('../utils/auditLogger');
 const emailService = require('../services/emailService');
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// Accounts that must NOT be able to sign in / refresh / use PIN
+const blockedStatusMessage = (user) => {
+  const st = user && user.status;
+  if (st === 'Pending' || st === 'Pending Password' || st === 'รอตั้งรหัสผ่าน') {
+    return 'บัญชีนี้ยังอยู่ในสถานะรอตั้งรหัสผ่าน (Pending) กรุณาตรวจสอบอีเมลและตั้งรหัสผ่านให้เรียบร้อยก่อนเข้าใช้งาน';
+  }
+  if (st === 'Inactive') {
+    return 'บัญชีนี้ถูกระงับการใช้งาน (Inactive) กรุณาติดต่อผู้ดูแลระบบหรือฝ่ายทรัพยากรบุคคล (HR)';
+  }
+  if (st === 'Resign' || st === 'Resigned') {
+    return 'บัญชีนี้พ้นสภาพการเป็นพนักงานแล้ว (Resign) ไม่สามารถเข้าสู่ระบบได้';
+  }
+  return null;
+};
+
 // Strip sensitive fields before sending to client
 const stripSensitive = (user) => {
   if (!user) return user;
   const { password, pin_hash, pinHash, ...safe } = user;
   safe.hasPin = Boolean(user.pin_hash || user.pinHash);
   return safe;
+};
+
+// Per-account PIN brute-force lockout (5 failures → 15 min lock)
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCK_MS = 15 * 60 * 1000;
+const pinFailures = new Map(); // key -> { count, lockedUntil }
+const isPinLocked = (key) => {
+  const f = pinFailures.get(key);
+  return Boolean(f && f.lockedUntil && f.lockedUntil > Date.now());
+};
+const recordPinFailure = (key) => {
+  const f = pinFailures.get(key) || { count: 0, lockedUntil: 0 };
+  if (f.lockedUntil && f.lockedUntil <= Date.now()) { f.count = 0; f.lockedUntil = 0; }
+  f.count += 1;
+  if (f.count >= PIN_MAX_ATTEMPTS) f.lockedUntil = Date.now() + PIN_LOCK_MS;
+  pinFailures.set(key, f);
+};
+const PIN_LOCKED_RESPONSE = {
+  success: false,
+  message: 'ใส่ PIN ผิดเกินกำหนด บัญชีถูกล็อกชั่วคราว 15 นาที กรุณาเข้าสู่ระบบด้วยรหัสผ่าน',
 };
 
 exports.login = async (req, res) => {
@@ -47,55 +84,6 @@ exports.login = async (req, res) => {
     // Determine Portal Type ('web' or 'app')
     const isWebPortal = portal === 'web' || (req.path && req.path.includes('web'));
     const isAppPortal = portal === 'app' || (req.path && req.path.includes('app'));
-
-    // Support Demo Account ("demo" / "demo") for Mobile App
-    if (cleanUsername === 'demo' && (cleanPassword === 'demo' || cleanPassword === '1234')) {
-      if (isWebPortal) {
-        return res.status(403).json({
-          success: false,
-          message: 'บัญชีนี้เป็นพนักงานทดสอบ (Demo) สามารถเข้าใช้งานได้เฉพาะบน Mobile App เท่านั้น',
-        });
-      }
-
-      const demoUser = {
-        id: 'EMP-DEMO',
-        code: 'EMP-DEMO',
-        username: 'demo',
-        name: 'พนักงานทดสอบ (Demo Account)',
-        email: 'demo@wellx989.com',
-        phone: '081-234-5678',
-        role: 'Employee',
-        department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-        position: 'Mobile Developer',
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        hasPin: Boolean(require('../stores/memoryStore').demoPinHash),
-      };
-
-      const demoToken = signAccessToken({
-        id: demoUser.id,
-        code: demoUser.code,
-        username: demoUser.username,
-        role: demoUser.role,
-        portal: 'app',
-      }, '1d');
-      const demoRefreshToken = signRefreshToken({
-        id: demoUser.id,
-        role: demoUser.role,
-      }, '30d');
-
-      return res.status(200).json({
-        success: true,
-        message: 'เข้าสู่ระบบสำเร็จ (Demo Mobile App)',
-        token: demoToken,
-        accessToken: demoToken,
-        refreshToken: demoRefreshToken,
-        user: demoUser,
-        tokenConfig: {
-          accessTokenMinutes: 1440,
-          refreshTokenDays: 30,
-        },
-      });
-    }
 
     const [admins, employees] = await Promise.all([
       dbStore.getAdmins(),
@@ -140,7 +128,26 @@ exports.login = async (req, res) => {
         });
       }
 
-      const expectedPassword = String(foundAdmin.password || '1234').trim();
+      if (
+        foundAdmin.status === 'Pending' ||
+        foundAdmin.status === 'Pending Password' ||
+        foundAdmin.status === 'รอตั้งรหัสผ่าน'
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'บัญชีผู้ดูแลระบบนี้ยังอยู่ในสถานะรอตั้งรหัสผ่าน กรุณาตรวจสอบอีเมลและตั้งรหัสผ่านผ่านลิงก์ที่ได้รับก่อนเข้าใช้งาน',
+        });
+      }
+
+      if (foundAdmin.status === 'Inactive') {
+        return res.status(403).json({
+          success: false,
+          message: 'บัญชีผู้ดูแลระบบนี้ถูกระงับการใช้งาน (Inactive) กรุณาติดต่อ Super Admin',
+        });
+      }
+
+      const expectedPassword = String(foundAdmin.password || '').trim();
       const check = await comparePassword(cleanPassword, expectedPassword);
 
       if (!check.valid) {
@@ -168,6 +175,7 @@ exports.login = async (req, res) => {
         id: foundAdmin.id,
         code: foundAdmin.code,
         username: foundAdmin.username,
+        name: foundAdmin.name,
         role: foundAdmin.role || 'Admin',
         portal: 'web',
       }, '1d');
@@ -220,7 +228,21 @@ exports.login = async (req, res) => {
         });
       }
 
-      const expectedPassword = String(foundEmployee.password || '1234').trim();
+      if (foundEmployee.status === 'Inactive') {
+        return res.status(403).json({
+          success: false,
+          message: 'บัญชีนี้ถูกระงับการใช้งาน (Inactive) กรุณาติดต่อฝ่ายทรัพยากรบุคคล (HR)',
+        });
+      }
+
+      if (foundEmployee.status === 'Resign' || foundEmployee.status === 'Resigned') {
+        return res.status(403).json({
+          success: false,
+          message: 'บัญชีนี้พ้นสภาพการเป็นพนักงานแล้ว (Resign) ไม่สามารถเข้าสู่ระบบได้',
+        });
+      }
+
+      const expectedPassword = String(foundEmployee.password || '').trim();
       const check = await comparePassword(cleanPassword, expectedPassword);
 
       if (!check.valid) {
@@ -248,6 +270,7 @@ exports.login = async (req, res) => {
         id: foundEmployee.id,
         code: foundEmployee.code,
         username: foundEmployee.username,
+        name: foundEmployee.name,
         role: foundEmployee.role || 'Employee',
         portal: 'app',
       }, '15m');
@@ -281,7 +304,11 @@ exports.login = async (req, res) => {
 
     // DEFAULT (NO PORTAL FLAG): ADMIN -> WEB ONLY, EMPLOYEE -> APP ONLY
     if (foundAdmin) {
-      const expectedPassword = String(foundAdmin.password || '1234').trim();
+      const adminBlocked = blockedStatusMessage(foundAdmin);
+      if (adminBlocked) {
+        return res.status(403).json({ success: false, message: adminBlocked });
+      }
+      const expectedPassword = String(foundAdmin.password || '').trim();
       const check = await comparePassword(cleanPassword, expectedPassword);
 
       if (!check.valid) {
@@ -301,6 +328,7 @@ exports.login = async (req, res) => {
         id: foundAdmin.id,
         code: foundAdmin.code,
         username: foundAdmin.username,
+        name: foundAdmin.name,
         role: foundAdmin.role || 'Admin',
         portal: 'web',
       }, '1d');
@@ -319,7 +347,11 @@ exports.login = async (req, res) => {
     }
 
     if (foundEmployee) {
-      const expectedPassword = String(foundEmployee.password || '1234').trim();
+      const employeeBlocked = blockedStatusMessage(foundEmployee);
+      if (employeeBlocked) {
+        return res.status(403).json({ success: false, message: employeeBlocked });
+      }
+      const expectedPassword = String(foundEmployee.password || '').trim();
       const check = await comparePassword(cleanPassword, expectedPassword);
 
       if (!check.valid) {
@@ -339,6 +371,7 @@ exports.login = async (req, res) => {
         id: foundEmployee.id,
         code: foundEmployee.code,
         username: foundEmployee.username,
+        name: foundEmployee.name,
         role: foundEmployee.role || 'Employee',
         portal: 'app',
       }, '15m');
@@ -414,6 +447,11 @@ exports.refreshToken = async (req, res) => {
       });
     }
 
+    const refreshBlocked = blockedStatusMessage(user);
+    if (refreshBlocked) {
+      return res.status(403).json({ success: false, message: refreshBlocked });
+    }
+
     const isAdmin = admins.some((a) => a.id === user.id);
     const portal = isAdmin ? 'web' : 'app';
     const expiresIn = isAdmin ? '1d' : '15m';
@@ -422,6 +460,7 @@ exports.refreshToken = async (req, res) => {
       id: user.id,
       code: user.code,
       username: user.username,
+      name: user.name,
       role: user.role || (isAdmin ? 'Admin' : 'Employee'),
       portal,
     }, expiresIn);
@@ -434,6 +473,51 @@ exports.refreshToken = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Employees change their own profile picture without an Admin. The picture arrives as a small
+// image data URL (the app resizes it first) and is stored in employees.avatar_url.
+const AVATAR_DATA_URL = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const AVATAR_MAX_LENGTH = 600 * 1024; // characters of the data URL (about 450 KB of image)
+
+exports.updateMyAvatar = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้ที่ได้รับสิทธิ์ กรุณาเข้าสู่ระบบก่อน' });
+    }
+
+    const avatarUrl = req.body && req.body.avatarUrl;
+    if (typeof avatarUrl !== 'string' || !AVATAR_DATA_URL.test(avatarUrl)) {
+      return res.status(400).json({ success: false, message: 'ไฟล์รูปภาพไม่ถูกต้อง (รองรับ JPG, PNG, WEBP)' });
+    }
+    if (avatarUrl.length > AVATAR_MAX_LENGTH) {
+      return res.status(400).json({ success: false, message: 'ไฟล์รูปภาพใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง' });
+    }
+
+    const employees = await dbStore.getEmployees();
+    const emp = employees.find((e) => e.id === userId);
+    if (!emp) {
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลพนักงาน (เปลี่ยนรูปโปรไฟล์ได้เฉพาะบัญชีพนักงานในแอป)' });
+    }
+
+    const updated = await dbStore.updateEmployee(emp.id, { avatarUrl });
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลพนักงาน' });
+    }
+
+    logAudit(req, {
+      action: 'UPDATE_OWN_AVATAR',
+      resourceType: 'employee',
+      resourceId: emp.id,
+      details: { code: emp.code },
+    }).catch(() => {});
+
+    return res.status(200).json({ success: true, message: 'เปลี่ยนรูปโปรไฟล์เรียบร้อยแล้ว', avatarUrl: updated.avatarUrl });
+  } catch (error) {
+    console.error('Error in updateMyAvatar:', error);
+    return res.status(500).json({ success: false, message: error.message || 'ไม่สามารถเปลี่ยนรูปโปรไฟล์ได้' });
   }
 };
 
@@ -451,25 +535,6 @@ exports.getProfile = async (req, res) => {
       if (decoded && decoded.id) {
         targetId = decoded.id;
       }
-    }
-
-    if (targetId && String(targetId).toLowerCase().includes('demo')) {
-      return res.status(200).json({
-        success: true,
-        user: {
-          id: 'EMP-DEMO',
-          code: 'EMP-DEMO',
-          username: 'demo',
-          name: 'พนักงานทดสอบ (Demo Account)',
-          email: 'demo@wellx989.com',
-          phone: '081-234-5678',
-          role: 'Employee',
-          department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-          position: 'Mobile Developer',
-          avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-          hasPin: Boolean(require('../stores/memoryStore').demoPinHash),
-        },
-      });
     }
 
     const [employees, admins] = await Promise.all([
@@ -509,8 +574,18 @@ exports.getProfile = async (req, res) => {
 // POST /api/auth/forgot-password (Request Password Reset Link)
 exports.forgotPassword = async (req, res) => {
   try {
-    const { employeeId, email } = req.body;
+    const { employeeId, email, portal } = req.body;
     const identifier = String(employeeId || email || '').trim().toLowerCase();
+    // A reset requested from the web admin may only reach web admin accounts, so the link always opens the WEB set-password page
+    const isWebRequest = portal === 'web';
+    // Policy: employees (mobile app) can NOT reset their own password. They ask an Admin, who resets it
+    // from the web All Employees menu (POST /employees/:id/reset-password). Only the web admin portal may use this endpoint.
+    if (!isWebRequest) {
+      return res.status(403).json({
+        success: false,
+        message: 'พนักงานไม่สามารถรีเซ็ตรหัสผ่านด้วยตัวเองได้ กรุณาแจ้งผู้ดูแลระบบ (Admin) ให้รีเซ็ตรหัสผ่านให้',
+      });
+    }
 
     if (!identifier) {
       return res.status(400).json({
@@ -519,36 +594,11 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Support demo account
-    if (identifier === 'demo' || identifier === 'emp-demo' || identifier === 'demo@wellx989.com') {
-      const emailPreview = await emailService.sendPasswordSetupEmail({
-        name: 'พนักงานทดสอบ (Demo)',
-        email: 'demo@wellx989.com',
-        role: 'Employee',
-        department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-        code: 'EMP-DEMO',
-      });
-
-      logAudit(req, {
-        action: 'FORGOT_PASSWORD_REQUEST',
-        resourceType: 'Auth',
-        resourceId: 'EMP-DEMO',
-        details: { identifier: 'demo', email: 'demo@wellx989.com' },
-      });
-
-      return res.json({
-        success: true,
-        message: 'ระบบได้ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมล demo@wellx989.com เรียบร้อยแล้ว',
-        email: 'demo@wellx989.com',
-        resetUrl: emailPreview?.setupLink || '/set-password?email=demo%40wellx989.com',
-      });
-    }
-
     const [employees, admins] = await Promise.all([
       dbStore.getEmployees(),
       dbStore.getAdmins(),
     ]);
-    const allUsers = [...employees, ...admins];
+    const allUsers = isWebRequest ? [...admins] : [...employees, ...admins];
 
     const found = allUsers.find(
       (u) =>
@@ -559,6 +609,13 @@ exports.forgotPassword = async (req, res) => {
     );
 
     if (!found) {
+      // Production: identical response to avoid account enumeration
+      if (IS_PROD) {
+        return res.json({
+          success: true,
+          message: 'หากข้อมูลตรงกับบัญชีในระบบ ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลที่ลงทะเบียนไว้',
+        });
+      }
       return res.status(404).json({
         success: false,
         message: `ไม่พบบัญชีที่ตรงกับ "${identifier}" ในระบบ กรุณาตรวจสอบรหัสพนักงานหรือติดต่อฝ่าย HR`,
@@ -567,13 +624,22 @@ exports.forgotPassword = async (req, res) => {
 
     const targetEmail = found.email || `${found.username || 'user'}@wellx989.com`;
 
-    const emailPreview = await emailService.sendPasswordSetupEmail({
-      name: found.name || found.username || 'ผู้ใช้งาน',
-      email: targetEmail,
-      role: found.role || 'Employee',
-      department: found.department || 'General',
-      code: found.code || found.id,
-    });
+    const isAdmin = admins.some((a) => a.id === found.id || a.code === found.id);
+    const emailPreview = isAdmin
+      ? await emailService.sendAdminPasswordSetupEmail({
+          name: found.name || found.username || 'ผู้ดูแลระบบ',
+          email: targetEmail,
+          role: found.role || 'Admin',
+          passwordHash: found.password,
+        })
+      : await emailService.sendPasswordSetupEmail({
+          name: found.name || found.username || 'ผู้ใช้งาน',
+          email: targetEmail,
+          role: found.role || 'Employee',
+          department: found.department || 'General',
+          code: found.code || found.id,
+          passwordHash: found.password,
+        });
 
     logAudit(req, {
       action: 'FORGOT_PASSWORD_REQUEST',
@@ -591,9 +657,9 @@ exports.forgotPassword = async (req, res) => {
     return res.json({
       success: true,
       message: `ระบบได้ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมล ${maskedEmail} เรียบร้อยแล้ว`,
-      email: targetEmail,
       maskedEmail,
-      resetUrl: emailPreview?.setupLink || `/set-password?email=${encodeURIComponent(targetEmail)}`,
+      // Dev only: link is never returned in production (emailPreview is stripped)
+      ...(emailPreview?.setupLink ? { resetUrl: emailPreview.setupLink } : {}),
     });
   } catch (error) {
     console.error('Error in forgotPassword:', error);
@@ -636,25 +702,24 @@ exports.setPin = async (req, res) => {
       });
     }
 
-    const isDemo = String(userId).toLowerCase().includes('demo');
-    let user = null;
+    const [employees, admins] = await Promise.all([
+      dbStore.getEmployees(),
+      dbStore.getAdmins(),
+    ]);
+
+    let user = employees.find((e) => e.id === userId || e.code === userId || e.username === userId);
     let userType = 'employee';
+    if (!user) {
+      user = admins.find((a) => a.id === userId || a.code === userId || a.username === userId);
+      userType = 'admin';
+    }
 
-    if (!isDemo) {
-      const [employees, admins] = await Promise.all([
-        dbStore.getEmployees(),
-        dbStore.getAdmins(),
-      ]);
-
-      user = employees.find((e) => e.id === userId || e.code === userId || e.username === userId);
-      if (!user) {
-        user = admins.find((a) => a.id === userId || a.code === userId || a.username === userId);
-        userType = 'admin';
-      }
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งานในระบบ' });
     }
 
     // If user already had a PIN set, require verification of currentPin or currentPassword
-    const existingPinHash = isDemo ? memoryStore.demoPinHash : (user?.pinHash || user?.pin_hash);
+    const existingPinHash = user.pinHash || user.pin_hash;
     if (existingPinHash) {
       let isVerified = false;
       if (currentPin) {
@@ -677,11 +742,9 @@ exports.setPin = async (req, res) => {
     // Hash the new 6-digit PIN with bcrypt
     const hashedPin = await hashPassword(cleanPin);
 
-    if (isDemo) {
-      memoryStore.demoPinHash = hashedPin;
-    } else if (userType === 'employee' && user) {
+    if (userType === 'employee') {
       await dbStore.updateEmployee(user.id, { pinHash: hashedPin });
-    } else if (userType === 'admin' && user) {
+    } else if (userType === 'admin') {
       await dbStore.updateAdmin(user.id, { pinHash: hashedPin });
     }
 
@@ -736,56 +799,6 @@ exports.verifyPin = async (req, res) => {
 
     const cleanTarget = String(targetUserId).trim().toLowerCase();
 
-    // Support Demo Account PIN Verification
-    if (cleanTarget === 'demo' || cleanTarget.includes('demo')) {
-      const demoPin = memoryStore.demoPinHash;
-      let valid = false;
-      if (demoPin) {
-        const check = await comparePassword(cleanPin, demoPin);
-        valid = check.valid;
-      } else {
-        // Default demo PIN: '123456'
-        valid = cleanPin === '123456';
-      }
-
-      if (!valid) {
-        return res.status(401).json({
-          success: false,
-          message: 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง',
-        });
-      }
-
-      const demoUser = {
-        id: 'EMP-DEMO',
-        code: 'EMP-DEMO',
-        username: 'demo',
-        name: 'พนักงานทดสอบ (Demo Account)',
-        email: 'demo@wellx989.com',
-        phone: '081-234-5678',
-        role: 'Employee',
-        department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-        position: 'Mobile Developer',
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        hasPin: true,
-      };
-
-      const demoToken = signAccessToken({
-        id: demoUser.id,
-        code: demoUser.code,
-        username: demoUser.username,
-        role: demoUser.role,
-        portal: 'app',
-      }, '1d');
-
-      return res.status(200).json({
-        success: true,
-        message: 'ยืนยันรหัส PIN สำเร็จ (Demo)',
-        token: demoToken,
-        accessToken: demoToken,
-        user: demoUser,
-      });
-    }
-
     const [employees, admins] = await Promise.all([
       dbStore.getEmployees(),
       dbStore.getAdmins(),
@@ -807,17 +820,31 @@ exports.verifyPin = async (req, res) => {
       });
     }
 
+    const pinBlocked = blockedStatusMessage(found);
+    if (pinBlocked) {
+      return res.status(403).json({ success: false, message: pinBlocked });
+    }
+    if (isPinLocked(found.id)) {
+      return res.status(429).json(PIN_LOCKED_RESPONSE);
+    }
+
+    // Login PIN is user-defined only (no default derived from the birth date).
     const storedPinHash = found.pinHash || found.pin_hash;
     if (!storedPinHash) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: 'บัญชีนี้ยังไม่ได้ตั้งรหัส PIN กรุณาเข้าสู่ระบบด้วยรหัสผ่านก่อน',
+        message: 'บัญชีนี้ยังไม่ได้ตั้ง PIN เข้าสู่ระบบ กรุณาเข้าสู่ระบบด้วยรหัสผ่านแล้วตั้ง PIN 6 หลัก',
         hasPin: false,
       });
     }
 
+    if (isPinLocked(found.id)) {
+      return res.status(429).json(PIN_LOCKED_RESPONSE);
+    }
+
     const check = await comparePassword(cleanPin, storedPinHash);
     if (!check.valid) {
+      recordPinFailure(found.id);
       logAudit(req, {
         action: 'VERIFY_PIN_FAILED',
         resourceType: 'auth',
@@ -825,17 +852,22 @@ exports.verifyPin = async (req, res) => {
         details: { reason: 'Invalid PIN' },
       }).catch(() => {});
 
+      if (isPinLocked(found.id)) {
+        return res.status(429).json(PIN_LOCKED_RESPONSE);
+      }
       return res.status(401).json({
         success: false,
         message: 'รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง',
       });
     }
+    pinFailures.delete(found.id);
 
     // PIN is valid! Issue fresh JWT token for seamless session
     const accessToken = signAccessToken({
       id: found.id,
       code: found.code,
       username: found.username,
+      name: found.name,
       role: found.role || 'Employee',
       portal: found.role === 'Admin' || found.role === 'Super Admin' ? 'web' : 'app',
     }, '15m');
@@ -881,22 +913,6 @@ exports.removePin = async (req, res) => {
       });
     }
 
-    if (!password) {
-      return res.status(400).json({
-        success: false,
-        message: 'กรุณาระบุรหัสผ่านบัญชีเพื่อยืนยันการยกเลิก PIN',
-      });
-    }
-
-    if (String(userId).toLowerCase().includes('demo')) {
-      delete memoryStore.demoPinHash;
-      return res.status(200).json({
-        success: true,
-        message: 'ยกเลิกการใช้งานรหัส PIN เรียบร้อยแล้ว',
-        hasPin: false,
-      });
-    }
-
     const [employees, admins] = await Promise.all([
       dbStore.getEmployees(),
       dbStore.getAdmins(),
@@ -913,12 +929,14 @@ exports.removePin = async (req, res) => {
       return res.status(404).json({ success: false, message: 'ไม่พบบัญชีผู้ใช้' });
     }
 
-    const passCheck = await comparePassword(String(password).trim(), user.password);
-    if (!passCheck.valid) {
-      return res.status(401).json({
-        success: false,
-        message: 'รหัสผ่านไม่ถูกต้อง ไม่สามารถยกเลิก PIN ได้',
-      });
+    if (password) {
+      const passCheck = await comparePassword(String(password).trim(), user.password);
+      if (!passCheck.valid) {
+        return res.status(401).json({
+          success: false,
+          message: 'รหัสผ่านไม่ถูกต้อง ไม่สามารถยกเลิก PIN ได้',
+        });
+      }
     }
 
     if (userType === 'employee') {
@@ -955,13 +973,6 @@ exports.getPinStatus = async (req, res) => {
       return res.status(401).json({ success: false, message: 'กรุณาเข้าสู่ระบบก่อน' });
     }
 
-    if (String(userId).toLowerCase().includes('demo')) {
-      return res.status(200).json({
-        success: true,
-        hasPin: Boolean(memoryStore.demoPinHash),
-      });
-    }
-
     const [employees, admins] = await Promise.all([
       dbStore.getEmployees(),
       dbStore.getAdmins(),
@@ -980,3 +991,45 @@ exports.getPinStatus = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.logout = async (req, res) => {
+  try {
+    const memoryStore = require('../stores/memoryStore');
+    let userId = req.user?.id;
+    if (!userId && req.body?.refreshToken) {
+      const decodedRefresh = verifyRefreshToken(req.body.refreshToken);
+      if (decodedRefresh && decodedRefresh.id) userId = decodedRefresh.id;
+    }
+
+    if (userId) {
+        const [employees, admins] = await Promise.all([
+          dbStore.getEmployees(),
+          dbStore.getAdmins(),
+        ]);
+        const emp = employees.find((e) => e.id === userId || e.code === userId || e.username === userId);
+        if (emp) {
+          await dbStore.updateEmployee(emp.id, { pinHash: null });
+        }
+        const adm = admins.find((a) => a.id === userId || a.code === userId || a.username === userId);
+        if (adm) {
+          await dbStore.updateAdmin(adm.id, { pinHash: null });
+        }
+
+      logAudit(req, {
+        action: 'LOGOUT_RESET_PIN',
+        resourceType: 'auth',
+        resourceId: userId,
+        details: { resetPin: true },
+      }).catch(() => {});
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'ออกจากระบบและรีเซ็ตรหัส PIN เรียบร้อยแล้ว',
+    });
+  } catch (error) {
+    console.error('Error in logout:', error);
+    return res.status(200).json({ success: true, message: 'ออกจากระบบเรียบร้อยแล้ว' });
+  }
+};
+

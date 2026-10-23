@@ -62,6 +62,36 @@ app.use((err, req, res, next) => {
 // Start Server
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+
+  // Automated Server-side Midnight Auto Clock-Out Job for Real DB
+  const runAutoClockOutJob = async () => {
+    try {
+      const { todayIso, durationUntilEndOfDay } = require('./utils/time');
+      // A forgotten clock-out is closed at 23:59 and the worked time is counted from clock-in until then
+      const stale = await pool.query(
+        `SELECT id, check_in FROM attendance WHERE (check_out IS NULL OR check_out = '') AND date_iso < $1`,
+        [todayIso()]
+      );
+      let closed = 0;
+      for (const row of stale.rows) {
+        const upd = await pool.query(
+          `UPDATE attendance
+           SET check_out = '23:59 น.', duration = $2
+           WHERE id = $1 AND (check_out IS NULL OR check_out = '')`,
+          [row.id, durationUntilEndOfDay(row.check_in)]
+        );
+        closed += upd.rowCount;
+      }
+      const res = { rowCount: closed };
+      if (res.rowCount > 0) {
+        console.log(`⏰ [Auto Clock-out] Automatically closed ${res.rowCount} unclosed attendance record(s) in Real DB.`);
+      }
+    } catch (e) {
+      // Background worker catches errors cleanly
+    }
+  };
+  setInterval(runAutoClockOutJob, 60000);
+  runAutoClockOutJob();
 });
 
 // Graceful Shutdown Handlers (Production & Container Lifecycle)

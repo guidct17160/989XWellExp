@@ -1,5 +1,7 @@
 const db = require('../config/database');
 const memoryStore = require('./memoryStore');
+const httpError = require('../utils/httpError');
+const { todayIso, bangkokParts } = require('../utils/time');
 
 module.exports = function createLeaveStore(storeRef) {
   const store = {
@@ -31,6 +33,9 @@ module.exports = function createLeaveStore(storeRef) {
       if (cleanId) {
         myLeaves = await (storeRef ? storeRef.getLeaveRequests(cleanId) : store.getLeaveRequests(cleanId));
       }
+      // Quota is per calendar year: leave from previous years must not consume this year's quota
+      const currentYear = String(bangkokParts().year);
+      myLeaves = myLeaves.filter((l) => !l || !l.startDate || String(l.startDate).startsWith(currentYear));
 
       // 3. Filter by gender & Active status
       const eligiblePolicies = policies.filter((p) => {
@@ -87,11 +92,6 @@ module.exports = function createLeaveStore(storeRef) {
           used: usedDays,
           remaining: remainingDays,
           applicableGender: p.applicableGender || 'all',
-          allowedStartDate: p.allowedStartDate,
-          allowedEndDate: p.allowedEndDate,
-          dateRangeEnabled: p.dateRangeEnabled,
-          minAdvanceDays: p.minAdvanceDays,
-          maxConsecutiveDays: p.maxConsecutiveDays,
           color: '#F5A623',
           icon: icon,
         };
@@ -130,7 +130,7 @@ module.exports = function createLeaveStore(storeRef) {
           (u.role === 'SuperBoss' || u.role === 'Super Admin' || u.role === 'CEO') &&
           u.id !== requester.id &&
           u.code !== requester.code
-      ) || { id: 'ADM-001', name: 'สมชาย ใจดี (CEO / SuperBoss)', role: 'SuperBoss' };
+      ) || admins.find((a) => a.role === 'Super Admin' || a.role === 'CEO') || admins[0] || null;
 
       const hasDeptBoss = !!directManager;
       const initialLevel = (isBoss || isSuperBoss || !hasDeptBoss) ? 2 : 1;
@@ -160,29 +160,20 @@ module.exports = function createLeaveStore(storeRef) {
           const isRequesterMale = reqGender === 'male' || reqGender === 'ชาย';
 
           if (isFemalePolicy && !isRequesterFemale) {
-            throw new Error(
+            throw httpError(400, 
               `ไม่อนุญาตให้ยื่นลาประเภท "${matchedPolicy.typeName}" เนื่องจากสิทธิ์การลานี้เปิดให้เฉพาะพนักงานเพศหญิงเท่านั้น`
             );
           }
           if (isMalePolicy && !isRequesterMale) {
-            throw new Error(
+            throw httpError(400, 
               `ไม่อนุญาตให้ยื่นลาประเภท "${matchedPolicy.typeName}" เนื่องจากสิทธิ์การลานี้เปิดให้เฉพาะพนักงานเพศชายเท่านั้น`
             );
           }
         }
 
-        // 2. Date Range Constraints
-        if (matchedPolicy.dateRangeEnabled) {
-          if (matchedPolicy.allowedStartDate && data.startDate < matchedPolicy.allowedStartDate) {
-            throw new Error(
-              `ไม่อนุญาตให้ยื่นลาประเภทนี้ในวันที่ ${data.startDate} เนื่องจากอยู่นอกช่วงเวลาที่กำหนด (สามารถลาได้ตั้งแต่วันที่ ${matchedPolicy.allowedStartDate})`
-            );
-          }
-          if (matchedPolicy.allowedEndDate && data.endDate > matchedPolicy.allowedEndDate) {
-            throw new Error(
-              `ไม่อนุญาตให้ยื่นลาประเภทนี้ในวันที่ ${data.endDate} เนื่องจากเกินวันที่กำหนดให้ลาได้ (สิ้นสุดวันที่ ${matchedPolicy.allowedEndDate})`
-            );
-          }
+        // 2. Policy rule configured by HR: supporting document
+        if (matchedPolicy.requireAttachment && !data.attachmentUrl) {
+          throw httpError(400, `ประเภทการลา "${matchedPolicy.typeName}" ต้องแนบเอกสารประกอบการลา`);
         }
 
         // 3. Balance / Quota Validation against Real Database
@@ -190,16 +181,16 @@ module.exports = function createLeaveStore(storeRef) {
         const reqBal = currentBalances.find(b => b.policyId === matchedPolicy.id || b.id === matchedPolicy.categoryKey);
         if (reqBal) {
           if (reqBal.remaining <= 0) {
-            throw new Error(`คุณใช้สิทธิ์ "${matchedPolicy.typeName}" ครบตามกำหนดแล้ว (เหลือ 0 วัน) ไม่สามารถยื่นลาเพิ่มได้`);
+            throw httpError(400, `คุณใช้สิทธิ์ "${matchedPolicy.typeName}" ครบตามกำหนดแล้ว (เหลือ 0 วัน) ไม่สามารถยื่นลาเพิ่มได้`);
           }
           if (Number(data.totalDays || 1) > reqBal.remaining) {
-            throw new Error(`จำนวนวันลาที่ระบุ (${data.totalDays || 1} วัน) เกินสิทธิ์คงเหลือของคุณ (คงเหลือ ${reqBal.remaining} วัน)`);
+            throw httpError(400, `จำนวนวันลาที่ระบุ (${data.totalDays || 1} วัน) เกินสิทธิ์คงเหลือของคุณ (คงเหลือ ${reqBal.remaining} วัน)`);
           }
         }
       }
 
       const newLeave = {
-        id: `leave-${Date.now()}`,
+        id: `leave-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         employeeId: requester.id,
         employeeName: requester.name,
         employeeCode: requester.code || requester.id,
@@ -216,11 +207,9 @@ module.exports = function createLeaveStore(storeRef) {
         currentApproverId: targetApprover ? targetApprover.id : null,
         currentApproverName: targetApprover ? targetApprover.name : null,
         directManagerId: directManager ? directManager.id : null,
-        superbossId: superboss.id,
-        createdAt: new Date().toISOString().split('T')[0],
+        superbossId: superboss ? superboss.id : (admins[0]?.id || 'ADM-001'),
+        createdAt: todayIso(),
       };
-
-      memoryStore.memoryLeaves.unshift(newLeave);
 
       if (db.isPgConnected()) {
         try {
@@ -232,11 +221,13 @@ module.exports = function createLeaveStore(storeRef) {
           );
         } catch (e) {
           console.error('PG insert error in addLeaveRequest:', e);
+          throw new Error('ไม่สามารถบันทึกใบลาลงฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
         }
       }
+      memoryStore.memoryLeaves.unshift(newLeave);
 
       if (targetApprover) {
-        memoryStore.memoryNotifications.unshift({
+        const notifPayload = {
           id: `notif-${Date.now()}`,
           employeeId: targetApprover.id,
           title: `📩 คำขอใหม่ (${data.leaveType}) จาก ${requester.name}`,
@@ -244,7 +235,12 @@ module.exports = function createLeaveStore(storeRef) {
           type: 'warning',
           isRead: false,
           createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        });
+        };
+        if (storeRef?.addNotification) {
+          storeRef.addNotification(notifPayload);
+        } else {
+          memoryStore.memoryNotifications.unshift(notifPayload);
+        }
       }
 
       return newLeave;
@@ -272,6 +268,7 @@ module.exports = function createLeaveStore(storeRef) {
               endDate: r.end_date,
               totalDays: Number(r.total_days || 1),
               reason: r.reason,
+              attachmentUrl: r.attachment_url || null,
               status: r.status,
               approver: r.approver,
               remark: r.remark,
@@ -309,6 +306,7 @@ module.exports = function createLeaveStore(storeRef) {
               endDate: r.end_date,
               totalDays: Number(r.total_days || 1),
               reason: r.reason,
+              attachmentUrl: r.attachment_url || null,
               status: r.status,
               approver: r.approver,
               remark: r.remark,
@@ -336,9 +334,39 @@ module.exports = function createLeaveStore(storeRef) {
           );
         } catch (e) {
           console.error('PG update error in updateLeaveStatus:', e);
+          throw new Error('ไม่สามารถอัปเดตสถานะใบลาในฐานข้อมูลได้');
         }
       }
       return item;
+    },
+
+    // LEAVE ATTACHMENTS (files the employee attaches to a leave request)
+    addLeaveAttachment: async ({ id, employeeId, fileName, mimeType, buffer }) => {
+      if (db.isPgConnected()) {
+        try {
+          await db.query(
+            'INSERT INTO leave_attachments (id, employee_id, file_name, mime_type, size_bytes, data) VALUES ($1, $2, $3, $4, $5, $6)',
+            [id, employeeId, fileName, mimeType, buffer.length, buffer]
+          );
+        } catch (e) {
+          console.error('PG insert error in addLeaveAttachment:', e);
+          throw new Error('ไม่สามารถบันทึกไฟล์แนบลงฐานข้อมูลได้');
+        }
+        return { id, employeeId, fileName, mimeType, size: buffer.length };
+      }
+      const item = { id, employeeId, fileName, mimeType, size: buffer.length, buffer };
+      memoryStore.memoryLeaveAttachments.push(item);
+      return { id, employeeId, fileName, mimeType, size: buffer.length };
+    },
+
+    getLeaveAttachment: async (id) => {
+      if (db.isPgConnected()) {
+        const res = await db.query('SELECT id, employee_id, file_name, mime_type, size_bytes, data FROM leave_attachments WHERE id = $1', [id]);
+        const r = res.rows[0];
+        if (!r) return null;
+        return { id: r.id, employeeId: r.employee_id, fileName: r.file_name, mimeType: r.mime_type, size: r.size_bytes, buffer: r.data };
+      }
+      return memoryStore.memoryLeaveAttachments.find((a) => a.id === id) || null;
     },
 
     // LEAVE POLICIES
@@ -346,51 +374,39 @@ module.exports = function createLeaveStore(storeRef) {
       if (db.isPgConnected()) {
         try {
           const res = await db.query('SELECT * FROM leave_policies ORDER BY id ASC');
-          if (res.rows && res.rows.length > 0) {
-            return res.rows.map((r) => ({
-              id: r.id,
-              typeName: r.type_name,
-              categoryKey: r.category_key,
-              defaultQuota: parseInt(r.default_quota, 10) || 0,
-              isPaid: !!r.is_paid,
-              applicableGender: r.applicable_gender || 'all',
-              allowedStartDate: r.allowed_start_date || null,
-              allowedEndDate: r.allowed_end_date || null,
-              dateRangeEnabled: !!r.date_range_enabled,
-              minAdvanceDays: parseInt(r.min_advance_days, 10) || 0,
-              maxConsecutiveDays: parseInt(r.max_consecutive_days, 10) || 30,
-              allowBackdated: !!r.allow_backdated,
-              maxBackdatedDays: parseInt(r.max_backdated_days, 10) || 0,
-              requireAttachment: !!r.require_attachment,
-              description: r.description || '',
-              status: r.status || 'Active',
-              createdAt: r.created_at,
-              updatedAt: r.updated_at,
-            }));
-          }
+          return res.rows.map((r) => ({
+            id: r.id,
+            typeName: r.type_name,
+            categoryKey: r.category_key,
+            defaultQuota: parseInt(r.default_quota, 10) || 0,
+            isPaid: !!r.is_paid,
+            applicableGender: r.applicable_gender || 'all',
+            requireAttachment: !!r.require_attachment,
+            description: r.description || '',
+            status: r.status || 'Active',
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+          }));
         } catch (e) {
+          // never answer from the in-memory copy while PostgreSQL is the source of truth: the web and the app would disagree
           console.error('PG query error in getLeavePolicies:', e);
+          throw new Error('ไม่สามารถโหลดนโยบายการลาจากฐานข้อมูลได้');
         }
       }
       return memoryStore.memoryLeavePolicies;
     },
 
     addLeavePolicy: async (policyData) => {
-      const newId = policyData.id || `LP-${String(memoryStore.memoryLeavePolicies.length + 1).padStart(2, '0')}`;
+      // Never derive the id from the in-memory array length (empty after restart -> would overwrite LP-01)
+      const newId = policyData.id || `LP-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
       const newPolicy = {
         id: newId,
         typeName: policyData.typeName || 'นโยบายการลาใหม่',
-        categoryKey: policyData.categoryKey || 'custom',
+        // no category given (the web form no longer asks for one): use the unique policy id so balances never collide
+        categoryKey: policyData.categoryKey || newId,
         defaultQuota: parseInt(policyData.defaultQuota, 10) || 10,
         isPaid: policyData.isPaid !== undefined ? !!policyData.isPaid : true,
         applicableGender: policyData.applicableGender || 'all',
-        allowedStartDate: policyData.allowedStartDate || null,
-        allowedEndDate: policyData.allowedEndDate || null,
-        dateRangeEnabled: !!policyData.dateRangeEnabled,
-        minAdvanceDays: parseInt(policyData.minAdvanceDays, 10) || 0,
-        maxConsecutiveDays: parseInt(policyData.maxConsecutiveDays, 10) || 30,
-        allowBackdated: !!policyData.allowBackdated,
-        maxBackdatedDays: parseInt(policyData.maxBackdatedDays, 10) || 0,
         requireAttachment: !!policyData.requireAttachment,
         description: policyData.description || '',
         status: policyData.status || 'Active',
@@ -410,23 +426,14 @@ module.exports = function createLeaveStore(storeRef) {
           await db.query(
             `INSERT INTO leave_policies (
                id, type_name, category_key, default_quota, is_paid, applicable_gender,
-               allowed_start_date, allowed_end_date, date_range_enabled,
-               min_advance_days, max_consecutive_days, allow_backdated, max_backdated_days,
                require_attachment, description, status, updated_at
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
              ON CONFLICT (id) DO UPDATE SET
                type_name = EXCLUDED.type_name,
                category_key = EXCLUDED.category_key,
                default_quota = EXCLUDED.default_quota,
                is_paid = EXCLUDED.is_paid,
                applicable_gender = EXCLUDED.applicable_gender,
-               allowed_start_date = EXCLUDED.allowed_start_date,
-               allowed_end_date = EXCLUDED.allowed_end_date,
-               date_range_enabled = EXCLUDED.date_range_enabled,
-               min_advance_days = EXCLUDED.min_advance_days,
-               max_consecutive_days = EXCLUDED.max_consecutive_days,
-               allow_backdated = EXCLUDED.allow_backdated,
-               max_backdated_days = EXCLUDED.max_backdated_days,
                require_attachment = EXCLUDED.require_attachment,
                description = EXCLUDED.description,
                status = EXCLUDED.status,
@@ -438,13 +445,6 @@ module.exports = function createLeaveStore(storeRef) {
               newPolicy.defaultQuota,
               newPolicy.isPaid,
               newPolicy.applicableGender,
-              newPolicy.allowedStartDate,
-              newPolicy.allowedEndDate,
-              newPolicy.dateRangeEnabled,
-              newPolicy.minAdvanceDays,
-              newPolicy.maxConsecutiveDays,
-              newPolicy.allowBackdated,
-              newPolicy.maxBackdatedDays,
               newPolicy.requireAttachment,
               newPolicy.description,
               newPolicy.status,
@@ -452,32 +452,35 @@ module.exports = function createLeaveStore(storeRef) {
           );
         } catch (e) {
           console.error('PG insert error in addLeavePolicy:', e);
+          throw new Error('ไม่สามารถบันทึกนโยบายการลาลงฐานข้อมูลได้');
         }
       }
       return newPolicy;
     },
 
     updateLeavePolicy: async (id, updateData) => {
-      let existing = memoryStore.memoryLeavePolicies.find((p) => p.id === id);
-      if (!existing) {
-        existing = { id, typeName: updateData.typeName || 'นโยบายการลา', categoryKey: updateData.categoryKey || 'custom' };
-        memoryStore.memoryLeavePolicies.push(existing);
-      }
+      // Always merge onto the CURRENT stored policy (PostgreSQL), so a partial update
+      // (e.g. only { status }) never wipes the other columns
+      const allPolicies = await store.getLeavePolicies();
+      const existing = allPolicies.find((p) => p.id === id);
+      if (!existing) throw httpError(404, 'ไม่พบนโยบายการลาที่ต้องการแก้ไข');
+
+      const intOr = (v, fallback) => {
+        if (v === undefined || v === null || v === '') return fallback;
+        const n = parseInt(v, 10);
+        return Number.isNaN(n) ? fallback : n;
+      };
 
       const updated = {
         ...existing,
         ...updateData,
         id,
-        defaultQuota: updateData.defaultQuota !== undefined ? parseInt(updateData.defaultQuota, 10) : existing.defaultQuota,
+        defaultQuota: intOr(updateData.defaultQuota, existing.defaultQuota),
         applicableGender: updateData.applicableGender || existing.applicableGender || 'all',
-        minAdvanceDays: updateData.minAdvanceDays !== undefined ? parseInt(updateData.minAdvanceDays, 10) : existing.minAdvanceDays,
-        maxConsecutiveDays: updateData.maxConsecutiveDays !== undefined ? parseInt(updateData.maxConsecutiveDays, 10) : existing.maxConsecutiveDays,
-        maxBackdatedDays: updateData.maxBackdatedDays !== undefined ? parseInt(updateData.maxBackdatedDays, 10) : existing.maxBackdatedDays,
+        isPaid: updateData.isPaid !== undefined ? !!updateData.isPaid : existing.isPaid,
+        requireAttachment: updateData.requireAttachment !== undefined ? !!updateData.requireAttachment : existing.requireAttachment,
         updatedAt: new Date().toISOString(),
       };
-
-      const idx = memoryStore.memoryLeavePolicies.findIndex((p) => p.id === id);
-      if (idx >= 0) memoryStore.memoryLeavePolicies[idx] = updated;
 
       if (db.isPgConnected()) {
         try {
@@ -487,31 +490,17 @@ module.exports = function createLeaveStore(storeRef) {
                category_key = COALESCE($2, category_key),
                default_quota = COALESCE($3, default_quota),
                is_paid = COALESCE($4, is_paid),
-               allowed_start_date = $5,
-               allowed_end_date = $6,
-               date_range_enabled = COALESCE($7, date_range_enabled),
-               min_advance_days = COALESCE($8, min_advance_days),
-               max_consecutive_days = COALESCE($9, max_consecutive_days),
-               allow_backdated = COALESCE($10, allow_backdated),
-               max_backdated_days = COALESCE($11, max_backdated_days),
-               require_attachment = COALESCE($12, require_attachment),
-               description = COALESCE($13, description),
-               status = COALESCE($14, status),
-               applicable_gender = COALESCE($15, applicable_gender),
+               require_attachment = COALESCE($5, require_attachment),
+               description = COALESCE($6, description),
+               status = COALESCE($7, status),
+               applicable_gender = COALESCE($8, applicable_gender),
                updated_at = CURRENT_TIMESTAMP
-             WHERE id = $16`,
+             WHERE id = $9`,
             [
               updated.typeName,
               updated.categoryKey,
               updated.defaultQuota,
               updated.isPaid,
-              updated.allowedStartDate || null,
-              updated.allowedEndDate || null,
-              updated.dateRangeEnabled,
-              updated.minAdvanceDays,
-              updated.maxConsecutiveDays,
-              updated.allowBackdated,
-              updated.maxBackdatedDays,
               updated.requireAttachment,
               updated.description,
               updated.status,
@@ -521,7 +510,15 @@ module.exports = function createLeaveStore(storeRef) {
           );
         } catch (e) {
           console.error('PG update error in updateLeavePolicy:', e);
+          throw new Error('ไม่สามารถบันทึกนโยบายการลาลงฐานข้อมูลได้');
         }
+      }
+
+      const idx = memoryStore.memoryLeavePolicies.findIndex((p) => p.id === id);
+      if (idx >= 0) {
+        memoryStore.memoryLeavePolicies[idx] = updated;
+      } else {
+        memoryStore.memoryLeavePolicies.push(updated);
       }
       return updated;
     },
@@ -532,6 +529,7 @@ module.exports = function createLeaveStore(storeRef) {
           await db.query('DELETE FROM leave_policies WHERE id = $1', [id]);
         } catch (e) {
           console.error('PG delete error in deleteLeavePolicy:', e);
+          throw new Error('ไม่สามารถลบนโยบายการลาออกจากฐานข้อมูลได้');
         }
       }
       memoryStore.memoryLeavePolicies = memoryStore.memoryLeavePolicies.filter((p) => p.id !== id);
@@ -627,6 +625,7 @@ module.exports = function createLeaveStore(storeRef) {
               endDate: r.end_date,
               totalDays: Number(r.total_days || 1),
               reason: r.reason,
+              attachmentUrl: r.attachment_url || null,
               status: r.status,
               approver: r.approver,
               remark: r.remark,
@@ -641,50 +640,7 @@ module.exports = function createLeaveStore(storeRef) {
         leavesList = memoryStore.memoryLeaves.map(enrichUserData);
       }
 
-      // 2. Fetch OT
-      let otList = [];
-      if (db.isPgConnected()) {
-        try {
-          const res = await db.query(`
-            SELECT ot.*, 
-                   COALESCE(e.name, a.name, ot.employee_id) as "employeeName", 
-                   COALESCE(e.department, a.department, 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)') as department, 
-                   COALESCE(e.role, a.role, 'Employee') as "requesterRole", 
-                   COALESCE(e.code, a.code, ot.employee_id) as "employeeCode"
-            FROM ot_requests ot
-            LEFT JOIN employees e ON ot.employee_id = e.id OR ot.employee_id = e.code OR ot.employee_id = e.email
-            LEFT JOIN admins a ON ot.employee_id = a.id OR ot.employee_id = a.code OR ot.employee_id = a.email
-            ORDER BY ot.created_at DESC
-          `);
-          if (res.rows) {
-            otList = res.rows.map((r) => enrichUserData({
-              id: r.id,
-              employeeId: r.employee_id,
-              employeeName: r.employeeName,
-              employeeCode: r.employeeCode,
-              department: r.department,
-              requesterRole: r.requesterRole,
-              dateIso: r.date_iso,
-              startTime: r.start_time,
-              endTime: r.end_time,
-              hours: Number(r.hours || 1),
-              taskDescription: r.task_description,
-              reason: r.task_description,
-              status: r.status,
-              approver: r.approver,
-              remark: r.remark,
-              createdAt: r.created_at,
-            }));
-          }
-        } catch (e) {
-          console.error('PG query error in ot pending:', e);
-        }
-      }
-      if (otList.length === 0) {
-        otList = memoryStore.memoryOt.map(enrichUserData);
-      }
-
-      // 3. Fetch Time Corrections
+      // 2. Fetch Time Corrections
       let tcList = [];
       if (db.isPgConnected()) {
         try {
@@ -731,7 +687,7 @@ module.exports = function createLeaveStore(storeRef) {
       const filterForUser = (item) => {
         if (!item) return false;
         const s = item.status ? item.status.trim() : '';
-        if (s === 'อนุมัติแล้ว' || s === 'อนุมัติเรียบร้อย' || s === 'ไม่อนุมัติ' || s === 'ยกเลิกแล้ว') {
+        if (!s.startsWith('รออนุมัติ')) {
           return false;
         }
 
@@ -771,16 +727,6 @@ module.exports = function createLeaveStore(storeRef) {
         details: l.reason || `ยื่นขอลา ${l.leaveType || 'ลางาน'} จำนวน ${l.totalDays || 1} วัน`,
       }));
 
-      const pendingOt = otList.filter(filterForUser).map((o) => ({
-        ...o,
-        requestType: 'ot',
-        role: o.requesterRole || 'Employee',
-        type: `ขอ OT (${o.hours || 1} ชม.)`,
-        title: `ขอ OT (${o.hours || 1} ชม.)`,
-        date: o.dateIso || o.createdAt || '-',
-        details: o.taskDescription || o.reason || `ปฏิบัติงานล่วงเวลา ${o.startTime || '18:00'} - ${o.endTime || '20:00'} (${o.hours || 1} ชม.)`,
-      }));
-
       const pendingCorrections = tcList.filter(filterForUser).map((c) => ({
         ...c,
         requestType: 'time-correction',
@@ -791,212 +737,350 @@ module.exports = function createLeaveStore(storeRef) {
         details: c.reason || `ขอปรับปรุงเวลาเป็น เข้า: ${c.newCheckIn || '-'} / ออก: ${c.newCheckOut || '-'}`,
       }));
 
-      return [...pendingLeaves, ...pendingOt, ...pendingCorrections];
+      return [...pendingLeaves, ...pendingCorrections];
     },
 
-    processApprovalRequest: async ({ requestType, id, status, approver, remark, approverRole }) => {
-      let target = null;
-      let tableName = null;
+    // APPROVAL HISTORY (Real DB)
+    getApprovalHistory: async () => {
+      const employees = await (storeRef ? storeRef.getEmployees() : []);
+      const admins = await (storeRef ? storeRef.getAdmins() : []);
+      const allUsers = [...employees, ...admins];
 
-      if (requestType === 'leave') {
-        target = memoryStore.memoryLeaves.find((l) => l.id === id);
-        tableName = 'leave_requests';
-      } else if (requestType === 'ot') {
-        target = memoryStore.memoryOt.find((o) => o.id === id);
-        tableName = 'ot_requests';
-      } else if (requestType === 'time-correction' || requestType === 'time_correction') {
-        target = memoryStore.memoryTimeCorrections.find((c) => c.id === id);
-        tableName = 'time_corrections';
-      }
+      const enrichUserData = (item) => {
+        const emp = allUsers.find(
+          (u) =>
+            u &&
+            (u.id === item.employeeId ||
+             u.code === item.employeeId ||
+             u.id === item.employeeCode ||
+             u.code === item.employeeCode ||
+             u.email === item.employeeId)
+        );
+        return {
+          ...item,
+          employeeName: item.employeeName || (emp ? emp.name : item.employeeId),
+          employeeCode: item.employeeCode || (emp ? emp.code : item.employeeId),
+          department: item.department || (emp ? emp.department : 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'),
+          requesterRole: item.requesterRole || (emp ? emp.role : 'Employee'),
+        };
+      };
 
-      if (db.isPgConnected() && tableName) {
+      let historyList = [];
+      if (db.isPgConnected()) {
         try {
-          const res = await db.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
-          if (res.rows && res.rows.length > 0) {
-            const r = res.rows[0];
-            target = {
+          const [leavesRes, tcRes] = await Promise.all([
+            db.query(`
+              SELECT l.*, 
+                     COALESCE(e.name, a.name, l.employee_id) as "employeeName", 
+                     COALESCE(e.department, a.department, 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)') as department, 
+                     COALESCE(e.role, a.role, 'Employee') as "requesterRole", 
+                     COALESCE(e.code, a.code, l.employee_id) as "employeeCode"
+              FROM leave_requests l
+              LEFT JOIN employees e ON l.employee_id = e.id OR l.employee_id = e.code OR l.employee_id = e.email
+              LEFT JOIN admins a ON l.employee_id = a.id OR l.employee_id = a.code OR l.employee_id = a.email
+              WHERE l.status NOT LIKE 'รออนุมัติ%'
+              ORDER BY l.created_at DESC
+            `),
+            db.query(`
+              SELECT tc.*, 
+                     COALESCE(e.name, a.name, tc.employee_id) as "employeeName", 
+                     COALESCE(e.department, a.department, 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)') as department, 
+                     COALESCE(e.role, a.role, 'Employee') as "requesterRole", 
+                     COALESCE(e.code, a.code, tc.employee_id) as "employeeCode"
+              FROM time_corrections tc
+              LEFT JOIN employees e ON tc.employee_id = e.id OR tc.employee_id = e.code OR tc.employee_id = e.email
+              LEFT JOIN admins a ON tc.employee_id = a.id OR tc.employee_id = a.code OR tc.employee_id = a.email
+              WHERE tc.status NOT LIKE 'รออนุมัติ%'
+              ORDER BY tc.created_at DESC
+            `),
+          ]);
+
+          if (leavesRes.rows) {
+            historyList.push(...leavesRes.rows.map((r) => enrichUserData({
               id: r.id,
+              requestType: 'leave',
               employeeId: r.employee_id,
+              employeeName: r.employeeName,
+              employeeCode: r.employeeCode,
+              department: r.department,
               leaveType: r.leave_type,
+              days: Number(r.total_days || 1),
               startDate: r.start_date,
               endDate: r.end_date,
-              dateIso: r.date_iso,
-              oldCheckIn: r.old_check_in,
-              newCheckIn: r.new_check_in,
-              oldCheckOut: r.old_check_out,
-              newCheckOut: r.new_check_out,
-              hours: r.hours,
+              date: r.start_date === r.end_date ? r.start_date : `${r.start_date} ถึง ${r.end_date}`,
+              reason: r.reason,
               status: r.status,
-              approver: r.approver,
+              approverName: r.approver || 'ผู้จัดการ',
               remark: r.remark,
-              ...(target || {}),
-            };
+              actionTime: r.created_at ? new Date(r.created_at).toLocaleString('th-TH') : '-',
+              createdAt: r.created_at,
+            })));
+          }
+
+          if (tcRes.rows) {
+            historyList.push(...tcRes.rows.map((r) => enrichUserData({
+              id: r.id,
+              requestType: 'time-correction',
+              employeeId: r.employee_id,
+              employeeName: r.employeeName,
+              employeeCode: r.employeeCode,
+              department: r.department,
+              date: r.date_iso,
+              reason: r.reason,
+              details: `เข้า: ${r.new_check_in || '-'} / ออก: ${r.new_check_out || '-'}`,
+              status: r.status,
+              approverName: r.approver || 'ผู้จัดการ',
+              remark: r.remark,
+              actionTime: r.created_at ? new Date(r.created_at).toLocaleString('th-TH') : '-',
+              createdAt: r.created_at,
+            })));
           }
         } catch (e) {
-          console.error('PG query error in processApprovalRequest target lookup:', e);
+          console.error('PG query error in getApprovalHistory:', e);
         }
       }
 
+      // Sort by creation date descending
+      historyList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      return historyList;
+    },
+
+    processApprovalRequest: async ({ requestType, id, status, approver, approverId, remark, approverRole }) => {
+      const rt = requestType === 'time_correction' ? 'time-correction' : requestType;
+      let target = null;
+      let tableName = null;
+      let memList = null;
+
+      if (rt === 'leave') {
+        memList = memoryStore.memoryLeaves;
+        tableName = 'leave_requests';
+      } else if (rt === 'time-correction') {
+        memList = memoryStore.memoryTimeCorrections;
+        tableName = 'time_corrections';
+      } else {
+        throw httpError(400, 'ประเภทคำขอไม่ถูกต้อง (ต้องเป็น leave หรือ time-correction)');
+      }
+      target = memList.find((x) => x.id === id) || null;
+
+      if (db.isPgConnected()) {
+        // PostgreSQL is the source of truth for the current status
+        const res = await db.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
+        if (res.rows && res.rows.length > 0) {
+          const r = res.rows[0];
+          target = {
+            ...(target || {}),
+            id: r.id,
+            employeeId: r.employee_id,
+            leaveType: r.leave_type,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            dateIso: r.date_iso,
+            oldCheckIn: r.old_check_in,
+            newCheckIn: r.new_check_in,
+            oldCheckOut: r.old_check_out,
+            newCheckOut: r.new_check_out,
+            hours: r.hours,
+            status: r.status,
+            approver: r.approver,
+            remark: r.remark,
+          };
+        } else {
+          target = null;
+        }
+      }
+
+      if (!target) throw httpError(404, 'ไม่พบคำขอที่ต้องการดำเนินการ');
+
+      const currentStatus = String(target.status || '').trim();
+      if (!currentStatus.startsWith('รออนุมัติ')) {
+        throw httpError(409, `คำขอนี้ถูกดำเนินการไปแล้ว (สถานะปัจจุบัน: ${currentStatus || '-'})`);
+      }
+
+      const normRole = (r) => String(r || '').toLowerCase().replace(/[\s_-]+/g, '');
+      const SUPER_ROLES = ['superboss', 'superadmin', 'ceo', 'director'];
+      const isApproverSuperboss = SUPER_ROLES.includes(normRole(approverRole));
+      const isLevel2Status = currentStatus.includes('ระดับ 2') || currentStatus.includes('Superboss');
       const isApproveAction = status === 'approved' || status === 'อนุมัติ' || status === 'อนุมัติแล้ว';
-      const isApproverSuperboss =
-        approverRole === 'SuperBoss' ||
-        (approver && (approver.includes('SuperBoss') || approver.includes('CEO') || approver.includes('เดชอุดม')));
+
+      const employees = await (storeRef ? storeRef.getEmployees() : []);
+      const admins = await (storeRef ? storeRef.getAdmins() : []);
+      const allUsers = [...employees, ...admins];
+      const findUser = (uid) => allUsers.find((u) => u && uid && (u.id === uid || u.code === uid || u.email === uid));
+      const requester = findUser(target.employeeId);
+      const requesterRole = target.requesterRole || (requester ? requester.role : 'Employee');
+
+      // ---- Authorization of the approver for THIS request ----
+      if (!isApproverSuperboss) {
+        if (approverId && target.employeeId === approverId) {
+          throw httpError(403, 'ไม่สามารถอนุมัติ/ปฏิเสธคำขอของตนเองได้');
+        }
+        if (isLevel2Status) {
+          throw httpError(403, 'คำขอนี้อยู่ในขั้นอนุมัติระดับ 2 ต้องให้ Superboss เป็นผู้พิจารณา');
+        }
+        if (requesterRole === 'Boss' || requesterRole === 'Manager' || requesterRole === 'HR Admin') {
+          throw httpError(403, 'คำขอของหัวหน้างานต้องให้ Superboss เป็นผู้พิจารณา');
+        }
+        const approverUser = findUser(approverId);
+        const dA = String((approverUser && approverUser.department) || '').trim().toLowerCase();
+        const dR = String((requester && requester.department) || '').trim().toLowerCase();
+        if (dA && dA !== '-' && dR && dA !== dR) {
+          throw httpError(403, 'คุณสามารถอนุมัติได้เฉพาะคำขอของพนักงานในแผนกเดียวกันเท่านั้น');
+        }
+      }
+
+      const syncMemory = (patch) => {
+        const m = memList.find((x) => x.id === id);
+        if (m) Object.assign(m, patch);
+      };
+      const sendNotif = (payload) => {
+        const n = {
+          ...payload,
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          isRead: false,
+          createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        };
+        if (storeRef?.addNotification) {
+          storeRef.addNotification(n);
+        } else {
+          memoryStore.memoryNotifications.unshift(n);
+        }
+      };
+      // Conditional update: only succeeds while the request is still pending (prevents double processing)
+      const updatePg = async (setSql, params) => {
+        if (!db.isPgConnected()) return;
+        const r = await db.query(
+          `UPDATE ${tableName} SET ${setSql} WHERE id = $${params.length + 1} AND status LIKE 'รออนุมัติ%'`,
+          [...params, id]
+        );
+        if (r.rowCount === 0) throw httpError(409, 'คำขอนี้ถูกดำเนินการไปแล้วโดยผู้อื่น กรุณารีเฟรชรายการ');
+      };
+      const typeLabel = rt === 'leave' ? `ใบลา${target.leaveType ? ` (${target.leaveType})` : ''}` : 'คำขอปรับปรุงเวลา';
 
       if (isApproveAction) {
-        const isLevel1 =
-          !isApproverSuperboss &&
-          target &&
-          (target.approvalLevel === 1 ||
-           target.status === 'รออนุมัติ' ||
-           target.status === 'รออนุมัติระดับ 1 (Boss)') &&
-          target.requesterRole !== 'Boss' &&
-          target.requesterRole !== 'Manager';
+        if (!isApproverSuperboss) {
+          // Level 1 (Boss) approval -> forward to Level 2 (Superboss)
+          await updatePg('status = $1, approver = $2', ['รออนุมัติระดับ 2 (Superboss)', approver]);
+          syncMemory({ approvalLevel: 2, status: 'รออนุมัติระดับ 2 (Superboss)', approverLevel1: approver });
 
-        if (isLevel1) {
-          if (target) {
-            target.approvalLevel = 2;
-            target.status = 'รออนุมัติระดับ 2 (Superboss)';
-            target.approverLevel1 = approver;
+          const superbossUser =
+            (target.superbossId && findUser(target.superbossId)) ||
+            allUsers.find((u) => u && SUPER_ROLES.includes(normRole(u.role)) && u.id !== target.employeeId) ||
+            admins[0] ||
+            null;
+          if (superbossUser) {
+            sendNotif({
+              employeeId: superbossUser.id,
+              title: `📢 ${typeLabel} ของ ${(requester && requester.name) || target.employeeName || 'พนักงาน'} ผ่านการอนุมัติระดับ 1 แล้ว`,
+              message: `คำขอผ่าน Boss (${approver}) เรียบร้อยแล้ว รอ Superboss พิจารณาอนุมัติระดับ 2`,
+              type: 'info',
+            });
           }
-
-          if (db.isPgConnected() && tableName) {
-            try {
-              await db.query(
-                `UPDATE ${tableName} SET status = $1, approver = $2 WHERE id = $3`,
-                ['รออนุมัติระดับ 2 (Superboss)', approver, id]
-              );
-            } catch (e) {
-              console.error('PG update error in approval Level 1:', e);
-            }
-          }
-
-          const superbossId = (target && target.superbossId) || 'ADM-001';
-          memoryStore.memoryNotifications.unshift({
-            id: `notif-${Date.now()}`,
-            employeeId: superbossId,
-            title: `📢 คำขอของ ${target?.employeeName || 'พนักงาน'} ผ่านการอนุมัติระดับ 1 แล้ว`,
-            message: `คำขอผ่าน Boss (${approver}) เรียบร้อยแล้ว รอ Superboss พิจารณาอนุมัติระดับ 2`,
-            type: 'info',
-            isRead: false,
-            createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          });
 
           return {
             id,
             status: 'รออนุมัติระดับ 2 (Superboss)',
             message: 'อนุมัติระดับ 1 (Boss) เรียบร้อยแล้ว ส่งต่อไปยังระดับ 2 (Superboss)',
           };
-        } else {
-          // Level 2 Final Approval
-          if (target) {
-            target.status = 'อนุมัติแล้ว';
-            target.approver = approver;
-            target.remark = remark || 'อนุมัติสมบูรณ์';
-          }
+        }
 
-          if (db.isPgConnected() && tableName) {
-            try {
-              await db.query(
-                `UPDATE ${tableName} SET status = $1, approver = $2, remark = $3 WHERE id = $4`,
-                ['อนุมัติแล้ว', approver, remark || 'อนุมัติสมบูรณ์', id]
-              );
-            } catch (e) {
-              console.error('PG update error in approval Level 2:', e);
-            }
-          }
+        // Level 2 (Superboss) = final approval
+        await updatePg('status = $1, approver = $2, remark = $3', ['อนุมัติแล้ว', approver, remark || 'อนุมัติสมบูรณ์']);
+        syncMemory({ status: 'อนุมัติแล้ว', approver, remark: remark || 'อนุมัติสมบูรณ์' });
 
-          // If Time Correction is approved, update the attendance table
-          if (requestType === 'time-correction' || requestType === 'time_correction' || target?.dateIso) {
-            const targetDate = target?.dateIso;
-            const newIn = target?.newCheckIn;
-            const newOut = target?.newCheckOut;
-            const targetEmpId = target?.employeeId;
-
-            if (targetDate && targetEmpId) {
-              const attIdx = memoryStore.memoryAttendance.findIndex(
-                (a) => a && (a.employeeId === targetEmpId || a.employeeCode === targetEmpId) && a.dateIso === targetDate
-              );
-              if (attIdx !== -1) {
-                if (newIn && newIn !== '-') memoryStore.memoryAttendance[attIdx].checkIn = newIn;
-                if (newOut && newOut !== '-') memoryStore.memoryAttendance[attIdx].checkOut = newOut;
-                memoryStore.memoryAttendance[attIdx].status = 'ลงเวลาเข้า-ออกครบถ้วน';
-                memoryStore.memoryAttendance[attIdx].isCorrected = true;
-                memoryStore.memoryAttendance[attIdx].isApproved = true;
-              }
-
-              if (db.isPgConnected()) {
-                try {
-                  await db.query(
-                    `UPDATE attendance 
-                     SET check_in = COALESCE(NULLIF($1, '-'), check_in),
-                         check_out = COALESCE(NULLIF($2, '-'), check_out),
-                         status = 'ลงเวลาเข้า-ออกครบถ้วน'
-                     WHERE (employee_id = $3 OR employee_id = (SELECT code FROM employees WHERE id = $3 LIMIT 1))
-                       AND date_iso = $4`,
-                    [newIn, newOut, targetEmpId, targetDate]
-                  );
-                } catch (e) {
-                  console.error('PG update attendance upon correction approval error:', e);
-                }
-              }
-            }
-          }
-
-          if (target && target.employeeId) {
-            memoryStore.memoryNotifications.unshift({
-              id: `notif-${Date.now()}`,
-              employeeId: target.employeeId,
-              title: `✅ คำขอของคุณได้รับการอนุมัติแล้ว`,
-              message: `คำขอ ${target.title || target.leaveType || 'ของคุณ'} ได้รับการอนุมัติสมบูรณ์เรียบร้อยแล้ว โดย ${approver}`,
-              type: 'success',
-              isRead: false,
-              createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-            });
-          }
-
-          return {
-            id,
-            status: 'อนุมัติแล้ว',
-            message: 'อนุมัติคำขอสมบูรณ์เรียบร้อยแล้ว',
+        // Approved Time Correction -> apply it to the attendance record (create it if the day has none)
+        if (rt === 'time-correction' && target.dateIso && target.employeeId) {
+          const fmt = (t) => {
+            const v = String(t || '').trim();
+            if (!v || v === '-') return null;
+            return /^\d{1,2}:\d{2}$/.test(v) ? `${v.padStart(5, '0')} น.` : v;
           };
-        }
-      } else {
-        // Reject Action
-        if (target) {
-          target.status = 'ไม่อนุมัติ';
-          target.approver = approver;
-          target.remark = remark || 'ไม่อนุมัติคำขอ';
-        }
+          const toSec = (t) => {
+            const m = String(t || '').match(/(\d{1,2}):(\d{2})/);
+            return m ? parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 : null;
+          };
+          const calcDur = (a, b) => {
+            const sa = toSec(a);
+            const sb = toSec(b);
+            if (sa === null || sb === null || sb <= sa) return '00:00:00 ชม.';
+            const d = sb - sa;
+            return `${String(Math.floor(d / 3600)).padStart(2, '0')}:${String(Math.floor((d % 3600) / 60)).padStart(2, '0')}:00 ชม.`;
+          };
+          const inT = fmt(target.newCheckIn);
+          const outT = fmt(target.newCheckOut);
 
-        if (db.isPgConnected() && tableName) {
-          try {
-            await db.query(
-              `UPDATE ${tableName} SET status = $1, approver = $2, remark = $3 WHERE id = $4`,
-              ['ไม่อนุมัติ', approver, remark || 'ไม่อนุมัติคำขอ', id]
+          const memAtt = memoryStore.memoryAttendance.find(
+            (a) => a && (a.employeeId === target.employeeId || a.employeeCode === target.employeeId) && a.dateIso === target.dateIso
+          );
+          if (memAtt) {
+            if (inT) memAtt.checkIn = inT;
+            if (outT) memAtt.checkOut = outT;
+            memAtt.duration = calcDur(memAtt.checkIn, memAtt.checkOut);
+            memAtt.status = 'ลงเวลาเข้า-ออกครบถ้วน';
+            memAtt.statusColor = '#10B981';
+            memAtt.isCorrected = true;
+            memAtt.isApproved = true;
+          }
+
+          if (db.isPgConnected()) {
+            const upd = await db.query(
+              `UPDATE attendance
+               SET check_in = COALESCE($1, check_in),
+                   check_out = COALESCE($2, check_out),
+                   status = 'ลงเวลาเข้า-ออกครบถ้วน',
+                   status_color = '#10B981'
+               WHERE (employee_id = $3 OR employee_id IN (SELECT code FROM employees WHERE id = $3) OR employee_id IN (SELECT id FROM employees WHERE code = $3))
+                 AND date_iso = $4
+               RETURNING id, check_in, check_out`,
+              [inT, outT, target.employeeId, target.dateIso]
             );
-          } catch (e) {
-            console.error('PG update error in reject:', e);
+            if (upd.rows && upd.rows.length > 0) {
+              for (const row of upd.rows) {
+                await db.query('UPDATE attendance SET duration = $1 WHERE id = $2', [calcDur(row.check_in, row.check_out), row.id]);
+              }
+            } else if (inT || outT) {
+              await db.query(
+                `INSERT INTO attendance (id, employee_id, date_iso, check_in, check_out, duration, status, status_color, location_name)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'ลงเวลาเข้า-ออกครบถ้วน', '#10B981', $7)`,
+                [`att-corr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, target.employeeId, target.dateIso, inT, outT, calcDur(inT, outT), 'บันทึกจากคำขอปรับปรุงเวลา (อนุมัติแล้ว)']
+              );
+            }
           }
         }
 
-        if (target && target.employeeId) {
-          memoryStore.memoryNotifications.unshift({
-            id: `notif-${Date.now()}`,
+        if (target.employeeId) {
+          sendNotif({
             employeeId: target.employeeId,
-            title: `❌ คำขอของคุณไม่ได้รับการอนุมัติ`,
-            message: `คำขอ ${target.title || target.leaveType || 'ของคุณ'} ถูกปฏิเสธ โดย ${approver} (เหตุผล: ${remark || 'ไม่ระบุ'})`,
-            type: 'error',
-            isRead: false,
-            createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            title: `✅ ${typeLabel} ของคุณได้รับการอนุมัติแล้ว`,
+            message: `${typeLabel} ได้รับการอนุมัติสมบูรณ์เรียบร้อยแล้ว โดย ${approver}`,
+            type: 'success',
           });
         }
 
         return {
           id,
-          status: 'ไม่อนุมัติ',
-          message: 'ปฏิเสธคำขอเรียบร้อยแล้ว',
+          status: 'อนุมัติแล้ว',
+          message: 'อนุมัติคำขอสมบูรณ์เรียบร้อยแล้ว',
         };
       }
+
+      // Reject Action (allowed at either level)
+      await updatePg('status = $1, approver = $2, remark = $3', ['ไม่อนุมัติ', approver, remark || 'ไม่อนุมัติคำขอ']);
+      syncMemory({ status: 'ไม่อนุมัติ', approver, remark: remark || 'ไม่อนุมัติคำขอ' });
+
+      if (target.employeeId) {
+        sendNotif({
+          employeeId: target.employeeId,
+          title: `❌ ${typeLabel} ของคุณไม่ได้รับการอนุมัติ`,
+          message: `${typeLabel} ถูกปฏิเสธ โดย ${approver} (เหตุผล: ${remark || 'ไม่ระบุ'})`,
+          type: 'error',
+        });
+      }
+
+      return {
+        id,
+        status: 'ไม่อนุมัติ',
+        message: 'ปฏิเสธคำขอเรียบร้อยแล้ว',
+      };
     },
   };
 

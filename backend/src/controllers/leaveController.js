@@ -1,5 +1,12 @@
 const dbStore = require('../services/dbStore');
+const { send: sendError } = require('../utils/httpError');
 const getEmpId = require('../helpers/getEmployeeId');
+const { isApproverRole } = require('../middlewares/authMiddleware');
+const { todayIso } = require('../utils/time');
+const { attachmentIdFromUrl } = require('./uploadController');
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const isValidIsoDate = (v) => ISO_DATE.test(String(v || '')) && !Number.isNaN(Date.parse(v));
 
 // GET /api/leaves/balances
 exports.getBalances = async (req, res) => {
@@ -12,7 +19,7 @@ exports.getBalances = async (req, res) => {
       balances,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -29,12 +36,37 @@ exports.createLeaveRequest = async (req, res) => {
       });
     }
 
+    if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate)) {
+      return res.status(400).json({ success: false, message: 'รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)' });
+    }
+    if (endDate < startDate) {
+      return res.status(400).json({ success: false, message: 'วันสิ้นสุดการลาต้องไม่ก่อนวันเริ่มลา' });
+    }
+    // Inclusive calendar span; half-day leave (0.5) is allowed, anything above the span is not
+    const spanDays = Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86400000) + 1;
+    const days = totalDays === undefined || totalDays === null || totalDays === '' ? spanDays : Number(totalDays);
+    if (!Number.isFinite(days) || days <= 0 || days > spanDays || (days * 2) % 1 !== 0) {
+      return res.status(400).json({
+        success: false,
+        message: `จำนวนวันลาไม่ถูกต้อง (ต้องมากกว่า 0 และไม่เกิน ${spanDays} วันตามช่วงวันที่เลือก)`,
+      });
+    }
+
+    // An attachment must be a file this employee uploaded through /uploads/leave-attachment
+    if (attachmentUrl) {
+      const attId = attachmentIdFromUrl(attachmentUrl);
+      const att = attId ? await dbStore.getLeaveAttachment(attId) : null;
+      if (!att || att.employeeId !== empId) {
+        return res.status(400).json({ success: false, message: 'ไฟล์แนบไม่ถูกต้อง กรุณาอัปโหลดไฟล์ใหม่อีกครั้ง' });
+      }
+    }
+
     const newRequest = await dbStore.addLeaveRequest({
       employeeId: empId,
       leaveType,
       startDate,
       endDate,
-      totalDays: totalDays || 1,
+      totalDays: days,
       reason,
       attachmentUrl,
     });
@@ -45,7 +77,7 @@ exports.createLeaveRequest = async (req, res) => {
       request: newRequest,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -61,7 +93,7 @@ exports.getMyRequests = async (req, res) => {
       requests: list,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -72,9 +104,18 @@ exports.getLeaveById = async (req, res) => {
     if (!reqItem) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการใบลา' });
     }
+
+    const ownerId = reqItem.employeeId || reqItem.employee_id;
+    if (!isApproverRole(req.user?.role) && ownerId !== req.user?.id && ownerId !== req.user?.code) {
+      return res.status(403).json({
+        success: false,
+        message: 'คุณไม่มีสิทธิ์เข้าถึงใบลาของพนักงานคนอื่น (Forbidden)',
+      });
+    }
+
     return res.status(200).json({ success: true, request: reqItem });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -95,6 +136,14 @@ exports.cancelLeave = async (req, res) => {
       });
     }
 
+    const st = String(leaveRequest.status || '');
+    if (st === 'ไม่อนุมัติ' || st === 'ยกเลิก') {
+      return res.status(400).json({ success: false, message: `ไม่สามารถยกเลิกได้ เนื่องจากใบลานี้อยู่ในสถานะ "${st}" แล้ว` });
+    }
+    if (st === 'อนุมัติแล้ว' && leaveRequest.startDate && leaveRequest.startDate < todayIso()) {
+      return res.status(400).json({ success: false, message: 'ไม่สามารถยกเลิกใบลาที่อนุมัติแล้วและเริ่มลาไปแล้วได้ กรุณาติดต่อ HR' });
+    }
+
     const updated = await dbStore.updateLeaveStatus(req.params.id, 'ยกเลิก', 'ยกเลิกโดยผู้ยื่น');
     return res.status(200).json({
       success: true,
@@ -102,6 +151,6 @@ exports.cancelLeave = async (req, res) => {
       request: updated,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };

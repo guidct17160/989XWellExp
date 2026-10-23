@@ -38,37 +38,59 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-/**
- * Strict requirement: user MUST be an Administrator
- * 
- * CRIT-4 FIX: Removed `req.user.portal === 'web'` check.
- * Admin status is now determined solely by the user's role field.
- */
-const requireAdmin = (req, res, next) => {
+const normRole = (role) => String(role || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+const ADMIN_ROLES = new Set(['admin', 'super admin', 'superadmin', 'hr admin', 'system admin', 'sys admin']);
+const APPROVER_ROLES = new Set([...ADMIN_ROLES, 'hr', 'manager', 'boss', 'superboss', 'super boss', 'supervisor', 'head', 'ceo', 'director']);
+
+const isAdminRole = (role) => ADMIN_ROLES.has(normRole(role));
+const isApproverRole = (role) => APPROVER_ROLES.has(normRole(role));
+// Super Admin = web-admin account management. 'SuperBoss' is an employee (mobile) approver role and
+// must NOT be able to create / edit / delete admin accounts.
+const isSuperAdminRole = (role) => {
+  const norm = normRole(role);
+  return norm === 'super admin' || norm === 'superadmin';
+};
+
+const makeRoleGuard = (check, label) => (req, res, next) => {
   if (!req.user || !req.user.id) {
     return res.status(401).json({
       success: false,
       message: 'กรุณาเข้าสู่ระบบก่อนทำรายการ (Unauthorized)',
     });
   }
-
-  const role = String(req.user.role || '').toLowerCase();
-  // CRIT-4 FIX: Only role-based admin check. Portal field is NOT used for authorization.
-  const isAdmin = role.includes('admin') || role === 'superadmin' || role === 'super admin';
-
-  if (!isAdmin) {
+  if (!check(req.user.role)) {
     return res.status(403).json({
       success: false,
-      message: 'คุณไม่มีสิทธิ์เข้าถึงส่วนนี้ เฉพาะผู้ดูแลระบบ (Admin) เท่านั้น (Forbidden)',
+      message: `คุณไม่มีสิทธิ์เข้าถึงส่วนนี้ เฉพาะ${label}เท่านั้น (Forbidden)`,
     });
   }
-
   next();
 };
+
+/**
+ * Strict requirement: user MUST be an Administrator (exact role allow-list)
+ */
+const requireAdmin = makeRoleGuard(isAdminRole, 'ผู้ดูแลระบบ (Admin)');
+
+/**
+ * Strict requirement: user MUST be Super Admin (highest privilege)
+ */
+const requireSuperAdmin = makeRoleGuard(isSuperAdminRole, 'ผู้ดูแลระบบสูงสุด (Super Admin)');
+
+/**
+ * Strict requirement: user MUST be Admin/HR/Manager (approval & company-wide reports)
+ */
+const requireApprover = makeRoleGuard(isApproverRole, 'ผู้ดูแลระบบ/หัวหน้างาน');
 
 module.exports = {
   authenticate,
   requireAuth,
   requireAdmin,
+  requireSuperAdmin,
+  requireApprover,
+  isAdminRole,
+  isSuperAdminRole,
+  isApproverRole,
 };
+
 

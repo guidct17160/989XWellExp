@@ -1,4 +1,5 @@
 const dbStore = require('../services/dbStore');
+const { send: sendError } = require('../utils/httpError');
 const { logAudit } = require('../utils/auditLogger');
 
 // GET /api/approvals/pending
@@ -8,7 +9,8 @@ exports.getPendingApprovals = async (req, res) => {
     const managerId = req.user?.id;
     if (!managerId) {
       return res.status(401).json({ success: false, message: 'กรุณาเข้าสู่ระบบก่อนทำรายการ' });
-    }    const pendingList = await dbStore.getPendingApprovals(managerId);
+    }
+    const pendingList = await dbStore.getPendingApprovals(managerId);
 
     return res.status(200).json({
       success: true,
@@ -16,12 +18,26 @@ exports.getPendingApprovals = async (req, res) => {
       approvals: pendingList,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
+  }
+};
+
+// GET /api/approvals/history (Real DB)
+exports.getApprovalHistory = async (req, res) => {
+  try {
+    const historyList = await dbStore.getApprovalHistory();
+    return res.status(200).json({
+      success: true,
+      total: historyList.length,
+      history: historyList,
+    });
+  } catch (error) {
+    return sendError(res, error);
   }
 };
 
 // PATCH /api/approvals/:requestType/:id
-// requestType: 'leave' | 'ot' | 'time-correction'
+// requestType: 'leave' | 'time-correction'
 exports.processApproval = async (req, res) => {
   try {
     const { requestType, id } = req.params;
@@ -35,14 +51,17 @@ exports.processApproval = async (req, res) => {
     }
 
     const statusText = action.toLowerCase() === 'approved' || action === 'อนุมัติ' ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
-    const approver = approverName || req.user?.name || req.body.approver || 'ผู้จัดการ';
-    const approverRole = req.body.approverRole || req.user?.role || req.headers['x-role'] || (approver.includes('SuperBoss') ? 'SuperBoss' : 'Boss');
+    // SECURITY: approver identity comes from the verified JWT; a body-supplied name is only a last-resort label
+    const approver = req.user?.name || req.user?.username || approverName || 'ผู้จัดการ';
+    // SECURITY: role is taken ONLY from the verified JWT (never from body/headers)
+    const approverRole = req.user.role;
 
     const result = await dbStore.processApprovalRequest({
       requestType,
       id,
       status: statusText,
       approver,
+      approverId: req.user.id,
       approverRole,
       remark: remark || '',
     });
@@ -60,6 +79,6 @@ exports.processApproval = async (req, res) => {
       result,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };

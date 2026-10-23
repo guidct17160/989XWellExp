@@ -15,6 +15,9 @@ exports.getSettings = async (req, res) => {
 // PUT /api/settings
 exports.updateSettings = async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ success: false, message: 'ข้อมูลการตั้งค่าไม่ถูกต้อง' });
+    }
     const updated = await dbStore.updateSettings(req.body);
     res.json({ success: true, message: 'Settings updated successfully', settings: updated });
   } catch (error) {
@@ -73,7 +76,7 @@ exports.changePassword = async (req, res) => {
     }
 
     // Verify current password (supports both bcrypt and legacy plaintext)
-    const expectedPassword = String(user.password || '1234').trim();
+    const expectedPassword = String(user.password || '').trim();
     const check = await comparePassword(currentPassword, expectedPassword);
     if (!check.valid) {
       return res.status(401).json({

@@ -1,17 +1,24 @@
 const dbStore = require('../services/dbStore');
+const { send: sendError } = require('../utils/httpError');
 const getEmpId = require('../helpers/getEmployeeId');
+const { todayIso } = require('../utils/time');
+const { verifyPunchLocation } = require('./workLocationController');
 
 // POST /api/attendance/clock-in
 exports.clockIn = async (req, res) => {
   try {
-    const { latitude, longitude, locationName, photoUrl } = req.body;
+    const { latitude, longitude, locationName, locationId, photoUrl } = req.body;
     const empId = getEmpId(req);
+
+    // When work locations are set up, the punch must be made inside the chosen location's radius
+    const verified = await verifyPunchLocation(empId, { locationId, latitude, longitude });
 
     const result = await dbStore.addClockIn({
       employeeId: empId,
       latitude,
       longitude,
-      locationName,
+      locationName: verified ? verified.name : locationName,
+      locationId: verified ? verified.id : null,
       photoUrl,
     });
 
@@ -21,15 +28,17 @@ exports.clockIn = async (req, res) => {
       attendance: result,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
 // POST /api/attendance/clock-out
 exports.clockOut = async (req, res) => {
   try {
-    const { latitude, longitude, locationName } = req.body;
+    const { latitude, longitude, locationName, locationId } = req.body;
     const empId = getEmpId(req);
+
+    await verifyPunchLocation(empId, { locationId, latitude, longitude });
 
     const result = await dbStore.addClockOut({
       employeeId: empId,
@@ -44,7 +53,7 @@ exports.clockOut = async (req, res) => {
       attendance: result,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -59,7 +68,7 @@ exports.getTodayStatus = async (req, res) => {
       attendance: todayData,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -76,7 +85,7 @@ exports.getHistory = async (req, res) => {
       history,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -91,7 +100,7 @@ exports.getSummary = async (req, res) => {
       summary,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -101,13 +110,28 @@ exports.addCorrection = async (req, res) => {
     const empId = getEmpId(req);
     const { dateIso, oldCheckIn, newCheckIn, oldCheckOut, newCheckOut, reason } = req.body;
 
+    const day = dateIso || todayIso();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day)) || Number.isNaN(Date.parse(day))) {
+      return res.status(400).json({ success: false, message: 'รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)' });
+    }
+    if (day > todayIso()) {
+      return res.status(400).json({ success: false, message: 'ไม่สามารถขอปรับปรุงเวลาของวันที่ในอนาคตได้' });
+    }
+    const hasTime = (v) => v && String(v).trim() !== '' && String(v).trim() !== '-';
+    if (!hasTime(newCheckIn) && !hasTime(newCheckOut)) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุเวลาเข้างานหรือเวลาออกงานที่ต้องการแก้ไข' });
+    }
+    if ((hasTime(newCheckIn) && !/\d{1,2}:\d{2}/.test(String(newCheckIn))) || (hasTime(newCheckOut) && !/\d{1,2}:\d{2}/.test(String(newCheckOut)))) {
+      return res.status(400).json({ success: false, message: 'รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)' });
+    }
+
     const result = await dbStore.addTimeCorrection({
       employeeId: empId,
-      dateIso: dateIso || new Date().toISOString().split('T')[0],
+      dateIso: day,
       oldCheckIn: oldCheckIn || '-',
-      newCheckIn: newCheckIn || '08:00',
+      newCheckIn: hasTime(newCheckIn) ? newCheckIn : '-',
       oldCheckOut: oldCheckOut || '-',
-      newCheckOut: newCheckOut || '17:00',
+      newCheckOut: hasTime(newCheckOut) ? newCheckOut : '-',
       reason: reason || 'ขอปรับปรุงเวลาเข้า-ออกงาน',
     });
 
@@ -117,7 +141,7 @@ exports.addCorrection = async (req, res) => {
       correction: result,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -133,7 +157,7 @@ exports.getMyCorrections = async (req, res) => {
       corrections: list,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
@@ -149,7 +173,7 @@ exports.getCorrections = async (req, res) => {
       corrections: list,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return sendError(res, error);
   }
 };
 
