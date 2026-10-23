@@ -72,7 +72,7 @@
 - **Quest** (เมนู Mission ในเว็บ): แอดมินกรอก **Code** ของ Quest เอง (`quests.code` ห้ามซ้ำ ตัวอักษร/ตัวเลข/-/_ ไม่เกิน 30) และสร้าง Quest 4 ขั้น (Settings → Content → Reward → Summary) ปัจจุบันเนื้อหามีแค่ Quiz
   เก็บใน `quests` / `quest_sections` / `quest_questions` / `quest_choices` / `quest_members` / `quest_progress` (API `/quests*` เฉพาะแอดมิน)
   คำถามมีแค่ Single Choice / Multi Choice และอนุมัติแบบ **Auto Approve** อย่างเดียว (ยังไม่มี Manual approve) Admin ตั้ง "Pass score" (ตอบถูกกี่ข้อถึงผ่าน) และเลือกรางวัลฟรีได้ (ไม่หักแต้ม)
-  ฝั่งพนักงานในแอป (เมนู ภารกิจ): `GET /my-quests`, `GET /my-quests/:id` (ไม่ส่งเฉลย), `POST /my-quests/:id/submit` server ตรวจคำตอบเอง ถ้าผ่านและอยู่ในช่วงเวลา → อนุมัติทันที เพิ่มแต้มก้อนเดียวตามที่ Admin ตั้งทั้ง Quest (`quests.reward_points` ไม่มีแต้มรายข้อ เช่น ถูก 20 จาก 30 ข้อ ได้ 100 แต้ม) และแจกคูปองรางวัล ใน transaction เดียว (ผ่านแล้วทำซ้ำไม่ได้ ไม่จ่ายซ้ำ)
+  ฝั่งพนักงานในแอป (เมนู ภารกิจ): `GET /my-quests`, `GET /my-quests/:id` (ไม่ส่งเฉลย), `POST /my-quests/:id/submit` server ตรวจคำตอบเอง ถ้าผ่านและอยู่ในช่วงเวลา → อนุมัติทันที เพิ่มแต้มก้อนเดียวตามที่ Admin ตั้งทั้ง Quest (`quests.reward_points` ไม่มีแต้มรายข้อ เช่น ถูก 20 จาก 30 ข้อ ได้ 100 แต้ม) และแจกคูปองรางวัล ใน transaction เดียว (**ทำได้ครั้งเดียวต่อ Quest** ผ่านแล้วทำซ้ำไม่ได้ไม่จ่ายซ้ำ ถ้าส่งแล้วไม่ผ่านก็ปิด Quest นั้นของคนนั้น ทำซ้ำไม่ได้ ตอบ 409 แต่ Quest อื่นยังทำได้ตามปกติ แอปมีหน้ายืนยันก่อนส่ง)
   ผ่านเมื่อตอบถูก >= `quests.pass_count` ข้อ (ค่า 0 = ต้องถูกทุกข้อ) ถ้ารางวัลหมดสต็อกยังจ่ายแต้มตามปกติ Quiz ที่ตั้ง "No edit allow" แก้เนื้อหาไม่ได้เมื่อ Quest เริ่มแล้ว (ตรวจที่ server)
 
 ## เว็บ (frontend)

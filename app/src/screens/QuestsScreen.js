@@ -88,6 +88,11 @@ export default function QuestsScreen({ navigation }) {
                     <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
                     <Text style={[styles.badgeText, { color: '#16A34A' }]}>ผ่านแล้ว</Text>
                   </View>
+                ) : q.failed ? (
+                  <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="close-circle" size={14} color="#DC2626" />
+                    <Text style={[styles.badgeText, { color: '#DC2626' }]}>ไม่ผ่าน</Text>
+                  </View>
                 ) : (
                   <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
                     <Text style={[styles.badgeText, { color: '#B45309' }]}>ทำเลย</Text>
@@ -113,7 +118,8 @@ export default function QuestsScreen({ navigation }) {
                   <Text style={[styles.metaText, { color: '#7C3AED' }]}>รางวัลฟรี: {q.rewardTitle}</Text>
                 </View>
               )}
-              {!q.passed && <Text style={styles.deadline}>หมดเขต {fmtEnd(q)}</Text>}
+              {!q.passed && !q.failed && <Text style={styles.deadline}>หมดเขต {fmtEnd(q)}</Text>}
+              {q.failed && <Text style={[styles.deadline, { color: '#DC2626' }]}>ทำไม่ผ่านแล้ว ทำซ้ำไม่ได้</Text>}
             </TouchableOpacity>
           ))
         )}

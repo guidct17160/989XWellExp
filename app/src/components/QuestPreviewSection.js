@@ -36,7 +36,7 @@ export default function QuestPreviewSection({ navigation }) {
     }, [])
   );
 
-  const open = quests.filter((q) => !q.passed);
+  const open = quests.filter((q) => !q.passed && !q.failed);
   const shown = open.slice(0, 3);
 
   return (

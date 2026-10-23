@@ -65,6 +65,17 @@ export default function QuestPlayScreen({ navigation, route }) {
       Alert.alert('ตอบไม่ครบ', `คุณตอบแล้ว ${answeredCount}/${questions.length} ข้อ กรุณาตอบให้ครบทุกข้อก่อนส่ง`);
       return;
     }
+    Alert.alert(
+      'ยืนยันส่งคำตอบ',
+      'Quest นี้ทำได้ครั้งเดียว ถ้าไม่ผ่านจะทำซ้ำไม่ได้ ต้องการส่งคำตอบใช่ไหม',
+      [
+        { text: 'ตรวจสอบก่อน', style: 'cancel' },
+        { text: 'ส่งคำตอบ', onPress: sendAnswers },
+      ]
+    );
+  };
+
+  const sendAnswers = async () => {
     setSubmitting(true);
     try {
       const res = await tryFetchApi(`/my-quests/${encodeURIComponent(questId)}/submit`, {
@@ -86,10 +97,8 @@ export default function QuestPlayScreen({ navigation, route }) {
   };
 
   const closeResult = () => {
-    const passed = result && result.passed;
     setResult(null);
-    if (passed) navigation.goBack();
-    else setAnswers({}); // try again from a clean sheet
+    navigation.goBack(); // one attempt only: pass or fail, the quest is finished
   };
 
   return (
@@ -107,6 +116,12 @@ export default function QuestPlayScreen({ navigation, route }) {
             <Text style={styles.primaryText}>ลองอีกครั้ง</Text>
           </TouchableOpacity>
         </View>
+      ) : quest.failed ? (
+        <View style={styles.center}>
+          <Ionicons name="close-circle" size={64} color="#DC2626" />
+          <Text style={styles.doneTitle}>คุณทำ Quest นี้ไม่ผ่าน</Text>
+          <Text style={styles.errorText}>Quest นี้ทำได้ครั้งเดียว จึงไม่สามารถทำซ้ำได้</Text>
+        </View>
       ) : quest.passed ? (
         <View style={styles.center}>
           <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
@@ -122,6 +137,7 @@ export default function QuestPlayScreen({ navigation, route }) {
               <Text style={styles.ruleText}>
                 ต้องตอบถูกอย่างน้อย {quest.passCount} จาก {quest.questionCount} ข้อ จึงจะผ่านและได้รับ {quest.totalPoints} แต้ม
                 {quest.rewardTitle ? ` พร้อมรางวัลฟรี "${quest.rewardTitle}"` : ''} • หมดเขต {quest.endDate} {quest.endTime}
+                {'\n'}ทำได้ครั้งเดียว ถ้าไม่ผ่านจะทำซ้ำไม่ได้
               </Text>
             </View>
 
@@ -180,11 +196,12 @@ export default function QuestPlayScreen({ navigation, route }) {
                     </View>
                   </View>
                 )}
+                {!result.passed && <Text style={styles.resultLine}>Quest นี้ทำได้ครั้งเดียว จึงไม่สามารถทำซ้ำได้</Text>}
                 {result.passed && result.rewardSkipped && (
                   <Text style={styles.resultLine}>รางวัลหมดสต็อกแล้ว แต่ได้รับแต้มครบถ้วน</Text>
                 )}
                 <TouchableOpacity style={[styles.primaryBtn, { alignSelf: 'stretch', marginTop: 16 }]} onPress={closeResult}>
-                  <Text style={styles.primaryText}>{result.passed ? 'เสร็จสิ้น' : 'ลองใหม่อีกครั้ง'}</Text>
+                  <Text style={styles.primaryText}>{result.passed ? 'เสร็จสิ้น' : 'ปิด'}</Text>
                 </TouchableOpacity>
               </>
             )}

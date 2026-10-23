@@ -48,6 +48,8 @@ const summaryOf = (r) => {
     rewardTitle: r.reward_title || null,
     passed: !!r.passed,
     attempts: Number(r.attempts) || 0,
+    // a quest can be taken once: after a failed attempt it is closed for this employee
+    failed: !r.passed && (Number(r.attempts) || 0) > 0,
     score: Number(r.score) || 0,
     pointsAwarded: Number(r.points_awarded) || 0,
   };
@@ -79,7 +81,7 @@ module.exports = function createQuestPlayStore() {
         `${SUMMARY_SQL} WHERE ${ASSIGNED_SQL} ORDER BY q.created_at DESC`,
         [emp.id, String(emp.start_date || '')]
       );
-      return res.rows.map(summaryOf).filter((q) => q.passed || q.status === 'Active');
+      return res.rows.map(summaryOf).filter((q) => q.passed || q.failed || q.status === 'Active');
     },
 
     // The quiz an assigned employee may take — correct answers are NEVER sent
@@ -139,6 +141,7 @@ module.exports = function createQuestPlayStore() {
         await client.query('INSERT INTO quest_progress (quest_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [questId, emp.id]);
         const prog = (await client.query('SELECT * FROM quest_progress WHERE quest_id = $1 AND employee_id = $2 FOR UPDATE', [questId, emp.id])).rows[0];
         if (prog.passed) throw httpError(409, 'คุณทำ Quest นี้ผ่านและรับรางวัลไปแล้ว');
+        if (Number(prog.attempts) > 0) throw httpError(409, 'คุณทำ Quest นี้แล้วแต่ไม่ผ่าน ไม่สามารถทำซ้ำได้');
 
         // grade
         const qs = (await client.query(
