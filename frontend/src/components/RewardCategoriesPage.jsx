@@ -29,13 +29,7 @@ function CategoryDetail({ category, rewards, loading, onBack, onEdit, onRefresh 
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-200 text-xs font-bold uppercase tracking-wide cursor-pointer"
-          >
-            <Edit size={15} />
-            <span>Edit Category</span>
-          </button>
+
           <button onClick={onRefresh} className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors cursor-pointer" title="Refresh">
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -363,7 +357,7 @@ export default function RewardCategoriesPage() {
                         className="font-mono font-bold text-emerald-400 hover:underline cursor-pointer"
                         title="View rewards in this category"
                       >
-                        {c.rewardCount} items
+                        {c.rewardCount} 
                       </button>
                     </td>
                     <td className="py-4 px-6">

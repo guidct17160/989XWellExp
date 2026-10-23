@@ -305,11 +305,7 @@ function SettingsStep({ form, set }) {
         <p className="text-[11px] text-slate-500 mt-1">Up to 2,000 characters ({form.description.length}/2,000)</p>
       </div>
 
-      <div>
-        <label className={LABEL}>Image URL <span className="text-slate-500 normal-case font-medium">- optional</span></label>
-        <input className={INPUT} placeholder="https://..." value={form.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })} />
-        <p className="text-[11px] text-slate-500 mt-1">Recommended size 520 x 350 pixels (.gif, .png, .jpg, .jpeg)</p>
-      </div>
+ 
 
       <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-x-6 gap-y-5 pt-2 border-t border-red-900/30">
         <span className={`${LABEL} md:pt-2.5`}>Send Quest</span>
