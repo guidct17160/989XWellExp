@@ -16,16 +16,36 @@ import {
   Eye,
   EyeOff,
   User,
-  Building2
+  Send,
+  AlertCircle
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:5000/api';
+import { API_BASE } from '../config';
 
-export default function AdminManagement() {
+// Admin names are stored as one "name" column; show/edit them as first name + last name.
+const splitName = (full) => {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') };
+};
+
+const isInactive = (st) => st === 'Inactive' || st === 'Resign' || st === 'Resigned';
+
+export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, currentUser: propCurrentUser }) {
+  const user = propCurrentUser || (() => {
+    try {
+      const saved = localStorage.getItem('wellx989_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  const isSuperAdmin = propIsSuperAdmin !== undefined ? propIsSuperAdmin : (user?.role === 'Super Admin');
+
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,27 +54,27 @@ export default function AdminManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
 
-  // Form State
+  // Form State (No department, email is username, no password input in form)
   const [formData, setFormData] = useState({
-    name: '',
-    username: '',
-    password: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
-    role: 'Admin',
-    department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
+    role: 'HR Admin',
     status: 'Active',
   });
 
-  const [resetPasswordInput, setResetPasswordInput] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
 
-  const [departments, setDepartments] = useState([]);
+  // Status Toggle Modal State
+  const [statusToggleTarget, setStatusToggleTarget] = useState(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const triggerNotification = (msg) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+  const triggerNotification = (msg, type = 'success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const fetchAdmins = async () => {
@@ -64,9 +84,12 @@ export default function AdminManagement() {
       const data = await res.json();
       if (data.success && data.admins) {
         setAdmins(data.admins);
+      } else {
+        triggerNotification(data.message || 'Unable to load the administrator list', 'error');
       }
     } catch (err) {
       console.error('Failed to fetch admins', err);
+      triggerNotification('Unable to connect to the server to load the administrator list', 'error');
     } finally {
       setLoading(false);
     }
@@ -74,12 +97,6 @@ export default function AdminManagement() {
 
   useEffect(() => {
     fetchAdmins();
-    fetch(`${API_BASE}/departments`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.departments) setDepartments(data.departments);
-      })
-      .catch(() => null);
   }, []);
 
   const handleInputChange = (e) => {
@@ -88,15 +105,17 @@ export default function AdminManagement() {
   };
 
   const openAddModal = () => {
+    if (!isSuperAdmin) {
+      triggerNotification('Only a Super Admin can create an Admin', 'error');
+      return;
+    }
     setFormData({
-      name: '',
-      username: '',
-      password: '1234',
+      firstName: '',
+      lastName: '',
       email: '',
       phone: '',
-      role: 'Admin',
-      department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-      status: 'Active',
+      role: 'HR Admin',
+      status: 'Pending Password',
     });
     setShowAddModal(true);
   };
@@ -104,21 +123,17 @@ export default function AdminManagement() {
   const openEditModal = (admin) => {
     setSelectedAdmin(admin);
     setFormData({
-      name: admin.name || '',
-      username: admin.username || admin.code || '',
-      password: admin.password || '',
-      email: admin.email || '',
+      ...splitName(admin.name),
+      email: admin.email || admin.username || '',
       phone: admin.phone || '',
-      role: admin.role || 'Admin',
-      department: admin.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)',
-      status: admin.status || 'Active',
+      role: admin.role === 'Super Admin' ? 'Super Admin' : 'HR Admin',
+      status: isInactive(admin.status) ? 'Inactive' : (admin.status || 'Active'),
     });
     setShowEditModal(true);
   };
 
   const openResetPasswordModal = (admin) => {
     setSelectedAdmin(admin);
-    setResetPasswordInput('');
     setShowResetPasswordModal(true);
   };
 
@@ -127,11 +142,72 @@ export default function AdminManagement() {
     setShowDeleteModal(true);
   };
 
-  // CREATE ADMIN
+  // RESEND INVITE
+  const handleResendInvite = async (admin) => {
+    if (!admin || !admin.id) return;
+    setResendingId(admin.id);
+    try {
+      const res = await fetch(`${API_BASE}/admins/${admin.id}/resend-invite`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (json.success) {
+        triggerNotification(`Password setup email sent to ${admin.email}`);
+      } else {
+        triggerNotification(json.message || 'An error occurred while sending the email', 'error');
+      }
+    } catch (err) {
+      triggerNotification('A server connection error occurred', 'error');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  // Status Toggle Handlers
+  const handleRequestStatusToggle = (adm) => {
+    if (!isSuperAdmin || !adm) return;
+    if (adm.status === 'Pending Password' || adm.status === 'Pending' || adm.status === 'รอตั้งรหัสผ่าน') return;
+    const nextStatus = adm.status === 'Active' ? 'Inactive' : 'Active';
+    setStatusToggleTarget({ adm, nextStatus });
+  };
+
+  const handleConfirmStatusToggle = async () => {
+    if (!statusToggleTarget) return;
+    const { adm, nextStatus } = statusToggleTarget;
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch(`${API_BASE}/admins/${adm.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerNotification(`Status of ${adm.name} changed to "${nextStatus}"`);
+        setAdmins((prev) =>
+          prev.map((a) => (a.id === adm.id ? { ...a, status: nextStatus } : a))
+        );
+      } else {
+        triggerNotification(data.message || 'Unable to change the status', 'error');
+      }
+    } catch (err) {
+      triggerNotification('A server connection error occurred', 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+      setStatusToggleTarget(null);
+    }
+  };
+
+  const buildPayload = ({ firstName, lastName, ...rest }) => ({
+    ...rest,
+    name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+  });
+
+  // CREATE ADMIN (Strictly Super Admin, Email as Username, No Department, Email link for password)
   const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.username) {
-      alert('กรุณากรอกชื่อ-นามสกุล และ Username');
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email) {
+      triggerNotification('Please enter first name, last name and email', 'error');
       return;
     }
 
@@ -139,22 +215,22 @@ export default function AdminManagement() {
       const res = await fetch(`${API_BASE}/admins`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(buildPayload(formData)),
       });
       const json = await res.json();
 
       if (json.success) {
-        triggerNotification(`สร้างบัญชี Admin "${formData.name}" เรียบร้อยแล้ว`);
+        triggerNotification(`Admin account "${formData.firstName} ${formData.lastName}" created and password setup email sent to ${formData.email}`);
         setShowAddModal(false);
         setSearchTerm('');
         setRoleFilter('');
         fetchAdmins();
       } else {
-        alert(json.message || 'เกิดข้อผิดพลาดในการสร้าง Admin');
+        triggerNotification(json.message || 'An error occurred while creating the Admin', 'error');
       }
     } catch (err) {
       console.error('Failed to create admin', err);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      triggerNotification('A server connection error occurred', 'error');
     }
   };
 
@@ -167,42 +243,42 @@ export default function AdminManagement() {
       const res = await fetch(`${API_BASE}/admins/${selectedAdmin.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(buildPayload(formData)),
       });
       const json = await res.json();
 
       if (json.success) {
-        triggerNotification(`อัปเดตข้อมูล Admin "${formData.name}" เรียบร้อยแล้ว`);
+        triggerNotification(`Admin "${formData.firstName} ${formData.lastName}" updated`);
         setShowEditModal(false);
         fetchAdmins();
       } else {
-        alert(json.message || 'เกิดข้อผิดพลาดในการอัปเดตข้อมูล');
+        triggerNotification(json.message || 'An error occurred while updating the data', 'error');
       }
     } catch (err) {
       console.error('Failed to update admin', err);
+      triggerNotification('A server connection error occurred', 'error');
     }
   };
 
-  // RESET PASSWORD
+  // RESET PASSWORD — emails a set-password link; the admin chooses the new password themselves
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!resetPasswordInput || !selectedAdmin) return;
-
+    if (!selectedAdmin || sendingReset) return;
+    setSendingReset(true);
     try {
-      const res = await fetch(`${API_BASE}/admins/${selectedAdmin.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: resetPasswordInput }),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        triggerNotification(`เปลี่ยนรหัสผ่านของ "${selectedAdmin.name}" สำเร็จแล้ว`);
+      const res = await fetch(`${API_BASE}/admins/${selectedAdmin.id}/resend-invite`, { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        triggerNotification(`Password reset link sent to ${selectedAdmin.email || selectedAdmin.username}`);
         setShowResetPasswordModal(false);
-        fetchAdmins();
+      } else {
+        triggerNotification(json.message || 'Unable to send the password reset email', 'error');
       }
     } catch (err) {
-      console.error('Failed to reset password', err);
+      console.error('Failed to send reset password email', err);
+      triggerNotification('A server connection error occurred', 'error');
+    } finally {
+      setSendingReset(false);
     }
   };
 
@@ -217,12 +293,15 @@ export default function AdminManagement() {
       const json = await res.json();
 
       if (json.success) {
-        triggerNotification(`ลบบัญชี Admin "${selectedAdmin.name}" เรียบร้อยแล้ว`);
+        triggerNotification(`Admin account "${selectedAdmin.name}" deleted`);
         setShowDeleteModal(false);
         fetchAdmins();
+      } else {
+        triggerNotification(json.message || 'An error occurred while deleting the Admin', 'error');
       }
     } catch (err) {
       console.error('Failed to delete admin', err);
+      triggerNotification('An error occurred while deleting the Admin', 'error');
     }
   };
 
@@ -232,19 +311,35 @@ export default function AdminManagement() {
       (admin.name && admin.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (admin.username && admin.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (admin.email && admin.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (admin.code && admin.code.toLowerCase().includes(searchTerm.toLowerCase()));
+      (admin.code && admin.code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (admin.id && admin.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (admin.phone && admin.phone.includes(searchTerm));
 
     const matchesRole = roleFilter ? admin.role === roleFilter : true;
-    return matchesSearch && matchesRole;
+    const isPendingAdmin = admin.status === 'Pending Password' || admin.status === 'Pending' || admin.status === 'รอตั้งรหัสผ่าน';
+    const matchesStatus = statusFilter
+      ? (statusFilter === 'Inactive' ? isInactive(admin.status) : statusFilter === 'Pending' ? isPendingAdmin : admin.status === statusFilter)
+      : true;
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   return (
     <div className="flex flex-col gap-6 font-sans text-slate-100">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-red-950 border border-red-700/60 text-red-300 shadow-2xl text-sm font-bold animate-bounce">
-          <CheckCircle size={20} className="text-[#EF4444]" />
-          <span>{notification}</span>
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
+            typeof notification === 'object' && notification?.type === 'error'
+              ? 'bg-red-950 border border-red-700/60 text-red-300'
+              : 'bg-emerald-950 border border-emerald-700/60 text-emerald-300'
+          }`}
+        >
+          {typeof notification === 'object' && notification?.type === 'error' ? (
+            <AlertCircle size={20} className="text-[#EF4444]" />
+          ) : (
+            <CheckCircle size={20} className="text-emerald-400" />
+          )}
+          <span>{typeof notification === 'object' ? notification.msg : notification}</span>
         </div>
       )}
 
@@ -255,39 +350,30 @@ export default function AdminManagement() {
             <ShieldCheck size={26} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-white uppercase tracking-wide">จัดการผู้ดูแลระบบ (Admin Management)</h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              สร้างและกำหนดสิทธิ์รหัสผ่านสำหรับ Admin ที่คอยดูแลระบบและจัดการพนักงาน
-            </p>
+            <h1 className="text-xl font-black text-white uppercase tracking-wide">Admin Management</h1>
+            
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { fetchAdmins(); fetchAuditLogs(); }}
+            onClick={fetchAdmins}
             className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors"
-            title="รีเฟรชข้อมูล"
+            title="Refresh data"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
-          >
-            <UserPlus size={16} />
-            <span>สร้างบัญชี Admin ใหม่</span>
-          </button>
+          
+          
         </div>
       </div>
-
-
 
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">จำนวน Admin ทั้งหมด</span>
-            <div className="text-2xl font-black text-[#EF4444]">{admins.length} <span className="text-xs font-normal text-slate-400">บัญชี</span></div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">All Admin</span>
+            <div className="text-2xl font-black text-[#EF4444]">{admins.length} <span className="text-xs font-normal text-slate-400">accounts</span></div>
           </div>
           <div className="p-3 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
             <ShieldCheck size={22} />
@@ -296,9 +382,9 @@ export default function AdminManagement() {
 
         <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Super Admin / CEO</span>
-            <div className="text-2xl font-black text-amber-500">
-              {admins.filter((a) => a.role === 'Super Admin' || a.role === 'SuperBoss').length} <span className="text-xs font-normal text-slate-400">คน</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Super Admin</span>
+            <div className="text-2xl font-black text-amber-400">
+              {admins.filter((a) => a.role === 'Super Admin' || a.role === 'SuperBoss').length} <span className="text-xs font-normal text-slate-400">accounts</span>
             </div>
           </div>
           <div className="p-3 rounded-xl bg-amber-950/80 text-amber-500 border border-amber-800/40">
@@ -308,173 +394,226 @@ export default function AdminManagement() {
 
         <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">สถานะใช้งานอยู่ (Active)</span>
-            <div className="text-2xl font-black text-emerald-400">
-              {admins.filter((a) => a.status === 'Active').length} <span className="text-xs font-normal text-slate-400">บัญชี</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">HR Admin</span>
+            <div className="text-2xl font-black text-blue-400">
+              {admins.filter((a) => a.role === 'HR Admin').length} <span className="text-xs font-normal text-slate-400">accounts</span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
-            <CheckCircle size={22} />
+          <div className="p-3 rounded-xl bg-blue-950/80 text-blue-400 border border-blue-800/40">
+            <User size={22} />
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-lg flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-80">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ค้นหาชื่อ, Username, อีเมล..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-          />
-        </div>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-80">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search ID, name, email, phone..."
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+            />
+          </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center gap-2 bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-300">
             <Filter size={14} className="text-red-400" />
-            <span>สิทธิ์ใช้งาน:</span>
+            <span>Role:</span>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="bg-transparent font-bold text-[#EF4444] outline-none cursor-pointer"
             >
-              <option value="">ทั้งหมด</option>
+              <option value="">All</option>
               <option value="Super Admin">Super Admin</option>
               <option value="HR Admin">HR Admin</option>
-              <option value="Admin">Admin</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-300">
+            <Filter size={14} className="text-red-400" />
+            <span>Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-transparent font-bold text-[#EF4444] outline-none cursor-pointer"
+            >
+              <option value="">All</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Pending">Pending Password</option>
             </select>
           </div>
         </div>
+
+        {/* Create Admin button is strictly visible to Super Admin — far right */}
+        {isSuperAdmin && (
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto"
+          >
+            <UserPlus size={16} />
+            <span>Create New Admin Account</span>
+          </button>
+        )}
       </div>
 
-      {/* Admin Table */}
+      {/* Admin Table (No department column) */}
       <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                <th className="py-4 px-6">ชื่อผู้ดูแลระบบ (Admin)</th>
-                <th className="py-4 px-6">Username (เข้าเว็บ)</th>
-                <th className="py-4 px-6">ระดับสิทธิ์ (Role)</th>
-                <th className="py-4 px-6">ฝ่ายที่สังกัด</th>
-                <th className="py-4 px-6">สถานะ</th>
-                <th className="py-4 px-6 text-center">จัดการ</th>
+                <th className="py-4 px-6">ID</th>
+                <th className="py-4 px-6">First Name</th>
+                <th className="py-4 px-6">Last Name</th>
+                <th className="py-4 px-6">Email</th>
+                <th className="py-4 px-6">Phone</th>
+                <th className="py-4 px-6">Role</th>
+                <th className="py-4 px-6">Status</th>
+                <th className="py-4 px-6 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
-                    กำลังโหลดข้อมูล Admin...
+                  <td colSpan="8" className="py-12 text-center text-slate-500 font-mono">
+                    Loading Admin data...
                   </td>
                 </tr>
               ) : filteredAdmins.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
-                    ไม่พบข้อมูล Admin ตรงตามเงื่อนไข
+                  <td colSpan="8" className="py-12 text-center text-slate-500 font-mono">
+                    No Admin records match the criteria
                   </td>
                 </tr>
               ) : (
-                filteredAdmins.map((adm) => (
-                  <tr key={adm.id} className="hover:bg-red-950/20 transition-colors">
-                    {/* Name & Avatar */}
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={adm.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-                          alt={adm.name}
-                          className="w-10 h-10 rounded-full object-cover border border-red-900/40"
-                        />
-                        <div>
-                          <div className="font-bold text-white">{adm.name}</div>
-                          <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-mono">
-                            <span>{adm.email || '-'}</span>
-                          </div>
+                filteredAdmins.map((adm) => {
+                  const isPending = adm.status === 'Pending Password' || adm.status === 'Pending' || adm.status === 'รอตั้งรหัสผ่าน';
+                  return (
+                    <tr key={adm.id} className="hover:bg-red-950/20 transition-colors">
+                      <td className="py-4 px-6 font-mono text-xs font-bold text-[#EF4444]">{adm.code || adm.id}</td>
+
+                      <td className="py-4 px-6 font-bold text-white">{splitName(adm.name).firstName || '-'}</td>
+
+                      <td className="py-4 px-6 font-bold text-white">{splitName(adm.name).lastName || '-'}</td>
+
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <Mail size={14} className="text-[#EF4444]" />
+                          <span className="font-mono text-slate-200 text-xs">{adm.email || adm.username}</span>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Username */}
-                    <td className="py-4 px-6">
-                      <span className="font-bold font-mono text-[#EF4444] bg-red-950/80 px-2.5 py-1 rounded-md border border-red-800/40 text-xs">
-                        {adm.username || adm.code || 'admin'}
-                      </span>
-                    </td>
+                      <td className="py-4 px-6 text-xs text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <Phone size={12} className="text-slate-500" />
+                          <span>{adm.phone && adm.phone !== '-' ? adm.phone : '-'}</span>
+                        </div>
+                      </td>
 
-                    {/* Role */}
-                    <td className="py-4 px-6">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                          adm.role === 'Super Admin' || adm.role === 'SuperBoss'
-                            ? 'bg-amber-950 text-amber-400 border border-amber-700/60'
-                            : adm.role === 'HR Admin'
-                            ? 'bg-purple-950 text-purple-400 border border-purple-700/60'
-                            : 'bg-red-950 text-red-400 border border-red-700/60'
-                        }`}
-                      >
-                        {adm.role === 'Super Admin' ? '👑 Super Admin' : adm.role === 'HR Admin' ? '🛡️ HR Admin' : '👤 System Admin'}
-                      </span>
-                    </td>
-
-                    {/* Department */}
-                    <td className="py-4 px-6 text-xs text-slate-300">
-                      {adm.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-4 px-6">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                          adm.status === 'Active'
-                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-700/50'
-                            : 'bg-slate-900 text-slate-500 border border-slate-700'
-                        }`}
-                      >
-                        ● {adm.status === 'Active' ? 'Active (ใช้งานอยู่)' : 'Inactive'}
-                      </span>
-                    </td>
-
-                    {/* Action Buttons */}
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openEditModal(adm)}
-                          className="p-1.5 text-slate-400 hover:text-white hover:bg-red-950/40 rounded-lg transition-colors"
-                          title="แก้ไขข้อมูล Admin"
+                      {/* Role (Only 2 Roles: Super Admin & HR Admin) */}
+                      <td className="py-4 px-6">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                            adm.role === 'Super Admin' || adm.role === 'SuperBoss'
+                              ? 'bg-amber-950 text-amber-300 border border-amber-600/60 shadow-sm'
+                              : 'bg-blue-950 text-blue-300 border border-blue-600/60 shadow-sm'
+                          }`}
                         >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => openResetPasswordModal(adm)}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition-colors"
-                          title="เปลี่ยนรหัสผ่าน"
-                        >
-                          <KeyRound size={16} />
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(adm)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/60 rounded-lg transition-colors"
-                          title="ลบบัญชี Admin"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {adm.role === 'Super Admin' || adm.role === 'SuperBoss' ? '👑 Super Admin' : '🛡️ HR Admin'}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRequestStatusToggle(adm)}
+                            disabled={!isSuperAdmin || isPending}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all border ${
+                              adm.status === 'Active'
+                                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700/50 hover:bg-emerald-900 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
+                                : isPending
+                                ? 'bg-amber-950/80 text-amber-300 border border-amber-700/50 cursor-default'
+                                : 'bg-red-950/80 text-red-400 border-red-700/50 hover:bg-red-900 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
+                            }`}
+                            title={isPending ? 'Waiting for the administrator to set a password' : isSuperAdmin ? 'Click to toggle Active / Inactive' : adm.status}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                adm.status === 'Active'
+                                  ? 'bg-emerald-400 animate-pulse'
+                                  : isPending
+                                  ? 'bg-amber-400'
+                                  : 'bg-red-500'
+                              }`}
+                            />
+                            <span>{adm.status === 'Active' ? 'Active ' : isPending ? 'Pending Password' : 'Inactive '}</span>
+                          </button>
+
+                          {/* Quick resend invite link button for Pending accounts */}
+                          {isPending && isSuperAdmin && (
+                            <button
+                              onClick={() => handleResendInvite(adm)}
+                              disabled={resendingId === adm.id}
+                              className="text-[11px] font-bold bg-amber-900/60 hover:bg-amber-800 text-amber-200 px-2.5 py-1 rounded-lg border border-amber-600/50 transition-colors flex items-center gap-1 shadow-sm"
+                              title="Resend password setup email"
+                            >
+                              <Send size={11} className={resendingId === adm.id ? 'animate-spin' : ''} />
+                              <span>{resendingId === adm.id ? 'Sending...' : 'Resend'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Action Buttons */}
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {isSuperAdmin ? (
+                            <>
+                              <button
+                                onClick={() => openEditModal(adm)}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-red-950/40 rounded-lg transition-colors"
+                                title="Edit Admin"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => openResetPasswordModal(adm)}
+                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/40 rounded-lg transition-colors"
+                                title="Send password reset link by email"
+                              >
+                                <KeyRound size={16} />
+                              </button>
+                              <button
+                                onClick={() => openDeleteModal(adm)}
+                                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors"
+                                title="Delete Admin account"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-500">View only</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-
-
-      {/* CREATE ADMIN MODAL */}
-      {showAddModal && (
+      {/* CREATE ADMIN MODAL (No department, email is username, no password input) */}
+      {showAddModal && isSuperAdmin && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
             <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-900/30">
@@ -483,8 +622,8 @@ export default function AdminManagement() {
                   <UserPlus size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">สร้างบัญชี Admin ใหม่</h3>
-                  <p className="text-xs text-slate-400">สร้างรหัสผ่านสำหรับเข้าจัดการระบบบน Web Admin</p>
+                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Create New Admin Account</h3>
+                  <p className="text-xs text-slate-400">A link to set the Web Admin password will be sent to the email</p>
                 </div>
               </div>
               <button
@@ -495,15 +634,17 @@ export default function AdminManagement() {
               </button>
             </div>
 
+            
+
             <form onSubmit={handleAddSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">ชื่อ-นามสกุล Admin *</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name *</label>
                   <input
                     type="text"
-                    name="name"
-                    placeholder="เช่น สมชาย ใจดี"
-                    value={formData.name}
+                    name="firstName"
+                    placeholder="e.g. John"
+                    value={formData.firstName}
                     onChange={handleInputChange}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
                     required
@@ -511,12 +652,27 @@ export default function AdminManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Username (เข้าเว็บ) *</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name *</label>
                   <input
                     type="text"
-                    name="username"
-                    placeholder="เช่น admin_somchai"
-                    value={formData.username}
+                    name="lastName"
+                    placeholder="e.g. Smith"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="e.g. admin@wellx989.com"
+                    value={formData.email}
                     onChange={handleInputChange}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
                     required
@@ -524,82 +680,24 @@ export default function AdminManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">รหัสผ่าน (Password) *</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="password"
-                      placeholder="ตั้งรหัสผ่านเข้าเว็บ"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">ระดับสิทธิ์ (Role) *</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Role *
+                  </label>
                   <select
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
                   >
-                    <option value="Super Admin">👑 Super Admin (สิทธิ์สูงสุด)</option>
-                    <option value="HR Admin">🛡️ HR Admin (จัดการพนักงาน/อนุมัติ)</option>
-                    <option value="Admin">👤 System Admin (ผู้ดูแลทั่วไป)</option>
+                    <option value="Super Admin">👑 Super Admin</option>
+                    <option value="HR Admin">🛡️ HR Admin</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">ฝ่าย / แผนก (Department) *</label>
-                  <select
-                    name="department"
-                    value={formData.department}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                    required
-                  >
-                    {departments.length > 0 ? (
-                      departments.map((d) => (
-                        <option key={d.id || d.name} value={d.name}>
-                          {d.name}
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="ฝ่ายเทคโนโลยีสารสนเทศ (IT)">ฝ่ายเทคโนโลยีสารสนเทศ (IT)</option>
-                        <option value="ฝ่ายทรัพยากรบุคคล (HR)">ฝ่ายทรัพยากรบุคคล (HR)</option>
-                        <option value="ฝ่ายการตลาด (Marketing)">ฝ่ายการตลาด (Marketing)</option>
-                        <option value="ฝ่ายบัญชีและการเงิน (Finance)">ฝ่ายบัญชีและการเงิน (Finance)</option>
-                        <option value="ฝ่ายปฏิบัติการ (Operations)">ฝ่ายปฏิบัติการ (Operations)</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">อีเมล</label>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="admin@wellx989.com"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">เบอร์โทรศัพท์</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Phone Number
+                  </label>
                   <input
                     type="text"
                     name="phone"
@@ -617,13 +715,14 @@ export default function AdminManagement() {
                   onClick={() => setShowAddModal(false)}
                   className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
+                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide flex items-center gap-2"
                 >
-                  บันทึกและสร้าง Admin
+                  <Send size={15} />
+                  <span>Save and send ADMIN invitation email</span>
                 </button>
               </div>
             </form>
@@ -631,7 +730,7 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* EDIT ADMIN MODAL */}
+      {/* EDIT ADMIN MODAL (No department, only 2 roles) */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
@@ -641,8 +740,8 @@ export default function AdminManagement() {
                   <Edit size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">แก้ไขข้อมูล Admin</h3>
-                  <p className="text-xs text-slate-400">{formData.name} ({formData.username})</p>
+                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Edit Admin</h3>
+                  <p className="text-xs text-slate-400">{formData.firstName} {formData.lastName} ({formData.email})</p>
                 </div>
               </div>
               <button
@@ -656,11 +755,11 @@ export default function AdminManagement() {
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">ชื่อ-นามสกุล</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name *</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="firstName"
+                    value={formData.firstName}
                     onChange={handleInputChange}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
                     required
@@ -668,57 +767,60 @@ export default function AdminManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Username (เข้าเว็บ)</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name *</label>
                   <input
                     type="text"
-                    name="username"
-                    value={formData.username}
+                    name="lastName"
+                    value={formData.lastName}
                     onChange={handleInputChange}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
                     required
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">ระดับสิทธิ์ (Role)</label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                  >
-                    <option value="Super Admin">👑 Super Admin (สิทธิ์สูงสุด)</option>
-                    <option value="HR Admin">🛡️ HR Admin (จัดการพนักงาน/อนุมัติ)</option>
-                    <option value="Admin">👤 System Admin (ผู้ดูแลทั่วไป)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">สถานะ</label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                  >
-                    <option value="Active">Active (ใช้งานอยู่)</option>
-                    <option value="Inactive">Inactive (ระงับใช้งาน)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">อีเมล</label>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Email (Username) *</label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">เบอร์โทรศัพท์</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role *</label>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                  >
+                    <option value="Super Admin">👑 Super Admin</option>
+                    <option value="HR Admin">🛡️ HR Admin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Status</label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive </option>
+                    {formData.status === 'Pending Password' && (
+                      <option value="Pending Password">Pending Password</option>
+                    )}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Phone Number</label>
                   <input
                     type="text"
                     name="phone"
@@ -735,13 +837,13 @@ export default function AdminManagement() {
                   onClick={() => setShowEditModal(false)}
                   className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
                 >
-                  บันทึกการแก้ไข
+                  Save Changes
                 </button>
               </div>
             </form>
@@ -759,8 +861,8 @@ export default function AdminManagement() {
                   <KeyRound size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">เปลี่ยนรหัสผ่าน Admin</h3>
-                  <p className="text-xs text-slate-400">{selectedAdmin.name} ({selectedAdmin.username})</p>
+                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Reset Password (sent by email)</h3>
+                  <p className="text-xs text-slate-400">{selectedAdmin.name} ({selectedAdmin.email || selectedAdmin.username})</p>
                 </div>
               </div>
               <button
@@ -772,17 +874,11 @@ export default function AdminManagement() {
             </div>
 
             <form onSubmit={handleResetPasswordSubmit} className="flex flex-col gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">รหัสผ่านใหม่ *</label>
-                <input
-                  type="text"
-                  value={resetPasswordInput}
-                  onChange={(e) => setResetPasswordInput(e.target.value)}
-                  placeholder="กรอกรหัสผ่านใหม่สำหรับเข้าเว็บ"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
-                  required
-                />
-              </div>
+              <p className="text-sm text-slate-300 leading-relaxed bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
+                A password reset link will be sent to the email
+                <span className="font-bold text-white font-mono"> {selectedAdmin.email || selectedAdmin.username} </span>
+                The link is valid for 15 minutes, and the current password keeps working until the administrator sets a new one successfully
+              </p>
 
               <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-red-900/30">
                 <button
@@ -790,13 +886,15 @@ export default function AdminManagement() {
                   onClick={() => setShowResetPasswordModal(false)}
                   className="px-5 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/30 uppercase tracking-wide"
+                  disabled={sendingReset}
+                  className="px-6 py-2 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/30 uppercase tracking-wide flex items-center gap-2 disabled:opacity-60"
                 >
-                  ยืนยันเปลี่ยนรหัสผ่าน
+                  <Send size={15} />
+                  <span>{sendingReset ? 'Sending...' : 'Send password reset link by email'}</span>
                 </button>
               </div>
             </form>
@@ -808,39 +906,137 @@ export default function AdminManagement() {
       {showDeleteModal && selectedAdmin && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-200">
-            {/* Red Warning Trash Icon */}
             <div className="w-14 h-14 rounded-2xl bg-red-950/90 text-red-500 border border-red-700/60 flex items-center justify-center mb-5 shadow-lg shadow-red-950/50">
               <Trash2 size={28} />
             </div>
 
-            {/* Header/Title */}
             <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2">
-              ยืนยันการลบบัญชีผู้ดูแลระบบ ({selectedAdmin?.name})?
+              Confirm deleting the administrator account ({selectedAdmin?.name})?
             </h3>
 
-            {/* Body/Description */}
             <p className="text-sm text-slate-300 leading-relaxed mb-7 bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
-              คุณกำลังจะลบบัญชีผู้ดูแลระบบ <span className="font-bold text-white">{selectedAdmin?.name}</span> ({selectedAdmin?.username || selectedAdmin?.code || selectedAdmin?.id}) ออกจากระบบ ระบบจะไม่สามารถกู้คืนข้อมูลนี้ได้
+              You are about to delete the administrator account <span className="font-bold text-white">{selectedAdmin?.name}</span> ({selectedAdmin?.email || selectedAdmin?.username}) from the system
             </p>
 
-            {/* Buttons */}
             <div className="flex items-center justify-end gap-3">
-              {/* Secondary Cancel Button */}
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1A1D2C] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
               >
-                ยกเลิก
+                Cancel
               </button>
-              {/* Danger Red Confirm Delete Button */}
               <button
                 type="button"
                 onClick={handleDeleteSubmit}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
               >
                 <Trash2 size={16} />
-                <span>ยืนยันการลบ</span>
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATUS TOGGLE CONFIRMATION MODAL FOR ADMIN */}
+      {statusToggleTarget && (
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Icon & Title */}
+            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-red-900/30">
+              <div
+                className={`p-3 rounded-2xl border flex-shrink-0 ${
+                  statusToggleTarget.nextStatus === 'Inactive'
+                    ? 'bg-amber-950/90 text-amber-400 border-amber-700/60 shadow-lg shadow-amber-950/40'
+                    : 'bg-emerald-950/90 text-emerald-400 border-emerald-700/60 shadow-lg shadow-emerald-950/40'
+                }`}
+              >
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white uppercase tracking-wide">
+                  {statusToggleTarget.nextStatus === 'Inactive'
+                    ? 'Confirm suspending Admin access (Inactive)?'
+                    : 'Confirm enabling Admin access (Active)?'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Change Web Admin access status
+                </p>
+              </div>
+            </div>
+
+            {/* Admin Info Card */}
+            <div className="bg-[#0B0D13] rounded-2xl p-4 border border-red-900/30 mb-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-white text-sm truncate">
+                    {statusToggleTarget.adm.name}
+                  </div>
+                  <div className="text-xs text-slate-400 font-mono">
+                    {statusToggleTarget.adm.email || statusToggleTarget.adm.username} • {statusToggleTarget.adm.role}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Transition Display */}
+              <div className="flex items-center justify-between pt-2 border-t border-red-900/20 text-xs font-bold">
+                <span className="text-slate-400">Current status:</span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full ${
+                    statusToggleTarget.adm.status === 'Active'
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-700/50'
+                      : 'bg-red-950 text-red-400 border border-red-700/50'
+                  }`}
+                >
+                  ● {statusToggleTarget.adm.status}
+                </span>
+                <span className="text-slate-500">➜</span>
+                <span className="text-slate-400">New status:</span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full ${
+                    statusToggleTarget.nextStatus === 'Active'
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-sm'
+                      : 'bg-red-950 text-red-400 border border-red-500 shadow-sm'
+                  }`}
+                >
+                  ● {statusToggleTarget.nextStatus}
+                </span>
+              </div>
+            </div>
+
+            {/* Warning / Notice Text */}
+            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+              {statusToggleTarget.nextStatus === 'Inactive'
+                ? '⚠️ Once set to Inactive, this administrator will temporarily be unable to log in to Web Admin'
+                : '✅ Once set to Active, this administrator will be able to log in to Web Admin normally'}
+            </p>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-900/30">
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={() => setStatusToggleTarget(null)}
+                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1E293B] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={handleConfirmStatusToggle}
+                className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg transition-all uppercase tracking-wide flex items-center gap-2 text-white ${
+                  statusToggleTarget.nextStatus === 'Inactive'
+                    ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 shadow-amber-600/30'
+                    : 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30'
+                }`}
+              >
+                {isUpdatingStatus ? (
+                  <span>Saving...</span>
+                ) : (
+                  <span>Confirm change to {statusToggleTarget.nextStatus}</span>
+                )}
               </button>
             </div>
           </div>
@@ -849,3 +1045,4 @@ export default function AdminManagement() {
     </div>
   );
 }
+

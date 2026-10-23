@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   UserCheck,
   RefreshCw,
@@ -19,7 +20,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:5000/api';
+import { API_BASE } from '../config';
+
+// Pop-ups are drawn on the page body so they are always centred on the window, not on a scrolled / animated parent
+const Portal = ({ children }) => createPortal(children, document.body);
+import FilterBar from './FilterBar';
+import DatePicker from './DatePicker';
 
 export default function LeavePoliciesPage() {
   const [policies, setPolicies] = useState([]);
@@ -28,7 +34,6 @@ export default function LeavePoliciesPage() {
   const [successToast, setSuccessToast] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPaid, setFilterPaid] = useState('all'); // 'all' | 'paid' | 'unpaid'
-  const [filterDateRange, setFilterDateRange] = useState('all'); // 'all' | 'restricted' | 'open'
   const [filterGender, setFilterGender] = useState('all'); // 'all' | 'all_gender' | 'male' | 'female'
 
   // Modal State
@@ -41,18 +46,10 @@ export default function LeavePoliciesPage() {
   // Form State
   const [formId, setFormId] = useState('');
   const [formTypeName, setFormTypeName] = useState('');
-  const [formCategoryKey, setFormCategoryKey] = useState('annual');
   const [formDefaultQuota, setFormDefaultQuota] = useState(10);
   const [formIsPaid, setFormIsPaid] = useState(true);
   const [formApplicableGender, setFormApplicableGender] = useState('all');
-  const [formDateRangeEnabled, setFormDateRangeEnabled] = useState(false);
-  const [formAllowedStartDate, setFormAllowedStartDate] = useState('');
-  const [formAllowedEndDate, setFormAllowedEndDate] = useState('');
-  const [formMinAdvanceDays, setFormMinAdvanceDays] = useState(1);
-  const [formMaxConsecutiveDays, setFormMaxConsecutiveDays] = useState(10);
-  const [formAllowBackdated, setFormAllowBackdated] = useState(false);
-  const [formMaxBackdatedDays, setFormMaxBackdatedDays] = useState(0);
-  const [formRequireAttachment, setFormRequireAttachment] = useState(false);
+  const [formRequireAttachment, setFormRequireAttachment] = useState(true);
   const [formDescription, setFormDescription] = useState('');
   const [formStatus, setFormStatus] = useState('Active');
 
@@ -62,14 +59,15 @@ export default function LeavePoliciesPage() {
     try {
       const res = await fetch(`${API_BASE}/leave-policies`);
       const data = await res.json();
-      if (data && data.success && Array.isArray(data.policies)) {
+      if (res.ok && data && data.success && Array.isArray(data.policies)) {
         setPolicies(data.policies);
       } else {
         setPolicies([]);
+        showToast((data && data.message) || 'Unable to load leave policies', 'error');
       }
     } catch (err) {
       console.error('Error fetching policies:', err);
-      setErrorMsg('ไม่สามารถเชื่อมต่อ API นโยบายการลาได้');
+      showToast('Unable to connect to the leave policy API', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -79,9 +77,9 @@ export default function LeavePoliciesPage() {
     fetchPolicies();
   }, []);
 
-  const showToast = (msg) => {
-    setSuccessToast(msg);
-    setTimeout(() => setSuccessToast(''), 4000);
+  const showToast = (msg, type = 'success') => {
+    setSuccessToast({ msg, type });
+    setTimeout(() => setSuccessToast(null), 4000);
   };
 
   const handleOpenCreateModal = () => {
@@ -89,18 +87,10 @@ export default function LeavePoliciesPage() {
     const nextNum = policies.length + 1;
     setFormId(`LP-${String(nextNum).padStart(2, '0')}`);
     setFormTypeName('');
-    setFormCategoryKey('annual');
     setFormDefaultQuota(10);
     setFormIsPaid(true);
     setFormApplicableGender('all');
-    setFormDateRangeEnabled(false);
-    setFormAllowedStartDate('');
-    setFormAllowedEndDate('');
-    setFormMinAdvanceDays(1);
-    setFormMaxConsecutiveDays(10);
-    setFormAllowBackdated(false);
-    setFormMaxBackdatedDays(0);
-    setFormRequireAttachment(false);
+    setFormRequireAttachment(true);
     setFormDescription('');
     setFormStatus('Active');
     setIsModalOpen(true);
@@ -111,17 +101,9 @@ export default function LeavePoliciesPage() {
     setCurrentPolicy(p);
     setFormId(p.id);
     setFormTypeName(p.typeName);
-    setFormCategoryKey(p.categoryKey || 'annual');
     setFormDefaultQuota(p.defaultQuota || 0);
     setFormIsPaid(p.isPaid !== undefined ? p.isPaid : true);
     setFormApplicableGender(p.applicableGender || 'all');
-    setFormDateRangeEnabled(!!p.dateRangeEnabled);
-    setFormAllowedStartDate(p.allowedStartDate || '');
-    setFormAllowedEndDate(p.allowedEndDate || '');
-    setFormMinAdvanceDays(p.minAdvanceDays || 0);
-    setFormMaxConsecutiveDays(p.maxConsecutiveDays || 30);
-    setFormAllowBackdated(!!p.allowBackdated);
-    setFormMaxBackdatedDays(p.maxBackdatedDays || 0);
     setFormRequireAttachment(!!p.requireAttachment);
     setFormDescription(p.description || '');
     setFormStatus(p.status || 'Active');
@@ -131,19 +113,8 @@ export default function LeavePoliciesPage() {
   const handleSavePolicy = async (e) => {
     e.preventDefault();
     if (!formTypeName.trim()) {
-      alert('กรุณาระบุชื่อประเภทการลา');
+      showToast('Please enter a leave type name', 'error');
       return;
-    }
-
-    if (formDateRangeEnabled) {
-      if (!formAllowedStartDate || !formAllowedEndDate) {
-        alert('กรุณาระบุทั้งวันที่เริ่มต้นและวันที่สิ้นสุดเมื่อเปิดใช้งานการจำกัดช่วงวันที่');
-        return;
-      }
-      if (formAllowedEndDate < formAllowedStartDate) {
-        alert('วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้น');
-        return;
-      }
     }
 
     setIsSubmitting(true);
@@ -151,17 +122,9 @@ export default function LeavePoliciesPage() {
       const payload = {
         id: formId,
         typeName: formTypeName.trim(),
-        categoryKey: formCategoryKey,
         defaultQuota: parseInt(formDefaultQuota, 10) || 0,
         isPaid: formIsPaid,
         applicableGender: formApplicableGender || 'all',
-        allowedStartDate: formDateRangeEnabled ? formAllowedStartDate : null,
-        allowedEndDate: formDateRangeEnabled ? formAllowedEndDate : null,
-        dateRangeEnabled: formDateRangeEnabled,
-        minAdvanceDays: parseInt(formMinAdvanceDays, 10) || 0,
-        maxConsecutiveDays: parseInt(formMaxConsecutiveDays, 10) || 30,
-        allowBackdated: formAllowBackdated,
-        maxBackdatedDays: formAllowBackdated ? parseInt(formMaxBackdatedDays, 10) || 0 : 0,
         requireAttachment: formRequireAttachment,
         description: formDescription.trim(),
         status: formStatus,
@@ -184,15 +147,15 @@ export default function LeavePoliciesPage() {
 
       const resData = await res.json();
       if (res.ok && resData.success) {
-        showToast(modalMode === 'create' ? '✨ เพิ่มประเภทนโยบายการลาสำเร็จ' : '💾 บันทึกการตั้งค่านโยบายการลาเรียบร้อยแล้ว');
+        showToast(modalMode === 'create' ? '✨ Leave policy added successfully' : '💾 Leave policy settings saved successfully', 'success');
         setIsModalOpen(false);
         fetchPolicies();
       } else {
-        alert(resData.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        showToast(resData.message || 'An error occurred while saving', 'error');
       }
     } catch (err) {
       console.error('Save error:', err);
-      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกข้อมูลได้');
+      showToast('Unable to connect to the server to save', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -213,14 +176,14 @@ export default function LeavePoliciesPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`🗑️ ลบนโยบายการลา ${policyName} เรียบร้อยแล้ว`);
+        showToast(`🗑️ Leave policy ${policyName} deleted successfully`);
         setDeleteConfirmModal({ isOpen: false, policyId: '', policyName: '' });
         fetchPolicies();
       } else {
-        setErrorMsg(data.message || 'ไม่สามารถลบข้อมูลได้');
+        showToast(data.message || 'Unable to delete', 'error');
       }
     } catch (err) {
-      setErrorMsg('เกิดข้อผิดพลาดในการลบข้อมูล');
+      showToast('An error occurred while deleting', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -230,39 +193,41 @@ export default function LeavePoliciesPage() {
   const filteredPolicies = policies.filter((p) => {
     const matchSearch =
       (p.typeName && p.typeName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.categoryKey && p.categoryKey.toLowerCase().includes(searchTerm.toLowerCase()));
+      (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchPaid =
       filterPaid === 'all' ? true : filterPaid === 'paid' ? p.isPaid === true : p.isPaid === false;
-
-    const matchDateRange =
-      filterDateRange === 'all'
-        ? true
-        : filterDateRange === 'restricted'
-        ? p.dateRangeEnabled === true
-        : p.dateRangeEnabled === false;
 
     const matchGender =
       filterGender === 'all'
         ? true
         : (p.applicableGender || 'all') === filterGender;
 
-    return matchSearch && matchPaid && matchDateRange && matchGender;
+    return matchSearch && matchPaid && matchGender;
   });
 
   const totalPolicies = policies.length;
   const activePolicies = policies.filter((p) => p.status === 'Active').length;
   const paidPolicies = policies.filter((p) => p.isPaid).length;
-  const dateRestrictedPolicies = policies.filter((p) => p.dateRangeEnabled).length;
+  const unpaidPolicies = totalPolicies - paidPolicies;
 
   return (
     <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
       {/* Toast Alert */}
       {successToast && (
-        <div className="fixed top-6 right-6 z-50 bg-emerald-950 border border-emerald-500/60 text-emerald-200 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce">
-          <CheckCircle2 size={20} className="text-emerald-400" />
-          <span className="text-sm font-bold">{successToast}</span>
+        <div
+          className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
+            typeof successToast === 'object' && successToast?.type === 'error'
+              ? 'bg-red-950 border border-red-700/60 text-red-300'
+              : 'bg-emerald-950 border border-emerald-500/60 text-emerald-200'
+          }`}
+        >
+          {typeof successToast === 'object' && successToast?.type === 'error' ? (
+            <AlertTriangle size={20} className="text-[#EF4444]" />
+          ) : (
+            <CheckCircle2 size={20} className="text-emerald-400" />
+          )}
+          <span>{typeof successToast === 'object' ? successToast.msg : successToast}</span>
         </div>
       )}
 
@@ -274,16 +239,12 @@ export default function LeavePoliciesPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-red-950 text-[#EF4444] border border-red-800/40">
-                LEAVE POLICIES & QUOTAS
-              </span>
+              
               <h1 className="text-xl font-black text-white uppercase tracking-wide">
-                Leave Quotas & Policies (โควต้าวันลาและนโยบายการลาองค์กร)
+                Leave Quotas & Policies (Company Leave Entitlements and Rules)
               </h1>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              กำหนดสิทธิ์วันลาพักร้อน ลากิจ ลาป่วย และกฎเกณฑ์วันเวลาที่อนุญาตให้ลา (100% Real Database Sync & Mobile App Control)
-            </p>
+            
           </div>
         </div>
 
@@ -292,28 +253,21 @@ export default function LeavePoliciesPage() {
             onClick={fetchPolicies}
             disabled={isLoading}
             className="flex items-center gap-2 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 hover:text-white px-3.5 py-2.5 rounded-xl border border-red-900/40 text-xs font-bold transition-all"
-            title="รีเฟรชข้อมูลจากฐานข้อมูล"
+            title="Refresh data from the database"
           >
             <RefreshCw size={15} className={isLoading ? 'animate-spin text-red-500' : ''} />
-            <span>รีเฟรช</span>
+            <span>Refresh</span>
           </button>
 
-          <button
-            onClick={handleOpenCreateModal}
-            className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
-          >
-            <Plus size={16} />
-            <span>เพิ่มประเภทนโยบายการลา</span>
-          </button>
         </div>
       </div>
 
-      {/* KPI Stats Row */}
+      {/* Policy Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">นโยบายทั้งหมด</span>
-            <div className="text-2xl font-black text-white mt-1">{totalPolicies} <span className="text-xs font-normal text-slate-400">ประเภท</span></div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Policies</span>
+            <div className="text-2xl font-black text-white mt-1">{totalPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-800/40 flex items-center justify-center text-red-400">
             <Layers size={20} />
@@ -322,8 +276,8 @@ export default function LeavePoliciesPage() {
 
         <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">สถานะเปิดใช้งาน</span>
-            <div className="text-2xl font-black text-emerald-400 mt-1">{activePolicies} <span className="text-xs font-normal text-slate-400">ประเภท</span></div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active</span>
+            <div className="text-2xl font-black text-emerald-400 mt-1">{activePolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
             <CheckCircle2 size={20} />
@@ -332,8 +286,8 @@ export default function LeavePoliciesPage() {
 
         <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">ได้รับค่าจ้าง (Paid)</span>
-            <div className="text-2xl font-black text-blue-400 mt-1">{paidPolicies} <span className="text-xs font-normal text-slate-400">ประเภท</span></div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Paid</span>
+            <div className="text-2xl font-black text-blue-400 mt-1">{paidPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-950/60 border border-blue-800/40 flex items-center justify-center text-blue-400">
             <DollarSign size={20} />
@@ -342,226 +296,145 @@ export default function LeavePoliciesPage() {
 
         <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">จำกัดช่วงวันเวลาที่ลาได้</span>
-            <div className="text-2xl font-black text-amber-400 mt-1">{dateRestrictedPolicies} <span className="text-xs font-normal text-slate-400">ประเภท</span></div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Unpaid</span>
+            <div className="text-2xl font-black text-amber-400 mt-1">{unpaidPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-800/40 flex items-center justify-center text-amber-400">
-            <Calendar size={20} />
+            <DollarSign size={20} />
           </div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-[#141722] p-4 rounded-2xl border border-red-900/30 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative w-full md:w-80">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="ค้นหาชื่อประเภทการลา หรือ รหัสนโยบาย..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
-          />
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto">
-          {/* Gender Filter */}
-          <div className="flex items-center gap-2 bg-[#0B0D13] p-1 rounded-xl border border-red-900/30 text-xs shrink-0">
-            <span className="text-slate-400 pl-2 font-bold text-[11px]">เพศ:</span>
-            <button
-              onClick={() => setFilterGender('all')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterGender === 'all' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              ทั้งหมด
-            </button>
-            <button
-              onClick={() => setFilterGender('male')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterGender === 'male' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              👨 ชาย
-            </button>
-            <button
-              onClick={() => setFilterGender('female')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterGender === 'female' ? 'bg-pink-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              👩 หญิง
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[#0B0D13] p-1 rounded-xl border border-red-900/30 text-xs shrink-0">
-            <span className="text-slate-400 pl-2 font-bold text-[11px]">การจ่ายเงิน:</span>
-            <button
-              onClick={() => setFilterPaid('all')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterPaid === 'all' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              ทั้งหมด
-            </button>
-            <button
-              onClick={() => setFilterPaid('paid')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterPaid === 'paid' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Paid
-            </button>
-            <button
-              onClick={() => setFilterPaid('unpaid')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterPaid === 'unpaid' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Unpaid
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[#0B0D13] p-1 rounded-xl border border-red-900/30 text-xs shrink-0">
-            <span className="text-slate-400 pl-2 font-bold text-[11px]">เงื่อนไขวันที่:</span>
-            <button
-              onClick={() => setFilterDateRange('all')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterDateRange === 'all' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              ทั้งหมด
-            </button>
-            <button
-              onClick={() => setFilterDateRange('restricted')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${filterDateRange === 'restricted' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              จำกัดช่วงวันที่
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid of Policies Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredPolicies.map((p) => (
-          <div
-            key={p.id}
-            className="bg-[#141722] rounded-2xl p-6 border border-red-900/30 shadow-lg hover:border-red-600/50 transition-all flex flex-col justify-between"
+      <FilterBar
+        right={
+          <button
+          onClick={handleOpenCreateModal}
+          className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
-            <div>
-              {/* Header Badge */}
-              <div className="flex items-center justify-between mb-3.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono font-bold text-red-400 bg-red-950 px-2.5 py-1 rounded-lg border border-red-800/40">
-                    {p.id}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40' : 'bg-slate-900 text-slate-400 border-slate-700'}`}>
-                    {p.status === 'Active' ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    p.applicableGender === 'female'
-                      ? 'bg-pink-950/80 text-pink-300 border-pink-700/50'
-                      : p.applicableGender === 'male'
-                      ? 'bg-blue-950/80 text-blue-300 border-blue-700/50'
-                      : 'bg-slate-900 text-slate-300 border-slate-700'
-                  }`}>
-                    {p.applicableGender === 'female' ? '👩 เฉพาะเพศหญิง' : p.applicableGender === 'male' ? '👨 เฉพาะเพศชาย' : '🌐 ทุกเพศ'}
-                  </span>
-                </div>
+          <Plus size={16} />
+          <span>Add Leave Policy</span>
+          </button>
+        }
+        search={searchTerm}
+        onSearch={setSearchTerm}
+        placeholder="Search by leave type or policy ID..."
+        filters={[
+          {
+            label: 'Gender',
+            value: filterGender,
+            onChange: setFilterGender,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'male', label: 'Male' },
+              { value: 'female', label: 'Female' },
+            ],
+          },
+          {
+            label: 'Payment',
+            value: filterPaid,
+            onChange: setFilterPaid,
+            options: [
+              { value: 'all', label: 'All' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'unpaid', label: 'Unpaid' },
+            ],
+          },
+        ]}
+      />
 
-                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${p.isPaid ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800/40' : 'text-amber-400 bg-amber-950/80 border-amber-800/40'}`}>
-                  {p.isPaid ? 'ได้รับค่าจ้าง (Paid)' : 'ไม่ได้รับค่าจ้าง (Unpaid)'}
-                </span>
-              </div>
-
-              {/* Title & Quota */}
-              <h3 className="text-base font-bold text-white mb-2 leading-snug">{p.typeName}</h3>
-
-              <div className="flex items-baseline gap-2 mb-4 bg-[#0B0D13] p-3 rounded-xl border border-red-900/20">
-                <span className="text-2xl font-black text-amber-400 font-mono">{p.defaultQuota}</span>
-                <span className="text-xs font-semibold text-slate-400">วัน / ปี (โควต้าพื้นฐาน)</span>
-              </div>
-
-              {/* Allowed Date Range Badge (Feature Focus) */}
-              <div className="mb-4">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                  <Calendar size={13} className="text-red-400" />
-                  <span>กำหนดช่วงวันเวลาที่ลาได้</span>
-                </div>
-                {p.dateRangeEnabled && p.allowedStartDate && p.allowedEndDate ? (
-                  <div className="bg-amber-950/40 border border-amber-800/40 rounded-xl p-2.5 text-xs">
-                    <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                      <Clock size={13} />
-                      <span>{p.allowedStartDate} ถึง {p.allowedEndDate}</span>
-                    </div>
-                    <p className="text-[11px] text-amber-400/80 mt-1 leading-tight">
-                      ⚠️ พนักงานลาได้เฉพาะช่วงนี้เท่านั้น (หากเกินกำหนดจะไม่สามารถลาได้)
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-400 flex items-center gap-1.5">
-                    <CheckCircle2 size={13} className="text-emerald-400" />
-                    <span>ไม่จำกัดช่วงวันที่ (สามารถยื่นลาได้ตลอดทั้งปี)</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Rules List */}
-              <div className="space-y-1.5 text-xs text-slate-300 bg-[#0B0D13]/60 p-3 rounded-xl border border-red-900/10 mb-4">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">เพศที่ใช้สิทธิ์ได้:</span>
-                  <span className="font-bold text-white">
-                    {p.applicableGender === 'female' ? '👩 เฉพาะเพศหญิง' : p.applicableGender === 'male' ? '👨 เฉพาะเพศชาย' : '🌐 ทุกเพศ'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">ขอล่วงหน้าอย่างน้อย:</span>
-                  <span className="font-bold text-white">{p.minAdvanceDays > 0 ? `${p.minAdvanceDays} วัน` : 'ไม่กำหนด (ลาฉุกเฉินได้)'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">ลาติดต่อกันได้สูงสุด:</span>
-                  <span className="font-bold text-white">{p.maxConsecutiveDays} วัน</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">การลาย้อนหลัง:</span>
-                  <span className="font-bold text-white">{p.allowBackdated ? `อนุญาต (ไม่เกิน ${p.maxBackdatedDays} วัน)` : 'ไม่อนุญาต'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">เอกสารรับรอง:</span>
-                  <span className={`font-bold ${p.requireAttachment ? 'text-amber-400' : 'text-slate-400'}`}>
-                    {p.requireAttachment ? 'บังคับแนบเอกสาร' : 'ไม่บังคับ'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Description */}
-              {p.description ? (
-                <p className="text-xs text-slate-400 italic mb-4 line-clamp-2">
-                  หมายเหตุ: {p.description}
-                </p>
-              ) : null}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 pt-3 border-t border-red-900/20">
-              <button
-                onClick={() => handleOpenEditModal(p)}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-red-950/60 hover:bg-red-900/60 text-red-300 hover:text-white py-2 rounded-xl border border-red-800/40 text-xs font-bold transition-all"
-              >
-                <Edit size={14} />
-                <span>กำหนดการตั้งค่า / แก้ไข</span>
-              </button>
-              <button
-                onClick={() => requestDeletePolicy(p.id, p.typeName)}
-                className="p-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-900/30 transition-all"
-                title="ลบนโยบาย"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
+      {/* Policies Table */}
+      {filteredPolicies.length > 0 && (
+        <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[860px]">
+              <thead>
+                <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  <th className="py-4 px-5">Code</th>
+                  <th className="py-4 px-5 w-full">Leave Type</th>
+                  <th className="py-4 px-5 text-center">Quota</th>
+                  <th className="py-4 px-5">Pay Type</th>
+                  <th className="py-4 px-5">Gender</th>
+                  <th className="py-4 px-5">Document</th>
+                  <th className="py-4 px-5">Status</th>
+                  <th className="py-4 px-5 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-900/20 text-xs font-medium text-slate-200">
+                {filteredPolicies.map((p) => (
+                  <tr key={p.id} className="hover:bg-red-950/20 transition-colors align-middle">
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className="text-xs font-mono font-bold text-red-400 bg-red-950 px-2.5 py-1 rounded-lg border border-red-800/40 whitespace-nowrap">{p.id}</span>
+                    </td>
+                    <td className="py-4 px-5 min-w-[16rem]">
+                      <div className="text-sm font-bold text-white">{p.typeName}</div>
+                      
+                    </td>
+                    <td className="py-4 px-5 text-center whitespace-nowrap">
+                      <span className="text-lg font-black text-amber-400 font-mono">{p.defaultQuota}</span>
+                      <span className="text-[11px] text-slate-500 ml-1">days/yr</span>
+                    </td>
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${p.isPaid ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800/40' : 'text-amber-400 bg-amber-950/80 border-amber-800/40'}`}>
+                        {p.isPaid ? 'Paid' : 'Unpaid'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                        p.applicableGender === 'female'
+                          ? 'text-pink-300 bg-pink-950/60 border-pink-800/40'
+                          : p.applicableGender === 'male'
+                          ? 'text-sky-300 bg-sky-950/60 border-sky-800/40'
+                          : 'text-slate-300 bg-slate-900 border-slate-700'
+                      }`}>
+                        {p.applicableGender === 'female' ? 'Female only' : p.applicableGender === 'male' ? 'Male only' : 'All genders'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                        p.requireAttachment
+                          ? 'text-amber-300 bg-amber-950/60 border-amber-800/40'
+                          : 'text-slate-400 bg-slate-900 border-slate-700'
+                      }`}>
+                        {p.requireAttachment ? 'Required' : 'Not required'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40' : 'bg-red-950/80 text-red-400 border-red-800/40'}`}>
+                        {p.status === 'Active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleOpenEditModal(p)}
+                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition-colors"
+                          title="Configure / Edit"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => requestDeletePolicy(p.id, p.typeName)}
+                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/50 rounded-lg transition-colors"
+                          title="Delete policy"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {filteredPolicies.length === 0 && !isLoading && (
         <div className="bg-[#141722] rounded-2xl p-12 text-center border border-red-900/30 shadow-lg">
-          <AlertTriangle size={48} className="mx-auto text-amber-500 mb-3" />
-          <h3 className="text-base font-bold text-white mb-1">ไม่พบนโยบายการลาตามเงื่อนไขที่ค้นหา</h3>
-          <p className="text-xs text-slate-400 mb-4">ลองปรับเปลี่ยนคำค้นหา หรือกดปุ่มเพิ่มประเภทนโยบายการลาใหม่</p>
-          <button
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white px-4 py-2 rounded-xl text-xs font-bold"
-          >
-            <Plus size={15} />
-            <span>เพิ่มประเภทนโยบายการลา</span>
-          </button>
+
+          <p className="text-xs text-slate-400 mb-4">No leave policies match your search</p>
+
         </div>
       )}
 
@@ -569,6 +442,7 @@ export default function LeavePoliciesPage() {
       {/* Policy Configuration Modal (Popup Dialog) */}
       {/* ======================================================== */}
       {isModalOpen && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#141722] rounded-3xl border border-red-800/50 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
             {/* Modal Header */}
@@ -579,11 +453,9 @@ export default function LeavePoliciesPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-black text-white uppercase">
-                    {modalMode === 'create' ? 'เพิ่มประเภทนโยบายการลาใหม่' : `กำหนดการตั้งค่านโยบาย: ${formTypeName || formId}`}
+                    {modalMode === 'create' ? 'Add New Leave Policy' : `Policy Settings: ${formTypeName || formId}`}
                   </h2>
-                  <p className="text-xs text-slate-400">
-                    กำหนดโควต้า วันเวลาที่สามารถลาได้ และกฎเกณฑ์การอนุมัติ (เชื่อมโยงฐานข้อมูลจริง)
-                  </p>
+                  
                 </div>
               </div>
               <button
@@ -596,10 +468,10 @@ export default function LeavePoliciesPage() {
 
             {/* Form */}
             <form onSubmit={handleSavePolicy} className="space-y-5">
-              {/* Row 1: ID, Type Name, Category */}
+              {/* Row 1: ID, Type Name */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">รหัสนโยบาย (Policy ID)</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Policy ID</label>
                   <input
                     type="text"
                     value={formId}
@@ -611,39 +483,22 @@ export default function LeavePoliciesPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-300 block mb-1">ชื่อประเภทการลา (Leave Type Name) *</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Leave Type Name *</label>
                   <input
                     type="text"
                     value={formTypeName}
                     onChange={(e) => setFormTypeName(e.target.value)}
-                    placeholder="เช่น ลาพักร้อนประจำปี (Annual Leave)"
+                    placeholder="e.g. Annual Leave"
                     className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
                     required
                   />
                 </div>
               </div>
 
-              {/* Row 2: Category Key & Quotas & Paid */}
+              {/* Row 2: Quota, Pay Type, Applicable Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">หมวดหมู่ระบบ (Category Key)</label>
-                  <select
-                    value={formCategoryKey}
-                    onChange={(e) => setFormCategoryKey(e.target.value)}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
-                  >
-                    <option value="annual">annual (ลาพักร้อน)</option>
-                    <option value="sick">sick (ลาป่วย)</option>
-                    <option value="personal">personal (ลากิจ)</option>
-                    <option value="maternity">maternity (ลาคลอด)</option>
-                    <option value="ordination">ordination (ลาบวช)</option>
-                    <option value="paternity">paternity (ลาภริยาคลอดบุตร)</option>
-                    <option value="other">other (ลาอื่นๆ)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">โควต้าพื้นฐาน (วัน/ปี)</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Quota (days/yr)</label>
                   <input
                     type="number"
                     min="0"
@@ -656,199 +511,38 @@ export default function LeavePoliciesPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">การจ่ายค่าจ้าง</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Pay Type</label>
                   <select
                     value={formIsPaid ? 'true' : 'false'}
                     onChange={(e) => setFormIsPaid(e.target.value === 'true')}
                     className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
                   >
-                    <option value="true">ได้รับค่าจ้าง (Paid)</option>
-                    <option value="false">ไม่ได้รับค่าจ้าง (Unpaid)</option>
+                    <option value="true">Paid</option>
+                    <option value="false">Unpaid</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Gender *</label>
+                  <select
+                    value={formApplicableGender}
+                    onChange={(e) => setFormApplicableGender(e.target.value)}
+                    title="Leave requests and this quota are shown in the Mobile App only to employees whose gender matches"
+                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                  >
+                    <option value="all">All genders</option>
+                    <option value="male">Male only</option>
+                    <option value="female">Female only</option>
                   </select>
                 </div>
               </div>
 
-              {/* Gender Applicability Selection Section */}
-              <div className="bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30 space-y-2">
-                <label className="text-xs font-bold text-slate-200 block">
-                  เพศที่สามารถใช้สิทธิ์การลานี้ได้ (Applicable Gender) *
-                </label>
-                <p className="text-[11px] text-slate-400">
-                  ระบบจะเปิดให้ยื่นลาและแสดงโควต้านี้ใน Mobile App เฉพาะพนักงานที่มีเพศตรงตามที่เลือกไว้
-                </p>
-                <div className="grid grid-cols-3 gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setFormApplicableGender('all')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                      formApplicableGender === 'all'
-                        ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-600/30'
-                        : 'bg-[#141722] text-slate-400 border-red-900/30 hover:text-white'
-                    }`}
-                  >
-                    <span>🌐</span>
-                    <span>ทุกเพศ (All)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormApplicableGender('male')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                      formApplicableGender === 'male'
-                        ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30'
-                        : 'bg-[#141722] text-slate-400 border-red-900/30 hover:text-white'
-                    }`}
-                  >
-                    <span>👨</span>
-                    <span>เฉพาะเพศชาย (Male)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormApplicableGender('female')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                      formApplicableGender === 'female'
-                        ? 'bg-pink-600 text-white border-pink-500 shadow-md shadow-pink-600/30'
-                        : 'bg-[#141722] text-slate-400 border-red-900/30 hover:text-white'
-                    }`}
-                  >
-                    <span>👩</span>
-                    <span>เฉพาะเพศหญิง (Female)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* ======================================================== */}
-              {/* Highlight Section: Allowed Date Range Constraint */}
-              {/* ======================================================== */}
-              <div className="bg-gradient-to-r from-red-950/50 via-[#1A1E2E] to-red-950/30 p-5 rounded-2xl border border-red-700/40 shadow-inner space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-red-900/60 text-red-400">
-                      <Calendar size={18} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">
-                        กำหนดช่วงวันเวลาที่อนุญาตให้ลา (Allowed Leave Date Range)
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        บังคับใช้ใน Mobile App — ถ้าเกินวันที่กำหนดให้ต้องไม่สามารถลาได้อีก
-                      </p>
-                    </div>
-                  </div>
-
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formDateRangeEnabled}
-                      onChange={(e) => setFormDateRangeEnabled(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                  </label>
-                </div>
-
-                {formDateRangeEnabled && (
-                  <div className="pt-3 border-t border-red-800/30 space-y-3 animate-in fade-in duration-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-amber-300 block mb-1">
-                          วันที่เริ่มต้นที่อนุญาตให้ลา (Start Date) *
-                        </label>
-                        <input
-                          type="date"
-                          value={formAllowedStartDate}
-                          onChange={(e) => setFormAllowedStartDate(e.target.value)}
-                          className="w-full bg-[#0B0D13] border border-amber-700/50 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                          required={formDateRangeEnabled}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-amber-300 block mb-1">
-                          วันที่สิ้นสุดที่อนุญาตให้ลา (End Date / Cutoff Date) *
-                        </label>
-                        <input
-                          type="date"
-                          value={formAllowedEndDate}
-                          onChange={(e) => setFormAllowedEndDate(e.target.value)}
-                          className="w-full bg-[#0B0D13] border border-amber-700/50 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                          required={formDateRangeEnabled}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-amber-950/60 border border-amber-800/40 rounded-xl p-3 text-xs text-amber-200 flex items-start gap-2">
-                      <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">ระบบตรวจสอบแบบ Real-time บน Mobile App:</span> เมื่อเปิดใช้งาน พนักงานจะสามารถยื่นลาประเภทนี้ได้เฉพาะช่วงวันที่ระบุเท่านั้น หากเลือกวันที่นอกเหนือจากนี้หรือเกินกำหนด ระบบในแอปจะบล็อกและแสดงข้อความปฏิเสธทันที
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Row 3: Submission Rules & Advance Notice */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">ขอล่วงหน้าอย่างน้อย (วัน)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="90"
-                    value={formMinAdvanceDays}
-                    onChange={(e) => setFormMinAdvanceDays(e.target.value)}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">ใส่ 0 หากอนุญาตให้ลาฉุกเฉินได้ในวันเดียวกัน</span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">ลาติดต่อกันได้สูงสุด (วัน)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={formMaxConsecutiveDays}
-                    onChange={(e) => setFormMaxConsecutiveDays(e.target.value)}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
-                  />
-                </div>
-              </div>
-
-              {/* Row 4: Backdated & Attachment Toggles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300">อนุญาตให้ลาย้อนหลัง</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formAllowBackdated}
-                        onChange={(e) => setFormAllowBackdated(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
-                    </label>
-                  </div>
-                  {formAllowBackdated && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[11px] text-slate-400">ย้อนหลังได้ไม่เกิน:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="30"
-                        value={formMaxBackdatedDays}
-                        onChange={(e) => setFormMaxBackdatedDays(e.target.value)}
-                        className="w-16 bg-[#141722] border border-red-900/40 rounded-lg px-2 py-1 text-xs text-white text-center"
-                      />
-                      <span className="text-[11px] text-slate-400">วัน</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
+              {/* Row 4: Attachment toggle */}
+              <div className="bg-[#0B0D13] px-4 py-3 rounded-2xl border border-red-900/30">
+                <div className="flex items-center justify-between gap-4">
                   <div>
-                    <span className="text-xs font-bold text-slate-300 block">บังคับแนบเอกสาร</span>
-                    <span className="text-[10px] text-slate-500 block">เช่น ใบรับรองแพทย์ หรือ เอกสารรับรอง</span>
+                    <span className="text-xs font-bold text-slate-300 block">Require Attachment</span>
+                    <span className="text-[10px] text-slate-500 block">e.g. medical certificate or supporting document</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -864,25 +558,25 @@ export default function LeavePoliciesPage() {
 
               {/* Description & Status */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">หมายเหตุ / รายละเอียดนโยบายการลา</label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Notes / Policy Details</label>
                 <textarea
                   rows="2"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="เช่น ต้องมีใบรับรองแพทย์กรณีลาติดต่อกันเกิน 3 วัน หรือ นโยบายการใช้สิทธิ์สำหรับพนักงานผ่านโปร"
+                  placeholder="e.g. A medical certificate is required for more than 3 consecutive days, or eligibility rules for probation employees"
                   className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">สถานะเปิดใช้งานในระบบ</label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Status</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value)}
                   className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
                 >
-                  <option value="Active">เปิดใช้งาน (Active - แสดงใน App พนักงาน)</option>
-                  <option value="Inactive">ปิดใช้งานชั่วคราว (Inactive - ซ่อนใน App)</option>
+                  <option value="Active">Active </option>
+                  <option value="Inactive">Inactive </option>
                 </select>
               </div>
 
@@ -894,7 +588,7 @@ export default function LeavePoliciesPage() {
                   disabled={isSubmitting}
                   className="px-5 py-2.5 rounded-xl bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 text-xs font-bold border border-red-900/40 transition-colors"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -904,21 +598,23 @@ export default function LeavePoliciesPage() {
                   {isSubmitting ? (
                     <>
                       <RefreshCw size={14} className="animate-spin" />
-                      <span>กำลังบันทึก...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
-                    <span>บันทึกการตั้งค่า</span>
+                    <span>Save Settings</span>
                   )}
                 </button>
               </div>
             </form>
           </div>
         </div>
+        </Portal>
       )}
       {/* ======================================================== */}
       {/* Delete Confirmation Popup Modal */}
       {/* ======================================================== */}
       {deleteConfirmModal.isOpen && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div className="bg-[#141722] border border-red-900/60 rounded-3xl p-6 max-w-md w-full shadow-2xl shadow-red-950/50 space-y-5 animate-scale-up">
             <div className="flex items-center gap-3.5">
@@ -926,18 +622,18 @@ export default function LeavePoliciesPage() {
                 <Trash2 size={24} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">ยืนยันการลบนโยบายการลา</h3>
-                <p className="text-xs text-slate-400">กรุณาตรวจสอบก่อนยืนยันการทำรายการ</p>
+                <h3 className="text-base font-bold text-white">Confirm Leave Policy Deletion</h3>
+                <p className="text-xs text-slate-400">Please review before confirming</p>
               </div>
             </div>
 
             <div className="bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30 text-xs text-slate-300 leading-relaxed space-y-2">
               <p>
-                คุณต้องการลบนโยบายการลา <span className="font-bold text-white">"{deleteConfirmModal.policyName}"</span> (รหัส <span className="font-mono text-red-400 font-bold">{deleteConfirmModal.policyId}</span>) ใช่หรือไม่?
+                Are you sure you want to delete the leave policy <span className="font-bold text-white">"{deleteConfirmModal.policyName}"</span> (ID <span className="font-mono text-red-400 font-bold">{deleteConfirmModal.policyId}</span>)?
               </p>
               <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-semibold pt-1">
                 <AlertTriangle size={14} className="flex-shrink-0" />
-                <span>การลบนี้จะปิดการใช้งานสิทธิ์ของพนักงาน และไม่สามารถเรียกคืนได้</span>
+                <span>This will disable the employees' entitlement and cannot be undone</span>
               </div>
             </div>
 
@@ -948,7 +644,7 @@ export default function LeavePoliciesPage() {
                 disabled={isSubmitting}
                 className="flex-1 py-2.5 rounded-xl bg-[#0B0D13] hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 transition-colors"
               >
-                ยกเลิก
+                Cancel
               </button>
               <button
                 type="button"
@@ -959,18 +655,19 @@ export default function LeavePoliciesPage() {
                 {isSubmitting ? (
                   <>
                     <RefreshCw size={14} className="animate-spin" />
-                    <span>กำลังลบ...</span>
+                    <span>Deleting...</span>
                   </>
                 ) : (
                   <>
                     <Trash2 size={14} />
-                    <span>ยืนยันการลบ</span>
+                    <span>Confirm Delete</span>
                   </>
                 )}
               </button>
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

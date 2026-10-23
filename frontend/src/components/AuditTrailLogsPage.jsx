@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, ShieldCheck, Search, Filter, RefreshCw, Clock, FileSpreadsheet, Download, AlertCircle } from 'lucide-react';
+import { KeyRound, ShieldCheck, Search, Filter, RefreshCw, Clock, FileSpreadsheet, Download, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-const API_BASE = 'http://localhost:5000/api';
+import { API_BASE } from '../config';
+import FilterBar from './FilterBar';
 
 export default function AuditTrailLogsPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAction, setFilterAction] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -16,21 +20,21 @@ export default function AuditTrailLogsPage() {
       const headers = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
-      } else {
-        // Fallback for dev mode
-        headers['x-employee-id'] = 'ADM-001';
       }
 
-      const res = await fetch(`${API_BASE}/audit-logs?limit=100`, { headers });
+      const res = await fetch(`${API_BASE}/audit-logs?limit=500`, { headers });
       const json = await res.json();
-      if (json.success && (json.data || json.logs)) {
+      if (res.ok && json.success && (json.data || json.logs)) {
         setLogs(json.data || json.logs || []);
+        setLoadError('');
       } else {
         setLogs([]);
+        setLoadError(json.message || 'Unable to load audit logs');
       }
     } catch (e) {
       console.error('Failed to fetch audit logs:', e);
       setLogs([]);
+      setLoadError('Unable to connect to the server to load audit logs');
     } finally {
       setLoading(false);
     }
@@ -54,14 +58,40 @@ export default function AuditTrailLogsPage() {
       detailsStr.toLowerCase().includes(search) ||
       resourceStr.includes(search);
 
-    const matchFilter = filterAction === 'ALL' || log.action === filterAction;
+    // Backend actions are compound codes (LOGIN_SUCCESS, CREATE_EMPLOYEE, DELETE_ADMIN, APPROVE_REQUEST...), so match by keyword
+    const matchFilter = filterAction === 'ALL' || String(log.action || '').toUpperCase().includes(filterAction);
     return matchSearch && matchFilter;
   });
+
+  // Reset to first page when search or filter criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAction]);
+
+  // Pagination calculations
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + pageSize);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxButtons = 5;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + maxButtons - 1);
+    if (end - start < maxButtons - 1) {
+      start = Math.max(1, end - maxButtons + 1);
+    }
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   const handleExportCSV = () => {
     if (filteredLogs.length === 0) return;
 
-    const headers = ['ลำดับ', 'วัน-เวลา (Timestamp)', 'ผู้ดำเนินการ (Actor)', 'ตำแหน่ง (Role)', 'การกระทำ (Action)', 'เป้าหมาย (Resource)', 'รหัสเป้าหมาย (Resource ID)', 'รายละเอียด (Details)', 'IP Address'];
+    const headers = ['No.', 'Timestamp', 'Actor', 'Role', 'Action', 'Resource', 'Resource ID', 'Details', 'IP Address'];
     const rows = filteredLogs.map((item, index) => [
       index + 1,
       `"${item.createdAt || item.timestamp || '-'}"`,
@@ -86,24 +116,20 @@ export default function AuditTrailLogsPage() {
   };
 
   const getActionBadgeClass = (action) => {
-    switch (action) {
-      case 'ADMIN_LOGIN':
-      case 'LOGIN':
-        return 'bg-blue-950 text-blue-400 border-blue-800/50';
-      case 'CREATE':
-      case 'EMPLOYEE_CREATE':
-        return 'bg-emerald-950 text-emerald-400 border-emerald-800/50';
-      case 'UPDATE':
-      case 'EMPLOYEE_UPDATE':
-      case 'APPROVE':
-        return 'bg-amber-950 text-amber-400 border-amber-800/50';
-      case 'DELETE':
-      case 'EMPLOYEE_DELETE':
-      case 'REJECT':
-        return 'bg-red-950 text-red-400 border-red-800/50';
-      default:
-        return 'bg-purple-950 text-purple-400 border-purple-800/50';
+    const a = String(action || '').toUpperCase();
+    if (a.includes('FAILED') || a.includes('DELETE') || a.includes('REJECT')) {
+      return 'bg-red-950 text-red-400 border-red-800/50';
     }
+    if (a.includes('LOGIN')) {
+      return 'bg-blue-950 text-blue-400 border-blue-800/50';
+    }
+    if (a.includes('CREATE')) {
+      return 'bg-emerald-950 text-emerald-400 border-emerald-800/50';
+    }
+    if (a.includes('UPDATE') || a.includes('APPROVE') || a.includes('RESIGN')) {
+      return 'bg-amber-950 text-amber-400 border-amber-800/50';
+    }
+    return 'bg-purple-950 text-purple-400 border-purple-800/50';
   };
 
   return (
@@ -116,16 +142,12 @@ export default function AuditTrailLogsPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-red-950 text-[#EF4444] border border-red-800/40">
-                AUDIT & COMPLIANCE
-              </span>
+              
               <h1 className="text-xl font-black text-white uppercase tracking-wide">
-                Enterprise Audit Trail & PDPA Logs (ศูนย์บันทึกประวัติความปลอดภัย)
+                Enterprise Audit Trail & PDPA Logs (Security Activity Center)
               </h1>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              เก็บบันทึกประวัติการเข้าสู่ระบบ การอนุมัติ และการแก้ไขข้อมูลพนักงานตามมาตรฐาน PDPA / ISO 27001 (Real DB Sync)
-            </p>
+            
           </div>
         </div>
 
@@ -134,53 +156,38 @@ export default function AuditTrailLogsPage() {
             onClick={handleExportCSV}
             disabled={filteredLogs.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-600/50 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            title="ดาวน์โหลดรายงาน Audit Trail สำหรับการตรวจสอบ PDPA / ISO"
+            title="Download the audit trail report for PDPA / ISO review"
           >
             <FileSpreadsheet size={16} />
-            <span>ส่งออก CSV (PDPA Report)</span>
+            <span>Export</span>
           </button>
           <button
             onClick={fetchLogs}
             className="flex items-center gap-2 px-4 py-2.5 bg-red-950/60 hover:bg-red-900/60 border border-red-800/50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            <span>รีเฟรชข้อมูล</span>
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-lg flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ค้นหา Actor, IP, Action หรือรายละเอียด..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs font-medium text-white outline-none focus:border-[#EF4444] transition-all"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          <span className="text-xs text-slate-400 font-bold uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter size={14} /> ตัวกรอง:
-          </span>
-          {['ALL', 'LOGIN', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT'].map((action) => (
-            <button
-              key={action}
-              onClick={() => setFilterAction(action)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
-                filterAction === action
-                  ? 'bg-red-600 text-white shadow-md shadow-red-900/40 border border-red-500'
-                  : 'bg-[#0B0D13] text-slate-400 hover:text-white border border-red-900/30'
-              }`}
-            >
-              {action}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterBar
+        search={searchTerm}
+        onSearch={setSearchTerm}
+        placeholder="Search actor, IP, action or details..."
+        filters={[
+          {
+            label: 'Action',
+            value: filterAction,
+            onChange: setFilterAction,
+            options: ['ALL', 'LOGIN', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT'].map((a) => ({
+              value: a,
+              label: a === 'ALL' ? 'All' : a,
+            })),
+          },
+        ]}
+      />
 
       {/* Logs Table */}
       <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg p-6 overflow-hidden">
@@ -188,11 +195,11 @@ export default function AuditTrailLogsPage() {
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-[#0B0D13] text-slate-400 font-mono uppercase border-b border-red-900/30">
               <tr>
-                <th className="py-3 px-4">วัน-เวลา (Timestamp)</th>
-                <th className="py-3 px-4">ผู้ดำเนินการ (Actor)</th>
-                <th className="py-3 px-4">การกระทำ (Action)</th>
-                <th className="py-3 px-4">เป้าหมาย (Resource)</th>
-                <th className="py-3 px-4">รายละเอียด (Audit Details)</th>
+                <th className="py-3 px-4">Timestamp</th>
+                <th className="py-3 px-4">Actor</th>
+                <th className="py-3 px-4">Action</th>
+                <th className="py-3 px-4">Resource</th>
+                <th className="py-3 px-4">Audit Details</th>
                 <th className="py-3 px-4">IP Address</th>
               </tr>
             </thead>
@@ -202,7 +209,7 @@ export default function AuditTrailLogsPage() {
                   <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw size={24} className="animate-spin text-red-500" />
-                      <span>กำลังดึงข้อมูล Audit Trail จาก PostgreSQL...</span>
+                      <span>Loading audit trail from PostgreSQL...</span>
                     </div>
                   </td>
                 </tr>
@@ -211,12 +218,12 @@ export default function AuditTrailLogsPage() {
                   <td colSpan="6" className="py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <AlertCircle size={24} className="text-slate-600" />
-                      <span>ไม่พบประวัติการทำรายการที่ตรงกับเงื่อนไขการค้นหา</span>
+                      <span>{loadError || 'No audit records match your search'}</span>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => {
+                paginatedLogs.map((log) => {
                   const detailsText = typeof log.details === 'object'
                     ? JSON.stringify(log.details, null, 2)
                     : String(log.details || '-');
@@ -259,6 +266,76 @@ export default function AuditTrailLogsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {!loading && filteredLogs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-red-900/30 text-xs">
+            <div className="text-slate-400 font-mono">
+              Showing <span className="font-bold text-white">{startIndex + 1}</span> - <span className="font-bold text-white">{Math.min(startIndex + pageSize, totalItems)}</span> of <span className="font-bold text-[#EF4444]">{totalItems}</span> records (page {currentPage} / {totalPages})
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* First Page */}
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                title="First page"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+
+              {/* Prev Page */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
+                title="Previous page"
+              >
+                <ChevronLeft size={16} />
+                <span className="hidden sm:inline">Previous</span>
+              </button>
+
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1">
+                {getPageNumbers().map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-8 h-8 rounded-xl font-bold transition-all text-xs font-mono flex items-center justify-center ${
+                      currentPage === pageNum
+                        ? 'bg-[#DC2626] text-white shadow-lg shadow-red-600/30 border border-red-500 scale-105'
+                        : 'bg-[#0B0D13] text-slate-400 hover:text-white border border-red-900/40 hover:bg-red-950/40'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+
+              {/* Next Page */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
+                title="Next page"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight size={16} />
+              </button>
+
+              {/* Last Page */}
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                title="Last page"
+              >
+                <ChevronsRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

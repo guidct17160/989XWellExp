@@ -1,51 +1,43 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Playwright Configuration for WellX989 Enterprise E2E Test Suite
- * Designed by Senior Software QA & Senior Developer
- */
+// ไฟล์ตั้งค่า Playwright สำหรับเทส E2E ของเว็บแอดมิน
+// - เว็บรันด้วย Vite พอร์ต 3008 (กำหนดไว้ใน vite.config.js แบบ strictPort)
+// - เทสรันใน Google Chrome ที่ติดตั้งในเครื่อง (channel: 'chrome') จึงไม่ต้องโหลดเบราว์เซอร์เพิ่ม
+// - เทสทุกตัว mock การเรียก /api ทั้งหมด จึงไม่ต้องเปิด backend หรือฐานข้อมูล
+const PORT = 3008;
+const BASE_URL = `http://localhost:${PORT}`;
+
 export default defineConfig({
+  // โฟลเดอร์ที่เก็บไฟล์เทส
   testDir: './e2e',
-  timeout: 30000,
-  expect: {
-    timeout: 7000,
-  },
-  fullyParallel: false,
+  // เวลาสูงสุดต่อ 1 เคส (30 วินาที) และเวลารอสูงสุดของแต่ละ expect (7 วินาที)
+  timeout: 30_000,
+  expect: { timeout: 7_000 },
+  // รันเคสต่างๆ พร้อมกันเพื่อให้เร็วขึ้น
+  fullyParallel: true,
+  // บน CI: ห้ามเหลือ test.only ค้างไว้ และให้ลองใหม่ 1 ครั้งถ้าล้มเหลว
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: 1, // Sequential execution for predictable database & test state
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }]
-  ],
+  retries: process.env.CI ? 1 : 0,
+  // รายงานผล: แสดงรายการในเทอร์มินัล + สร้างรายงาน HTML (เปิดดูด้วย npm run test:e2e:report)
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:3008',
+    // ใช้ path สั้นๆ ใน page.goto('/login') ได้
+    baseURL: BASE_URL,
+    // เก็บ trace และภาพหน้าจอเฉพาะเคสที่ล้มเหลว เพื่อใช้ไล่หาสาเหตุ
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    viewport: { width: 1280, height: 720 },
-    actionTimeout: 10000,
-    navigationTimeout: 15000,
   },
   projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+    // จอคอมพิวเตอร์ (ทุกไฟล์ ยกเว้นไฟล์ responsive)
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' }, testIgnore: /responsive/ },
+    // จอมือถือ Pixel 7 (เฉพาะไฟล์ login.responsive.spec.js)
+    { name: 'mobile', use: { ...devices['Pixel 7'], channel: 'chrome' }, testMatch: /login\.responsive\.spec\.js/ },
   ],
-  webServer: [
-    {
-      command: 'cmd.exe /c npm start',
-      cwd: '../backend',
-      url: 'http://localhost:5000/api/health',
-      reuseExistingServer: true,
-      timeout: 30000,
-    },
-    {
-      command: 'cmd.exe /c npm run dev',
-      url: 'http://localhost:3008',
-      reuseExistingServer: true,
-      timeout: 30000,
-    },
-  ],
+  // ถ้ายังไม่มีเว็บรันอยู่ที่พอร์ต 3008 ให้เปิดให้เอง (ถ้ามีอยู่แล้วจะใช้ตัวเดิม)
+  webServer: {
+    command: 'npm run dev',
+    url: BASE_URL,
+    reuseExistingServer: true,
+    timeout: 60_000,
+  },
 });

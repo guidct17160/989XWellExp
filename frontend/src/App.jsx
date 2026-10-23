@@ -1,15 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
 import DashboardPage from './components/DashboardPage';
 import SetPasswordPage from './components/SetPasswordPage';
+import { HOME_PATH } from './routes';
 
 // Web Admin HR Timeout Settings:
-// Idle Timeout: 30 นาที (30 * 60 * 1000 ms) - ไม่มีการเคลื่อนไหว หน้าจอตัดทันที
-// Absolute Timeout: 8 ชั่วโมง (8 * 60 * 60 * 1000 ms) - หมดวันทำงาน ต้องล็อกอินใหม่
+// Idle Timeout: 30 minutes (30 * 60 * 1000 ms) - no activity, the session is cut off immediately
+// Absolute Timeout: 8 hours (8 * 60 * 60 * 1000 ms) - end of the working day, must log in again
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
 
+// The sign-in page lives at a clean /login URL. After signing in the user always lands on the Dashboard (/dashboard).
+const LOGIN_PATH = '/login';
+const FORGOT_PATH = '/forgot-password';
+const AUTH_PATHS = [LOGIN_PATH, FORGOT_PATH];
+
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('wellx989_user');
@@ -20,26 +31,39 @@ export default function App() {
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('wellx989_is_logged_in') === 'true' || !!localStorage.getItem('wellx989_user');
+    try {
+      // A session without a JWT cannot call any protected API, so require the token too
+      return !!localStorage.getItem('wellx989_token') &&
+        (localStorage.getItem('wellx989_is_logged_in') === 'true' || !!localStorage.getItem('wellx989_user'));
+    } catch (e) {
+      return false;
+    }
   });
 
-  const [isSetPasswordMode, setIsSetPasswordMode] = useState(false);
+  // A password-setup link from an email (/set-password?token=...&email=...) must be left untouched
+  const isSetPasswordMode = (() => {
+    const params = new URLSearchParams(location.search);
+    return !!params.get('token') && (location.pathname.includes('/set-password') || !!params.get('email'));
+  })();
   const [timeoutNotice, setTimeoutNotice] = useState(null);
 
   const lastActivityRef = useRef(Date.now());
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('token') || window.location.pathname.includes('/set-password')) {
-      setIsSetPasswordMode(true);
-    }
-  }, []);
+  // Current sign-in view (/login or /forgot-password); the address bar is the source of truth
+  const authPath = location.pathname === FORGOT_PATH ? FORGOT_PATH : LOGIN_PATH;
+  // ค่าที่ผู้ใช้พิมพ์ไว้ในหน้า Login ส่งไปเติมในหน้า Forgot password
+  const [forgotPrefill, setForgotPrefill] = useState('');
+  const goToAuthPath = (path, extra) => {
+    if (extra && typeof extra.identifier === 'string') setForgotPrefill(extra.identifier);
+    navigate(path);
+  };
 
   const handleLoginSuccess = (userData) => {
     const now = Date.now();
     setUser(userData);
     setIsLoggedIn(true);
     setTimeoutNotice(null);
+    navigate(HOME_PATH, { replace: true });
     try {
       localStorage.setItem('wellx989_user', JSON.stringify(userData));
       localStorage.setItem('wellx989_is_logged_in', 'true');
@@ -87,17 +111,17 @@ export default function App() {
     const intervalId = setInterval(() => {
       const now = Date.now();
 
-      // 1. Check Idle Timeout (30 นาที)
+      // 1. Check Idle Timeout (30 minutes)
       const lastAct = lastActivityRef.current || now;
       if (now - lastAct >= IDLE_TIMEOUT_MS) {
-        handleLogout('เซสชันหมดอายุเนื่องจากไม่มีการขยับหน้าจอเกิน 30 นาที (Idle Timeout)');
+        handleLogout('Session expired due to 30 minutes of inactivity (Idle Timeout)');
         return;
       }
 
-      // 2. Check Absolute Timeout (8 ชั่วโมง)
+      // 2. Check Absolute Timeout (8 hours)
       const loginTime = Number(localStorage.getItem('wellx989_login_time') || now);
       if (now - loginTime >= ABSOLUTE_TIMEOUT_MS) {
-        handleLogout('เซสชันหมดอายุจากการใช้งานครบ 8 ชั่วโมง (Absolute Timeout - หมดวันทำงาน)');
+        handleLogout('Session expired after 8 hours of use (Absolute Timeout - end of the working day)');
         return;
       }
     }, 10000);
@@ -109,18 +133,33 @@ export default function App() {
   }, [isLoggedIn, handleLogout]);
 
   const handleSetPasswordComplete = () => {
-    try {
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } catch (e) {}
-    setIsSetPasswordMode(false);
+    navigate('/', { replace: true });
   };
 
   if (isSetPasswordMode) {
     return <SetPasswordPage onComplete={handleSetPasswordComplete} />;
   }
 
+  // /set-password without a token has nothing to do
+  if (location.pathname.includes('/set-password')) {
+    return <Navigate to="/" replace />;
+  }
+
   if (!isLoggedIn) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} initialNotice={timeoutNotice} />;
+    // Signed out: only /login and /forgot-password exist, any other address goes to a clean /login
+    if (!AUTH_PATHS.includes(location.pathname)) {
+      return <Navigate to={LOGIN_PATH} replace />;
+    }
+    // หนึ่งหน้า = หนึ่งไฟล์ = หนึ่ง path
+    if (authPath === FORGOT_PATH) {
+      return <ForgotPasswordPage onNavigate={goToAuthPath} initialIdentifier={forgotPrefill} />;
+    }
+    return <LoginPage onLoginSuccess={handleLoginSuccess} initialNotice={timeoutNotice} onNavigate={goToAuthPath} />;
+  }
+
+  // Signed in: the sign-in pages are not reachable
+  if (AUTH_PATHS.includes(location.pathname)) {
+    return <Navigate to={HOME_PATH} replace />;
   }
 
   return <DashboardPage user={user} onLogout={() => handleLogout()} />;
