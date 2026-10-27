@@ -3,6 +3,7 @@ const { send: sendError } = require('../utils/httpError');
 const getEmpId = require('../helpers/getEmployeeId');
 const { todayIso } = require('../utils/time');
 const { verifyPunchLocation } = require('./workLocationController');
+const { logAudit } = require('../utils/auditLogger');
 
 // POST /api/attendance/clock-in
 exports.clockIn = async (req, res) => {
@@ -38,19 +39,20 @@ exports.clockOut = async (req, res) => {
     const { latitude, longitude, locationName, locationId } = req.body;
     const empId = getEmpId(req);
 
-    await verifyPunchLocation(empId, { locationId, latitude, longitude });
+    const verified = await verifyPunchLocation(empId, { locationId, latitude, longitude });
 
     const result = await dbStore.addClockOut({
       employeeId: empId,
       latitude,
       longitude,
-      locationName,
+      locationName: verified ? verified.name : locationName,
     });
 
     return res.status(200).json({
       success: true,
       message: 'บันทึกเวลาออกงานสำเร็จเรียบร้อยแล้ว',
       attendance: result,
+      pointsAwarded: result.pointsAwarded || 0, // bonus for on-time check-in + full hours (0 otherwise / switched off)
     });
   } catch (error) {
     return sendError(res, error);
@@ -135,9 +137,14 @@ exports.addCorrection = async (req, res) => {
       reason: reason || 'ขอปรับปรุงเวลาเข้า-ออกงาน',
     });
 
+    const approvedNow = result && result.status === 'อนุมัติแล้ว';
+    if (approvedNow) {
+      // a SuperBoss correction is approved by the system, so the audit trail records it
+      logAudit(req, { action: 'APPROVE_REQUEST', resourceType: 'time-correction', resourceId: result.id, details: { approver: req.user?.name, approverRole: req.user?.role, status: 'อนุมัติแล้ว', remark: 'SuperBoss: no approval needed' } }).catch(() => {});
+    }
     return res.status(201).json({
       success: true,
-      message: 'ยื่นคำขอปรับปรุงเวลาเรียบร้อยแล้ว รอการอนุมัติ',
+      message: approvedNow ? 'ปรับปรุงเวลาเรียบร้อยแล้ว (SuperBoss ไม่ต้องรออนุมัติ)' : 'ยื่นคำขอปรับปรุงเวลาเรียบร้อยแล้ว รอการอนุมัติ',
       correction: result,
     });
   } catch (error) {

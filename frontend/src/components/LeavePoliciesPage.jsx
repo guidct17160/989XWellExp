@@ -212,36 +212,36 @@ export default function LeavePoliciesPage() {
   const unpaidPolicies = totalPolicies - paidPolicies;
 
   return (
-    <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
+    <div className="space-y-6 text-slate-900 font-sans animate-in fade-in duration-200">
       {/* Toast Alert */}
       {successToast && (
         <div
           className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
             typeof successToast === 'object' && successToast?.type === 'error'
-              ? 'bg-red-950 border border-red-700/60 text-red-300'
-              : 'bg-emerald-950 border border-emerald-500/60 text-emerald-200'
+              ? 'bg-danger-50 border border-danger-200 text-danger-700'
+              : 'bg-emerald-50 border border-emerald-500/60 text-emerald-800'
           }`}
         >
           {typeof successToast === 'object' && successToast?.type === 'error' ? (
-            <AlertTriangle size={20} className="text-[#EF4444]" />
+            <AlertTriangle size={20} className="text-danger-600" />
           ) : (
-            <CheckCircle2 size={20} className="text-emerald-400" />
+            <CheckCircle2 size={20} className="text-emerald-600" />
           )}
           <span>{typeof successToast === 'object' ? successToast.msg : successToast}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+          <div className="p-3 rounded-2xl bg-violet-100 text-violet-700 border border-violet-200">
             <UserCheck size={28} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               
-              <h1 className="text-xl font-black text-white uppercase tracking-wide">
-                Leave Quotas & Policies (Company Leave Entitlements and Rules)
+              <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">
+                Leave Quotas
               </h1>
             </div>
             
@@ -252,10 +252,10 @@ export default function LeavePoliciesPage() {
           <button
             onClick={fetchPolicies}
             disabled={isLoading}
-            className="flex items-center gap-2 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 hover:text-white px-3.5 py-2.5 rounded-xl border border-red-900/40 text-xs font-bold transition-all"
+            className="flex items-center gap-2 bg-slate-50 hover:bg-violet-50 text-slate-700 hover:text-slate-900 px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold transition-all"
             title="Refresh data from the database"
           >
-            <RefreshCw size={15} className={isLoading ? 'animate-spin text-red-500' : ''} />
+            <RefreshCw size={15} className={isLoading ? 'animate-spin text-violet-600' : ''} />
             <span>Refresh</span>
           </button>
 
@@ -264,42 +264,42 @@ export default function LeavePoliciesPage() {
 
       {/* Policy Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Policies</span>
-            <div className="text-2xl font-black text-white mt-1">{totalPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Policies</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">{totalPolicies} <span className="text-xs font-normal text-slate-500">types</span></div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-800/40 flex items-center justify-center text-red-400">
+          <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center text-violet-600">
             <Layers size={20} />
           </div>
         </div>
 
-        <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active</span>
-            <div className="text-2xl font-black text-emerald-400 mt-1">{activePolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Active</span>
+            <div className="text-2xl font-black text-emerald-600 mt-1">{activePolicies} <span className="text-xs font-normal text-slate-500">types</span></div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
             <CheckCircle2 size={20} />
           </div>
         </div>
 
-        <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Paid</span>
-            <div className="text-2xl font-black text-blue-400 mt-1">{paidPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Paid</span>
+            <div className="text-2xl font-black text-blue-600 mt-1">{paidPolicies} <span className="text-xs font-normal text-slate-500">types</span></div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-950/60 border border-blue-800/40 flex items-center justify-center text-blue-400">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
             <DollarSign size={20} />
           </div>
         </div>
 
-        <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-md flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Unpaid</span>
-            <div className="text-2xl font-black text-amber-400 mt-1">{unpaidPolicies} <span className="text-xs font-normal text-slate-400">types</span></div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Unpaid</span>
+            <div className="text-2xl font-black text-amber-600 mt-1">{unpaidPolicies} <span className="text-xs font-normal text-slate-500">types</span></div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-800/40 flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
             <DollarSign size={20} />
           </div>
         </div>
@@ -310,7 +310,7 @@ export default function LeavePoliciesPage() {
         right={
           <button
           onClick={handleOpenCreateModal}
-          className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
+          className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
           <Plus size={16} />
           <span>Add Leave Policy</span>
@@ -345,11 +345,11 @@ export default function LeavePoliciesPage() {
 
       {/* Policies Table */}
       {filteredPolicies.length > 0 && (
-        <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[860px]">
               <thead>
-                <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   <th className="py-4 px-5">Code</th>
                   <th className="py-4 px-5 w-full">Leave Type</th>
                   <th className="py-4 px-5 text-center">Quota</th>
@@ -360,32 +360,31 @@ export default function LeavePoliciesPage() {
                   <th className="py-4 px-5 text-center">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-red-900/20 text-xs font-medium text-slate-200">
+              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-800">
                 {filteredPolicies.map((p) => (
-                  <tr key={p.id} className="hover:bg-red-950/20 transition-colors align-middle">
+                  <tr key={p.id} className="hover:bg-violet-50 transition-colors align-middle">
                     <td className="py-4 px-5 whitespace-nowrap">
-                      <span className="text-xs font-mono font-bold text-red-400 bg-red-950 px-2.5 py-1 rounded-lg border border-red-800/40 whitespace-nowrap">{p.id}</span>
+                      <span className="text-xs font-mono font-bold text-violet-600 bg-violet-100 px-2.5 py-1 rounded-lg border border-violet-200 whitespace-nowrap">{p.id}</span>
                     </td>
                     <td className="py-4 px-5 min-w-[16rem]">
-                      <div className="text-sm font-bold text-white">{p.typeName}</div>
+                      <div className="text-sm font-bold text-slate-900">{p.typeName}</div>
                       
                     </td>
                     <td className="py-4 px-5 text-center whitespace-nowrap">
-                      <span className="text-lg font-black text-amber-400 font-mono">{p.defaultQuota}</span>
-                      <span className="text-[11px] text-slate-500 ml-1">days/yr</span>
+                      <span className="text-lg font-black text-amber-600 font-mono">{p.defaultQuota}</span>
                     </td>
                     <td className="py-4 px-5 whitespace-nowrap">
-                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${p.isPaid ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800/40' : 'text-amber-400 bg-amber-950/80 border-amber-800/40'}`}>
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${p.isPaid ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-600 bg-amber-50 border-amber-200'}`}>
                         {p.isPaid ? 'Paid' : 'Unpaid'}
                       </span>
                     </td>
                     <td className="py-4 px-5 whitespace-nowrap">
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
                         p.applicableGender === 'female'
-                          ? 'text-pink-300 bg-pink-950/60 border-pink-800/40'
+                          ? 'text-pink-700 bg-pink-50 border-pink-200'
                           : p.applicableGender === 'male'
-                          ? 'text-sky-300 bg-sky-950/60 border-sky-800/40'
-                          : 'text-slate-300 bg-slate-900 border-slate-700'
+                          ? 'text-sky-700 bg-sky-50 border-sky-200'
+                          : 'text-slate-700 bg-slate-100 border-slate-300'
                       }`}>
                         {p.applicableGender === 'female' ? 'Female only' : p.applicableGender === 'male' ? 'Male only' : 'All genders'}
                       </span>
@@ -393,14 +392,14 @@ export default function LeavePoliciesPage() {
                     <td className="py-4 px-5 whitespace-nowrap">
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
                         p.requireAttachment
-                          ? 'text-amber-300 bg-amber-950/60 border-amber-800/40'
-                          : 'text-slate-400 bg-slate-900 border-slate-700'
+                          ? 'text-amber-700 bg-amber-50 border-amber-200'
+                          : 'text-slate-500 bg-slate-100 border-slate-300'
                       }`}>
                         {p.requireAttachment ? 'Required' : 'Not required'}
                       </span>
                     </td>
                     <td className="py-4 px-5 whitespace-nowrap">
-                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40' : 'bg-red-950/80 text-red-400 border-red-800/40'}`}>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${p.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-violet-100 text-violet-600 border-violet-200'}`}>
                         {p.status === 'Active' ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -408,14 +407,14 @@ export default function LeavePoliciesPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleOpenEditModal(p)}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                           title="Configure / Edit"
                         >
                           <Edit size={16} />
                         </button>
                         <button
                           onClick={() => requestDeletePolicy(p.id, p.typeName)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
                           title="Delete policy"
                         >
                           <Trash2 size={16} />
@@ -431,9 +430,9 @@ export default function LeavePoliciesPage() {
       )}
 
       {filteredPolicies.length === 0 && !isLoading && (
-        <div className="bg-[#141722] rounded-2xl p-12 text-center border border-red-900/30 shadow-lg">
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-lg">
 
-          <p className="text-xs text-slate-400 mb-4">No leave policies match your search</p>
+          <p className="text-xs text-slate-500 mb-4">No leave policies match your search</p>
 
         </div>
       )}
@@ -443,16 +442,16 @@ export default function LeavePoliciesPage() {
       {/* ======================================================== */}
       {isModalOpen && (
         <Portal>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#141722] rounded-3xl border border-red-800/50 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-violet-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 mb-6 border-b border-red-900/30">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-950 text-red-400 border border-red-800/40">
+                <div className="p-2.5 rounded-xl bg-violet-100 text-violet-600 border border-violet-200">
                   <Edit size={22} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-white uppercase">
+                  <h2 className="text-lg font-black text-slate-900 uppercase">
                     {modalMode === 'create' ? 'Add New Leave Policy' : `Policy Settings: ${formTypeName || formId}`}
                   </h2>
                   
@@ -460,7 +459,7 @@ export default function LeavePoliciesPage() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-red-950/40 transition-colors"
+                className="text-slate-500 hover:text-slate-900 p-2 rounded-xl hover:bg-violet-50 transition-colors"
               >
                 ✕
               </button>
@@ -471,25 +470,25 @@ export default function LeavePoliciesPage() {
               {/* Row 1: ID, Type Name */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Policy ID</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Policy ID</label>
                   <input
                     type="text"
                     value={formId}
                     onChange={(e) => setFormId(e.target.value)}
                     disabled={modalMode === 'edit'}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-red-500 disabled:opacity-60"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-violet-500 disabled:opacity-60"
                     required
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Leave Type Name *</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Leave Type Name *</label>
                   <input
                     type="text"
                     value={formTypeName}
                     onChange={(e) => setFormTypeName(e.target.value)}
                     placeholder="e.g. Annual Leave"
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                     required
                   />
                 </div>
@@ -498,24 +497,24 @@ export default function LeavePoliciesPage() {
               {/* Row 2: Quota, Pay Type, Applicable Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Quota (days/yr)</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Quota (days/yr)</label>
                   <input
                     type="number"
                     min="0"
                     max="365"
                     value={formDefaultQuota}
                     onChange={(e) => setFormDefaultQuota(e.target.value)}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Pay Type</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Pay Type</label>
                   <select
                     value={formIsPaid ? 'true' : 'false'}
                     onChange={(e) => setFormIsPaid(e.target.value === 'true')}
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                   >
                     <option value="true">Paid</option>
                     <option value="false">Unpaid</option>
@@ -523,12 +522,12 @@ export default function LeavePoliciesPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Gender *</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Gender *</label>
                   <select
                     value={formApplicableGender}
                     onChange={(e) => setFormApplicableGender(e.target.value)}
                     title="Leave requests and this quota are shown in the Mobile App only to employees whose gender matches"
-                    className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                   >
                     <option value="all">All genders</option>
                     <option value="male">Male only</option>
@@ -538,10 +537,10 @@ export default function LeavePoliciesPage() {
               </div>
 
               {/* Row 4: Attachment toggle */}
-              <div className="bg-[#0B0D13] px-4 py-3 rounded-2xl border border-red-900/30">
+              <div className="bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <span className="text-xs font-bold text-slate-300 block">Require Attachment</span>
+                    <span className="text-xs font-bold text-slate-700 block">Require Attachment</span>
                     <span className="text-[10px] text-slate-500 block">e.g. medical certificate or supporting document</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -551,29 +550,29 @@ export default function LeavePoliciesPage() {
                       onChange={(e) => setFormRequireAttachment(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
                   </label>
                 </div>
               </div>
 
               {/* Description & Status */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Notes / Policy Details</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Notes / Policy Details</label>
                 <textarea
                   rows="2"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="e.g. A medical certificate is required for more than 3 consecutive days, or eligibility rules for probation employees"
-                  className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Status</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Status</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value)}
-                  className="w-full bg-[#0B0D13] border border-red-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                 >
                   <option value="Active">Active </option>
                   <option value="Inactive">Inactive </option>
@@ -581,19 +580,19 @@ export default function LeavePoliciesPage() {
               </div>
 
               {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-red-900/30">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 text-xs font-bold border border-red-900/40 transition-colors"
+                  className="px-5 py-2.5 rounded-xl bg-slate-50 hover:bg-violet-50 text-slate-700 text-xs font-bold border border-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold shadow-lg shadow-violet-600/40 transition-all uppercase tracking-wide disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>
@@ -615,23 +614,23 @@ export default function LeavePoliciesPage() {
       {/* ======================================================== */}
       {deleteConfirmModal.isOpen && (
         <Portal>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-[#141722] border border-red-900/60 rounded-3xl p-6 max-w-md w-full shadow-2xl shadow-red-950/50 space-y-5 animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl shadow-slate-300 space-y-5 animate-scale-up">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-red-950/80 border border-red-700/50 flex items-center justify-center text-[#EF4444] shadow-inner flex-shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-violet-100 border border-violet-300 flex items-center justify-center text-violet-700 shadow-inner flex-shrink-0">
                 <Trash2 size={24} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Confirm Leave Policy Deletion</h3>
-                <p className="text-xs text-slate-400">Please review before confirming</p>
+                <h3 className="text-base font-bold text-slate-900">Confirm Leave Policy Deletion</h3>
+                <p className="text-xs text-slate-500">Please review before confirming</p>
               </div>
             </div>
 
-            <div className="bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30 text-xs text-slate-300 leading-relaxed space-y-2">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs text-slate-700 leading-relaxed space-y-2">
               <p>
-                Are you sure you want to delete the leave policy <span className="font-bold text-white">"{deleteConfirmModal.policyName}"</span> (ID <span className="font-mono text-red-400 font-bold">{deleteConfirmModal.policyId}</span>)?
+                Are you sure you want to delete the leave policy <span className="font-bold text-slate-900">"{deleteConfirmModal.policyName}"</span> (ID <span className="font-mono text-danger-600 font-bold">{deleteConfirmModal.policyId}</span>)?
               </p>
-              <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-semibold pt-1">
+              <div className="flex items-center gap-1.5 text-amber-600 text-[11px] font-semibold pt-1">
                 <AlertTriangle size={14} className="flex-shrink-0" />
                 <span>This will disable the employees' entitlement and cannot be undone</span>
               </div>
@@ -642,7 +641,7 @@ export default function LeavePoliciesPage() {
                 type="button"
                 onClick={() => setDeleteConfirmModal({ isOpen: false, policyId: '', policyName: '' })}
                 disabled={isSubmitting}
-                className="flex-1 py-2.5 rounded-xl bg-[#0B0D13] hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-300 transition-colors"
               >
                 Cancel
               </button>
@@ -650,7 +649,7 @@ export default function LeavePoliciesPage() {
                 type="button"
                 onClick={handleConfirmDeletePolicy}
                 disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold shadow-lg shadow-violet-600/40 transition-all uppercase tracking-wide disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>

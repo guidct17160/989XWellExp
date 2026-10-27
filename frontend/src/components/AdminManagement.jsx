@@ -324,33 +324,33 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
   });
 
   return (
-    <div className="flex flex-col gap-6 font-sans text-slate-100">
+    <div className="flex flex-col gap-6 font-sans text-slate-900">
       {/* Toast Notification */}
       {notification && (
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
             typeof notification === 'object' && notification?.type === 'error'
-              ? 'bg-red-950 border border-red-700/60 text-red-300'
-              : 'bg-emerald-950 border border-emerald-700/60 text-emerald-300'
+              ? 'bg-danger-50 border border-danger-200 text-danger-700'
+              : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
           }`}
         >
           {typeof notification === 'object' && notification?.type === 'error' ? (
-            <AlertCircle size={20} className="text-[#EF4444]" />
+            <AlertCircle size={20} className="text-danger-600" />
           ) : (
-            <CheckCircle size={20} className="text-emerald-400" />
+            <CheckCircle size={20} className="text-emerald-600" />
           )}
           <span>{typeof notification === 'object' ? notification.msg : notification}</span>
         </div>
       )}
 
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-[#DC2626] text-white shadow-lg shadow-red-600/30">
+          <div className="p-3 rounded-2xl bg-[#7C3AED] text-white shadow-lg shadow-violet-600/30">
             <ShieldCheck size={26} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-white uppercase tracking-wide">Admin Management</h1>
+            <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">Admin Management</h1>
             
           </div>
         </div>
@@ -358,7 +358,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
         <div className="flex items-center gap-3">
           <button
             onClick={fetchAdmins}
-            className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 text-slate-700 transition-colors"
             title="Refresh data"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -370,62 +370,62 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* Top Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">All Admin</span>
-            <div className="text-2xl font-black text-[#EF4444]">{admins.length} <span className="text-xs font-normal text-slate-400">accounts</span></div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">All Admin</span>
+            <div className="text-2xl font-black text-violet-700">{admins.length} <span className="text-xs font-normal text-slate-500">accounts</span></div>
           </div>
-          <div className="p-3 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+          <div className="p-3 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
             <ShieldCheck size={22} />
           </div>
         </div>
 
-        <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Super Admin</span>
-            <div className="text-2xl font-black text-amber-400">
-              {admins.filter((a) => a.role === 'Super Admin' || a.role === 'SuperBoss').length} <span className="text-xs font-normal text-slate-400">accounts</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Super Admin</span>
+            <div className="text-2xl font-black text-amber-600">
+              {admins.filter((a) => a.role === 'Super Admin' || a.role === 'SuperBoss').length} <span className="text-xs font-normal text-slate-500">accounts</span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-amber-950/80 text-amber-500 border border-amber-800/40">
+          <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
             <Lock size={22} />
           </div>
         </div>
 
-        <div className="bg-[#141722] rounded-2xl p-5 border border-red-900/30 shadow-lg flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-lg flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">HR Admin</span>
-            <div className="text-2xl font-black text-blue-400">
-              {admins.filter((a) => a.role === 'HR Admin').length} <span className="text-xs font-normal text-slate-400">accounts</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">HR Admin</span>
+            <div className="text-2xl font-black text-blue-600">
+              {admins.filter((a) => a.role === 'HR Admin').length} <span className="text-xs font-normal text-slate-500">accounts</span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-blue-950/80 text-blue-400 border border-blue-800/40">
+          <div className="p-3 rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
             <User size={22} />
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-[#141722] rounded-2xl p-4 border border-red-900/30 shadow-lg flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-lg flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="relative w-full md:w-80">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search ID, name, email, phone..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-300">
-            <Filter size={14} className="text-red-400" />
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700">
+            <Filter size={14} className="text-violet-600" />
             <span>Role:</span>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-transparent font-bold text-[#EF4444] outline-none cursor-pointer"
+              className="bg-transparent font-bold text-violet-700 outline-none cursor-pointer"
             >
               <option value="">All</option>
               <option value="Super Admin">Super Admin</option>
@@ -433,13 +433,13 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
             </select>
           </div>
 
-          <div className="flex items-center gap-2 bg-[#0B0D13] border border-red-900/40 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-300">
-            <Filter size={14} className="text-red-400" />
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700">
+            <Filter size={14} className="text-violet-600" />
             <span>Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-transparent font-bold text-[#EF4444] outline-none cursor-pointer"
+              className="bg-transparent font-bold text-violet-700 outline-none cursor-pointer"
             >
               <option value="">All</option>
               <option value="Active">Active</option>
@@ -453,7 +453,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
         {isSuperAdmin && (
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto"
+            className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto"
           >
             <UserPlus size={16} />
             <span>Create New Admin Account</span>
@@ -462,11 +462,11 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
       </div>
 
       {/* Admin Table (No department column) */}
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
                 <th className="py-4 px-6">ID</th>
                 <th className="py-4 px-6">First Name</th>
                 <th className="py-4 px-6">Last Name</th>
@@ -477,7 +477,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                 <th className="py-4 px-6 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-slate-500 font-mono">
@@ -494,21 +494,21 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                 filteredAdmins.map((adm) => {
                   const isPending = adm.status === 'Pending Password' || adm.status === 'Pending' || adm.status === 'รอตั้งรหัสผ่าน';
                   return (
-                    <tr key={adm.id} className="hover:bg-red-950/20 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs font-bold text-[#EF4444]">{adm.code || adm.id}</td>
+                    <tr key={adm.id} className="hover:bg-violet-50 transition-colors">
+                      <td className="py-4 px-6 font-mono text-xs font-bold text-violet-700">{adm.code || adm.id}</td>
 
-                      <td className="py-4 px-6 font-bold text-white">{splitName(adm.name).firstName || '-'}</td>
+                      <td className="py-4 px-6 font-bold text-slate-900">{splitName(adm.name).firstName || '-'}</td>
 
-                      <td className="py-4 px-6 font-bold text-white">{splitName(adm.name).lastName || '-'}</td>
+                      <td className="py-4 px-6 font-bold text-slate-900">{splitName(adm.name).lastName || '-'}</td>
 
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2">
-                          <Mail size={14} className="text-[#EF4444]" />
-                          <span className="font-mono text-slate-200 text-xs">{adm.email || adm.username}</span>
+                          <Mail size={14} className="text-violet-700" />
+                          <span className="font-mono text-slate-800 text-xs">{adm.email || adm.username}</span>
                         </div>
                       </td>
 
-                      <td className="py-4 px-6 text-xs text-slate-300">
+                      <td className="py-4 px-6 text-xs text-slate-700">
                         <div className="flex items-center gap-1.5">
                           <Phone size={12} className="text-slate-500" />
                           <span>{adm.phone && adm.phone !== '-' ? adm.phone : '-'}</span>
@@ -520,8 +520,8 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
                             adm.role === 'Super Admin' || adm.role === 'SuperBoss'
-                              ? 'bg-amber-950 text-amber-300 border border-amber-600/60 shadow-sm'
-                              : 'bg-blue-950 text-blue-300 border border-blue-600/60 shadow-sm'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-300 shadow-sm'
+                              : 'bg-blue-50 text-blue-700 border border-blue-300 shadow-sm'
                           }`}
                         >
                           {adm.role === 'Super Admin' || adm.role === 'SuperBoss' ? '👑 Super Admin' : '🛡️ HR Admin'}
@@ -537,10 +537,10 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                             disabled={!isSuperAdmin || isPending}
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all border ${
                               adm.status === 'Active'
-                                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700/50 hover:bg-emerald-900 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
                                 : isPending
-                                ? 'bg-amber-950/80 text-amber-300 border border-amber-700/50 cursor-default'
-                                : 'bg-red-950/80 text-red-400 border-red-700/50 hover:bg-red-900 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-default'
+                                : 'bg-violet-100 text-violet-600 border-violet-300 hover:bg-violet-200 cursor-pointer shadow-sm hover:scale-105 active:scale-95'
                             }`}
                             title={isPending ? 'Waiting for the administrator to set a password' : isSuperAdmin ? 'Click to toggle Active / Inactive' : adm.status}
                           >
@@ -550,7 +550,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                                   ? 'bg-emerald-400 animate-pulse'
                                   : isPending
                                   ? 'bg-amber-400'
-                                  : 'bg-red-500'
+                                  : 'bg-violet-500'
                               }`}
                             />
                             <span>{adm.status === 'Active' ? 'Active ' : isPending ? 'Pending Password' : 'Inactive '}</span>
@@ -561,7 +561,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                             <button
                               onClick={() => handleResendInvite(adm)}
                               disabled={resendingId === adm.id}
-                              className="text-[11px] font-bold bg-amber-900/60 hover:bg-amber-800 text-amber-200 px-2.5 py-1 rounded-lg border border-amber-600/50 transition-colors flex items-center gap-1 shadow-sm"
+                              className="text-[11px] font-bold bg-amber-100 hover:bg-amber-800 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-300 transition-colors flex items-center gap-1 shadow-sm"
                               title="Resend password setup email"
                             >
                               <Send size={11} className={resendingId === adm.id ? 'animate-spin' : ''} />
@@ -578,21 +578,21 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                             <>
                               <button
                                 onClick={() => openEditModal(adm)}
-                                className="p-1.5 text-slate-400 hover:text-white hover:bg-red-950/40 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-violet-50 rounded-lg transition-colors"
                                 title="Edit Admin"
                               >
                                 <Edit size={16} />
                               </button>
                               <button
                                 onClick={() => openResetPasswordModal(adm)}
-                                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/40 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                 title="Send password reset link by email"
                               >
                                 <KeyRound size={16} />
                               </button>
                               <button
                                 onClick={() => openDeleteModal(adm)}
-                                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors"
+                                className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
                                 title="Delete Admin account"
                               >
                                 <Trash2 size={16} />
@@ -614,21 +614,21 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* CREATE ADMIN MODAL (No department, email is username, no password input) */}
       {showAddModal && isSuperAdmin && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-900/30">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-slate-200 text-slate-900 my-8">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+                <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
                   <UserPlus size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Create New Admin Account</h3>
-                  <p className="text-xs text-slate-400">A link to set the Web Admin password will be sent to the email</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Create New Admin Account</h3>
+                  <p className="text-xs text-slate-500">A link to set the Web Admin password will be sent to the email</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={20} />
               </button>
@@ -639,33 +639,33 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
             <form onSubmit={handleAddSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">First Name *</label>
                   <input
                     type="text"
                     name="firstName"
                     placeholder="e.g. John"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Last Name *</label>
                   <input
                     type="text"
                     name="lastName"
                     placeholder="e.g. Smith"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Email *
                   </label>
                   <input
@@ -674,20 +674,20 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                     placeholder="e.g. admin@wellx989.com"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Role *
                   </label>
                   <select
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all cursor-pointer"
                   >
                     <option value="Super Admin">👑 Super Admin</option>
                     <option value="HR Admin">🛡️ HR Admin</option>
@@ -695,7 +695,7 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Phone Number
                   </label>
                   <input
@@ -704,22 +704,22 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                     placeholder="081-234-5678"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide flex items-center gap-2"
                 >
                   <Send size={15} />
                   <span>Save and send ADMIN invitation email</span>
@@ -732,21 +732,21 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* EDIT ADMIN MODAL (No department, only 2 roles) */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-900/30">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-slate-200 text-slate-900 my-8">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+                <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
                   <Edit size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Edit Admin</h3>
-                  <p className="text-xs text-slate-400">{formData.firstName} {formData.lastName} ({formData.email})</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Edit Admin</h3>
+                  <p className="text-xs text-slate-500">{formData.firstName} {formData.lastName} ({formData.email})</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={20} />
               </button>
@@ -755,48 +755,48 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">First Name *</label>
                   <input
                     type="text"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Last Name *</label>
                   <input
                     type="text"
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Email (Username) *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email (Username) *</label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Role *</label>
                   <select
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all cursor-pointer"
                   >
                     <option value="Super Admin">👑 Super Admin</option>
                     <option value="HR Admin">🛡️ HR Admin</option>
@@ -804,12 +804,12 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Status</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all cursor-pointer"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive </option>
@@ -820,28 +820,28 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Phone Number</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Phone Number</label>
                   <input
                     type="text"
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
+                  className="px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide"
                 >
                   Save Changes
                 </button>
@@ -853,38 +853,38 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* RESET PASSWORD MODAL */}
       {showResetPasswordModal && selectedAdmin && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100">
-            <div className="flex justify-between items-center mb-5 pb-4 border-b border-red-900/30">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900">
+            <div className="flex justify-between items-center mb-5 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-950 text-amber-500 border border-amber-800/40">
+                <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
                   <KeyRound size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Reset Password (sent by email)</h3>
-                  <p className="text-xs text-slate-400">{selectedAdmin.name} ({selectedAdmin.email || selectedAdmin.username})</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Reset Password (sent by email)</h3>
+                  <p className="text-xs text-slate-500">{selectedAdmin.name} ({selectedAdmin.email || selectedAdmin.username})</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowResetPasswordModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleResetPasswordSubmit} className="flex flex-col gap-4">
-              <p className="text-sm text-slate-300 leading-relaxed bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
+              <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 A password reset link will be sent to the email
-                <span className="font-bold text-white font-mono"> {selectedAdmin.email || selectedAdmin.username} </span>
+                <span className="font-bold text-slate-900 font-mono"> {selectedAdmin.email || selectedAdmin.username} </span>
                 The link is valid for 15 minutes, and the current password keeps working until the administrator sets a new one successfully
               </p>
 
-              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowResetPasswordModal(false)}
-                  className="px-5 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm"
+                  className="px-5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-sm"
                 >
                   Cancel
                 </button>
@@ -904,32 +904,32 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* DELETE ADMIN MODAL */}
       {showDeleteModal && selectedAdmin && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-14 h-14 rounded-2xl bg-red-950/90 text-red-500 border border-red-700/60 flex items-center justify-center mb-5 shadow-lg shadow-red-950/50">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 border border-violet-300 flex items-center justify-center mb-5 shadow-lg shadow-slate-300">
               <Trash2 size={28} />
             </div>
 
-            <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-wide mb-2">
               Confirm deleting the administrator account ({selectedAdmin?.name})?
             </h3>
 
-            <p className="text-sm text-slate-300 leading-relaxed mb-7 bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
-              You are about to delete the administrator account <span className="font-bold text-white">{selectedAdmin?.name}</span> ({selectedAdmin?.email || selectedAdmin?.username}) from the system
+            <p className="text-sm text-slate-700 leading-relaxed mb-7 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              You are about to delete the administrator account <span className="font-bold text-slate-900">{selectedAdmin?.name}</span> ({selectedAdmin?.email || selectedAdmin?.username}) from the system
             </p>
 
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1A1D2C] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteSubmit}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-danger-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
               >
                 <Trash2 size={16} />
                 <span>Confirm Delete</span>
@@ -941,63 +941,63 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
 
       {/* STATUS TOGGLE CONFIRMATION MODAL FOR ADMIN */}
       {statusToggleTarget && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[70] bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
             {/* Header Icon & Title */}
-            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-red-900/30">
+            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-slate-200">
               <div
                 className={`p-3 rounded-2xl border flex-shrink-0 ${
                   statusToggleTarget.nextStatus === 'Inactive'
-                    ? 'bg-amber-950/90 text-amber-400 border-amber-700/60 shadow-lg shadow-amber-950/40'
-                    : 'bg-emerald-950/90 text-emerald-400 border-emerald-700/60 shadow-lg shadow-emerald-950/40'
+                    ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-lg shadow-slate-300'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-lg shadow-slate-300'
                 }`}
               >
                 <ShieldCheck size={28} />
               </div>
               <div>
-                <h3 className="text-lg font-black text-white uppercase tracking-wide">
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">
                   {statusToggleTarget.nextStatus === 'Inactive'
                     ? 'Confirm suspending Admin access (Inactive)?'
                     : 'Confirm enabling Admin access (Active)?'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Change Web Admin access status
                 </p>
               </div>
             </div>
 
             {/* Admin Info Card */}
-            <div className="bg-[#0B0D13] rounded-2xl p-4 border border-red-900/30 mb-5 space-y-3">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-5 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-white text-sm truncate">
+                  <div className="font-bold text-slate-900 text-sm truncate">
                     {statusToggleTarget.adm.name}
                   </div>
-                  <div className="text-xs text-slate-400 font-mono">
+                  <div className="text-xs text-slate-500 font-mono">
                     {statusToggleTarget.adm.email || statusToggleTarget.adm.username} • {statusToggleTarget.adm.role}
                   </div>
                 </div>
               </div>
 
               {/* Status Transition Display */}
-              <div className="flex items-center justify-between pt-2 border-t border-red-900/20 text-xs font-bold">
-                <span className="text-slate-400">Current status:</span>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs font-bold">
+                <span className="text-slate-500">Current status:</span>
                 <span
                   className={`px-2.5 py-0.5 rounded-full ${
                     statusToggleTarget.adm.status === 'Active'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-700/50'
-                      : 'bg-red-950 text-red-400 border border-red-700/50'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'bg-violet-100 text-violet-600 border border-violet-300'
                   }`}
                 >
                   ● {statusToggleTarget.adm.status}
                 </span>
                 <span className="text-slate-500">➜</span>
-                <span className="text-slate-400">New status:</span>
+                <span className="text-slate-500">New status:</span>
                 <span
                   className={`px-2.5 py-0.5 rounded-full ${
                     statusToggleTarget.nextStatus === 'Active'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-sm'
-                      : 'bg-red-950 text-red-400 border border-red-500 shadow-sm'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-500 shadow-sm'
+                      : 'bg-violet-100 text-violet-600 border border-violet-500 shadow-sm'
                   }`}
                 >
                   ● {statusToggleTarget.nextStatus}
@@ -1006,19 +1006,19 @@ export default function AdminManagement({ isSuperAdmin: propIsSuperAdmin, curren
             </div>
 
             {/* Warning / Notice Text */}
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+            <p className="text-xs text-slate-700 leading-relaxed mb-6">
               {statusToggleTarget.nextStatus === 'Inactive'
                 ? '⚠️ Once set to Inactive, this administrator will temporarily be unable to log in to Web Admin'
                 : '✅ Once set to Active, this administrator will be able to log in to Web Admin normally'}
             </p>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-900/30">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 disabled={isUpdatingStatus}
                 onClick={() => setStatusToggleTarget(null)}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1E293B] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all"
               >
                 Cancel
               </button>

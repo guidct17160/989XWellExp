@@ -28,7 +28,6 @@ export default function RequestStatusScreen({ navigation }) {
   const [leaveState, setLeaveState] = useState(leaveStorage.getState());
   const [refreshing, setRefreshing] = useState(false);
 
-  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'leave' | 'correction'
   const [activeStatus, setActiveStatus] = useState('all'); // 'all' | 'รออนุมัติ' | 'อนุมัติ' | 'ไม่อนุมัติ'
   const [activeMonth, setActiveMonth] = useState(new Date().getMonth());
   const [activeYear, setActiveYear] = useState(new Date().getFullYear());
@@ -108,11 +107,6 @@ export default function RequestStatusScreen({ navigation }) {
   };
 
   const filteredList = combinedList.filter(item => {
-    // Category filter
-    if (activeCategory !== 'all' && item.categoryKey !== activeCategory) {
-      return false;
-    }
-
     // Status filter
     if (!matchesStatus(item.status, activeStatus)) {
       return false;
@@ -123,16 +117,6 @@ export default function RequestStatusScreen({ navigation }) {
     return month === activeMonth && year === activeYear;
   });
 
-  const monthList = combinedList.filter(item => {
-    const { month, year } = parseItemDate(item);
-    return month === activeMonth && year === activeYear;
-  });
-
-  const getCategoryCount = (catKey) => {
-    if (catKey === 'all') return monthList.length;
-    return monthList.filter(item => item.categoryKey === catKey).length;
-  };
-
   return (
     <SafeAreaView testID="screen-request-status" className="flex-1 bg-white" style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
@@ -141,60 +125,6 @@ export default function RequestStatusScreen({ navigation }) {
       <TopNavbar navigation={navigation} title="สถานะคำขอ" showBack />
 
       <View style={styles.container} className="flex-1 bg-slate-50">
-        {/* Senior Mobile App Category Chips Bar */}
-        <View className="bg-white border-b border-slate-100/80 shadow-xs">
-          <ScrollView
-            testID="request-status-category-filter"
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryScroll}
-            contentContainerStyle={styles.categoryContent}
-          >
-            {[
-              { key: 'all', label: 'ทั้งหมด', icon: 'grid-outline' },
-              { key: 'leave', label: 'ลางาน', icon: 'calendar-outline' },
-              { key: 'correction', label: 'ปรับปรุงเวลา', icon: 'time-outline' },
-            ].map(cat => {
-              const isActive = activeCategory === cat.key;
-              const count = getCategoryCount(cat.key);
-              return (
-                <TouchableOpacity
-                  testID={`request-status-cat-${cat.key}`}
-                  key={cat.key}
-                  style={[
-                    styles.categoryChip,
-                    isActive && styles.categoryChipActive
-                  ]}
-                  onPress={() => setActiveCategory(cat.key)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={cat.icon}
-                    size={16}
-                    color={isActive ? '#FFFFFF' : colors.primary}
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      isActive && styles.categoryChipTextActive
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-
-                  {/* Badge Count Bubble */}
-                  <View style={isActive ? styles.badgeCountActive : styles.badgeCountInactive}>
-                    <Text style={isActive ? styles.badgeCountTextActive : styles.badgeCountTextInactive}>
-                      {count}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
         {/* Status Sub-tabs (iOS-style Segmented Controller) */}
         <View testID="request-status-status-filter" style={styles.statusTabRow}>
           {[
@@ -239,7 +169,7 @@ export default function RequestStatusScreen({ navigation }) {
             <Ionicons name="chevron-back" size={18} color={colors.primary} />
           </TouchableOpacity>
           
-          <View className="flex-row items-center">
+          <View style={styles.monthLabel}>
             <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
             <Text style={styles.navMonthText}>{thaiMonths[activeMonth]} {activeYear + 543}</Text>
           </View>
@@ -258,7 +188,7 @@ export default function RequestStatusScreen({ navigation }) {
         <ScrollView
           testID="request-status-list"
           style={styles.scrollView}
-          className="flex-1 bg-slate-50"
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -405,75 +335,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  categoryScroll: {
-    maxHeight: 58,
-    backgroundColor: '#FFFFFF',
-  },
-  categoryContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginRight: 10,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  categoryChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  badgeCountActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 7,
-    paddingVertical: 1.5,
-    borderRadius: 12,
-    marginLeft: 6,
-  },
-  badgeCountInactive: {
-    backgroundColor: '#E2E8F0',
-    paddingHorizontal: 7,
-    paddingVertical: 1.5,
-    borderRadius: 12,
-    marginLeft: 6,
-  },
-  badgeCountTextActive: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  badgeCountTextInactive: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-  },
   statusTabRow: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
     borderRadius: 16,
     padding: 4,
     marginHorizontal: 16,
-    marginVertical: 10,
+    marginTop: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -533,8 +402,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.title,
   },
+  monthLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollView: {
     flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -556,8 +436,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardTitleRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    marginRight: 8,
   },
   categoryBadge: {
     paddingHorizontal: 8,

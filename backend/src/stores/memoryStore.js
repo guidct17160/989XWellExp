@@ -33,6 +33,7 @@ const memoryStore = {
     workTimeEnd: '17:00',
     workHoursPerDay: 9,
     lateThresholdTime: '09:00',
+    onTimePoints: 0,
     lateGraceMinutes: 60,
     enableBiometrics: true,
     enableGPSAttendance: true,

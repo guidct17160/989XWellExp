@@ -741,7 +741,11 @@ module.exports = function createLeaveStore(storeRef) {
     },
 
     // APPROVAL HISTORY (Real DB)
-    getApprovalHistory: async () => {
+    // viewer = { id, name } of the signed-in approver (from the token)
+    getApprovalHistory: async (viewer = {}) => {
+      const viewerId = viewer.id || null;
+      const viewerName = String(viewer.name || '').trim();
+      if (!viewerId) return [];
       const employees = await (storeRef ? storeRef.getEmployees() : []);
       const admins = await (storeRef ? storeRef.getAdmins() : []);
       const allUsers = [...employees, ...admins];
@@ -778,9 +782,11 @@ module.exports = function createLeaveStore(storeRef) {
               FROM leave_requests l
               LEFT JOIN employees e ON l.employee_id = e.id OR l.employee_id = e.code OR l.employee_id = e.email
               LEFT JOIN admins a ON l.employee_id = a.id OR l.employee_id = a.code OR l.employee_id = a.email
-              WHERE l.status NOT LIKE 'รออนุมัติ%'
+              WHERE (l.decided_by = $1 OR l.level1_by = $1
+                     OR (l.decided_by IS NULL AND l.level1_by IS NULL AND $2 <> '' AND l.approver = $2))
+                AND (l.status NOT LIKE 'รออนุมัติ%' OR l.status LIKE 'รออนุมัติระดับ 2%')
               ORDER BY l.created_at DESC
-            `),
+            `, [viewerId, viewerName]),
             db.query(`
               SELECT tc.*, 
                      COALESCE(e.name, a.name, tc.employee_id) as "employeeName", 
@@ -790,9 +796,11 @@ module.exports = function createLeaveStore(storeRef) {
               FROM time_corrections tc
               LEFT JOIN employees e ON tc.employee_id = e.id OR tc.employee_id = e.code OR tc.employee_id = e.email
               LEFT JOIN admins a ON tc.employee_id = a.id OR tc.employee_id = a.code OR tc.employee_id = a.email
-              WHERE tc.status NOT LIKE 'รออนุมัติ%'
+              WHERE (tc.decided_by = $1 OR tc.level1_by = $1
+                     OR (tc.decided_by IS NULL AND tc.level1_by IS NULL AND $2 <> '' AND tc.approver = $2))
+                AND (tc.status NOT LIKE 'รออนุมัติ%' OR tc.status LIKE 'รออนุมัติระดับ 2%')
               ORDER BY tc.created_at DESC
-            `),
+            `, [viewerId, viewerName]),
           ]);
 
           if (leavesRes.rows) {
@@ -812,6 +820,7 @@ module.exports = function createLeaveStore(storeRef) {
               status: r.status,
               approverName: r.approver || 'ผู้จัดการ',
               remark: r.remark,
+              rejectReason: r.status === 'ไม่อนุมัติ' && r.remark && r.remark !== 'ไม่อนุมัติคำขอ' ? r.remark : null, // the default text is not a reason
               actionTime: r.created_at ? new Date(r.created_at).toLocaleString('th-TH') : '-',
               createdAt: r.created_at,
             })));
@@ -826,11 +835,17 @@ module.exports = function createLeaveStore(storeRef) {
               employeeCode: r.employeeCode,
               department: r.department,
               date: r.date_iso,
+              dateIso: r.date_iso,
+              oldCheckIn: r.old_check_in,
+              newCheckIn: r.new_check_in,
+              oldCheckOut: r.old_check_out,
+              newCheckOut: r.new_check_out,
               reason: r.reason,
               details: `เข้า: ${r.new_check_in || '-'} / ออก: ${r.new_check_out || '-'}`,
               status: r.status,
               approverName: r.approver || 'ผู้จัดการ',
               remark: r.remark,
+              rejectReason: r.status === 'ไม่อนุมัติ' && r.remark && r.remark !== 'ไม่อนุมัติคำขอ' ? r.remark : null, // the default text is not a reason
               actionTime: r.created_at ? new Date(r.created_at).toLocaleString('th-TH') : '-',
               createdAt: r.created_at,
             })));
@@ -957,34 +972,11 @@ module.exports = function createLeaveStore(storeRef) {
       const typeLabel = rt === 'leave' ? `ใบลา${target.leaveType ? ` (${target.leaveType})` : ''}` : 'คำขอปรับปรุงเวลา';
 
       if (isApproveAction) {
-        if (!isApproverSuperboss) {
-          // Level 1 (Boss) approval -> forward to Level 2 (Superboss)
-          await updatePg('status = $1, approver = $2', ['รออนุมัติระดับ 2 (Superboss)', approver]);
-          syncMemory({ approvalLevel: 2, status: 'รออนุมัติระดับ 2 (Superboss)', approverLevel1: approver });
-
-          const superbossUser =
-            (target.superbossId && findUser(target.superbossId)) ||
-            allUsers.find((u) => u && SUPER_ROLES.includes(normRole(u.role)) && u.id !== target.employeeId) ||
-            admins[0] ||
-            null;
-          if (superbossUser) {
-            sendNotif({
-              employeeId: superbossUser.id,
-              title: `📢 ${typeLabel} ของ ${(requester && requester.name) || target.employeeName || 'พนักงาน'} ผ่านการอนุมัติระดับ 1 แล้ว`,
-              message: `คำขอผ่าน Boss (${approver}) เรียบร้อยแล้ว รอ Superboss พิจารณาอนุมัติระดับ 2`,
-              type: 'info',
-            });
-          }
-
-          return {
-            id,
-            status: 'รออนุมัติระดับ 2 (Superboss)',
-            message: 'อนุมัติระดับ 1 (Boss) เรียบร้อยแล้ว ส่งต่อไปยังระดับ 2 (Superboss)',
-          };
-        }
-
-        // Level 2 (Superboss) = final approval
-        await updatePg('status = $1, approver = $2, remark = $3', ['อนุมัติแล้ว', approver, remark || 'อนุมัติสมบูรณ์']);
+        // An approval is always FINAL: a Boss approves an Employee's request of the same department straight to
+        // "อนุมัติแล้ว" (the authorization above already refuses a Boss anything else: his own request, another
+        // department, a request that is at level 2). Requests of a Boss go to the SuperBoss, who decides the same way.
+        // Final approval
+        await updatePg('status = $1, approver = $2, remark = $3, decided_by = $4', ['อนุมัติแล้ว', approver, remark || 'อนุมัติสมบูรณ์', approverId || null]);
         syncMemory({ status: 'อนุมัติแล้ว', approver, remark: remark || 'อนุมัติสมบูรณ์' });
 
         // Approved Time Correction -> apply it to the attendance record (create it if the day has none)
@@ -1064,7 +1056,7 @@ module.exports = function createLeaveStore(storeRef) {
       }
 
       // Reject Action (allowed at either level)
-      await updatePg('status = $1, approver = $2, remark = $3', ['ไม่อนุมัติ', approver, remark || 'ไม่อนุมัติคำขอ']);
+      await updatePg('status = $1, approver = $2, remark = $3, decided_by = $4', ['ไม่อนุมัติ', approver, remark || 'ไม่อนุมัติคำขอ', approverId || null]);
       syncMemory({ status: 'ไม่อนุมัติ', approver, remark: remark || 'ไม่อนุมัติคำขอ' });
 
       if (target.employeeId) {

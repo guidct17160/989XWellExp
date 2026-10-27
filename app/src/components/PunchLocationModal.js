@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,12 +27,14 @@ const formatDistance = (m) => {
  * 1) "กำลังค้นหาตำแหน่ง..." while the GPS position and the allowed work locations are loaded
  * 2) a map plus a bottom sheet listing the work locations, nearest first; only locations inside their
  *    radius can be chosen (the server checks the distance again)
- * When no work location has been set up by an Admin, it closes straight away with no location (unrestricted punch).
+ * There is no confirm button: a punch is only possible by choosing a work location the employee is inside of.
+ * When no work location has been set up (or none is assigned / nearby) the employee cannot clock in / out.
  *
- * onSelect({ locationId, locationName, latitude, longitude }) | onSelect({}) when unrestricted
+ * onSelect({ locationId, locationName, latitude, longitude })
  */
 export default function PunchLocationModal({ visible, kind, onClose, onSelect }) {
   const [phase, setPhase] = useState('searching'); // searching | choose | error
+  const [canRetry, setCanRetry] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [position, setPosition] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -44,6 +46,7 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
   const load = useCallback(async () => {
     setPhase('searching');
     setErrorMsg('');
+    setCanRetry(true);
     try {
       const pos = await attendanceStorage.getPosition();
       if (!pos) {
@@ -51,7 +54,10 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
       }
       const result = await attendanceStorage.fetchWorkLocations(pos);
       if (!result.required) {
-        onSelectRef.current({}); // no work location configured yet: unrestricted punch, as before
+        // HR has not set up any work location yet, so nobody can punch (the server refuses too)
+        setErrorMsg('ยังไม่ได้กำหนดสถานที่ทำงาน ไม่สามารถลงเวลาได้ กรุณาติดต่อ HR');
+        setCanRetry(false);
+        setPhase('error');
         return;
       }
       setPosition(pos);
@@ -63,8 +69,15 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
     }
   }, []);
 
+  // every time the sheet opens it looks for the position again; the previous result is dropped when it closes
   useEffect(() => {
-    if (visible) load();
+    if (visible) {
+      load();
+    } else {
+      setPhase('searching');
+      setPosition(null);
+      setLocations([]);
+    }
   }, [visible, load]);
 
   useEffect(() => {
@@ -82,6 +95,9 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
     onSelectRef.current({ locationId: loc.id, locationName: loc.name, latitude: position.latitude, longitude: position.longitude });
   };
 
+  // Only the places the employee is inside of are shown (list and map). Locations that are too far are never listed.
+  const nearby = useMemo(() => locations.filter((l) => l.inRange), [locations]);
+
   const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
   const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] });
 
@@ -89,7 +105,7 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       {phase === 'choose' ? (
         <View style={styles.flex}>
-          <PunchMap position={position} locations={locations} />
+          <PunchMap position={position} locations={nearby} />
 
           <TouchableOpacity testID="punch-location-close" style={styles.mapClose} onPress={onClose}>
             <Ionicons name="close" size={22} color="#FFFFFF" />
@@ -105,25 +121,24 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
 
             {locations.length === 0 ? (
               <Text style={styles.emptyText}>ยังไม่มีสถานที่ทำงานที่คุณลงเวลาได้ กรุณาติดต่อ HR</Text>
+            ) : nearby.length === 0 ? (
+              <Text style={styles.emptyText}>ไม่มีสถานที่ใกล้เคียง ไม่สามารถลงเวลาได้</Text>
             ) : (
               <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-                {locations.map((l) => (
+                {nearby.map((l) => (
                   <TouchableOpacity
                     key={l.id}
                     testID={`punch-location-${l.id}`}
-                    style={[styles.item, !l.inRange && styles.itemDisabled]}
-                    activeOpacity={l.inRange ? 0.7 : 1}
+                    style={styles.item}
+                    activeOpacity={0.7}
                     onPress={() => choose(l)}
                   >
-                    <Ionicons name="location-outline" size={24} color={l.inRange ? '#111827' : '#9CA3AF'} style={{ marginRight: 14 }} />
+                    <Ionicons name="location-outline" size={24} color="#111827" style={{ marginRight: 14 }} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.itemName, !l.inRange && { color: '#9CA3AF' }]} numberOfLines={1}>{l.name}</Text>
-                      <Text style={styles.itemDistance}>
-                        {formatDistance(l.distanceM)}
-                        {l.inRange ? '' : `  •  อยู่นอกพื้นที่ (ต้องอยู่ภายใน ${l.radiusM} ม.)`}
-                      </Text>
+                      <Text style={styles.itemName} numberOfLines={1}>{l.name}</Text>
+                      <Text style={styles.itemDistance}>{formatDistance(l.distanceM)}</Text>
                     </View>
-                    {l.inRange && <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />}
+                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -156,9 +171,11 @@ export default function PunchLocationModal({ visible, kind, onClose, onSelect })
               <>
                 <Ionicons name="warning-outline" size={64} color="#FFFFFF" />
                 <Text style={styles.errorText}>{errorMsg}</Text>
-                <TouchableOpacity testID="punch-location-retry" style={styles.retryBtn} onPress={load}>
-                  <Text style={styles.retryText}>ลองอีกครั้ง</Text>
-                </TouchableOpacity>
+                {canRetry && (
+                  <TouchableOpacity testID="punch-location-retry" style={styles.retryBtn} onPress={load}>
+                    <Text style={styles.retryText}>ลองอีกครั้ง</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>

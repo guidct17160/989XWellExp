@@ -135,10 +135,13 @@ exports.getMyWorkLocations = async (req, res) => {
   }
 };
 
-// Used by clock-in / clock-out. Returns the verified location, or null while no location is configured.
+// Used by clock-in / clock-out. Returns the verified location. Punching needs a work location the employee is inside of,
+// so while HR has not set up any location nobody can clock in / out.
 // Distance is recomputed here from the coordinates the phone sent, never trusted from the app.
 exports.verifyPunchLocation = async (empId, { locationId, latitude, longitude }) => {
-  if ((await dbStore.countActiveWorkLocations()) === 0) return null;
+  if ((await dbStore.countActiveWorkLocations()) === 0) {
+    throw httpError(403, 'ยังไม่ได้กำหนดสถานที่ทำงาน ไม่สามารถลงเวลาได้ กรุณาติดต่อ HR');
+  }
 
   const lat = Number(latitude);
   const lng = Number(longitude);

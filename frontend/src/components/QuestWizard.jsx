@@ -19,12 +19,12 @@ import DatePicker from './DatePicker';
 import TimePicker from './TimePicker';
 
 const INPUT =
-  'w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed';
-const LABEL = 'block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1';
+  'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed';
+const LABEL = 'block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1';
 const BTN_PRIMARY =
-  'px-5 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-red-600/30 uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+  'px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs shadow-lg shadow-violet-600/30 uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 const BTN_GHOST =
-  'px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs uppercase tracking-wide transition-colors cursor-pointer';
+  'px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-xs uppercase tracking-wide transition-colors cursor-pointer';
 
 const STEPS = [
   { key: 'settings', label: 'Quest Settings', icon: Settings },
@@ -194,8 +194,8 @@ const validateStep = (step, f) => {
 
 function Radio({ checked, onChange, label, disabled }) {
   return (
-    <label className={`inline-flex items-center gap-2 text-sm font-medium text-slate-200 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
-      <input type="radio" checked={checked} onChange={onChange} disabled={disabled} className="w-4 h-4 accent-red-500" />
+    <label className={`inline-flex items-center gap-2 text-sm font-medium text-slate-800 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
+      <input type="radio" checked={checked} onChange={onChange} disabled={disabled} className="w-4 h-4 accent-violet-500" />
       <span>{label}</span>
     </label>
   );
@@ -203,7 +203,7 @@ function Radio({ checked, onChange, label, disabled }) {
 
 function Stepper({ step, setStep, maxStep }) {
   return (
-    <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg px-4 py-4 flex flex-wrap items-center justify-center gap-2 md:gap-4">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-lg px-4 py-4 flex flex-wrap items-center justify-center gap-2 md:gap-4">
       {STEPS.map((s, i) => {
         const Icon = s.icon;
         const active = i === step;
@@ -218,17 +218,17 @@ function Stepper({ step, setStep, maxStep }) {
             >
               <span
                 className={`w-10 h-10 rounded-full flex items-center justify-center border ${
-                  active ? 'bg-[#DC2626] border-red-400 text-white' : reachable ? 'bg-red-950/60 border-red-700/60 text-red-300' : 'bg-[#0B0D13] border-red-900/40 text-slate-600'
+                  active ? 'bg-[#7C3AED] border-violet-400 text-white' : reachable ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-slate-50 border-slate-200 text-slate-400'
                 }`}
               >
                 <Icon size={18} />
               </span>
               <span className="text-left">
-                <span className={`block text-[10px] font-bold uppercase tracking-wider ${active ? 'text-red-400' : 'text-slate-500'}`}>Step {i + 1}</span>
-                <span className={`block text-sm font-extrabold ${active ? 'text-white' : reachable ? 'text-slate-300' : 'text-slate-600'}`}>{s.label}</span>
+                <span className={`block text-[10px] font-bold uppercase tracking-wider ${active ? 'text-violet-600' : 'text-slate-500'}`}>Step {i + 1}</span>
+                <span className={`block text-sm font-extrabold ${active ? 'text-slate-900' : reachable ? 'text-slate-700' : 'text-slate-400'}`}>{s.label}</span>
               </span>
             </button>
-            {i < STEPS.length - 1 && <ChevronRight size={18} className="text-slate-600 hidden sm:block" />}
+            {i < STEPS.length - 1 && <ChevronRight size={18} className="text-slate-400 hidden sm:block" />}
           </React.Fragment>
         );
       })}
@@ -288,26 +288,26 @@ function SettingsStep({ form, set }) {
   return (
     <div className="space-y-6">
       <div>
-        <label className={LABEL}>Code <span className="text-red-400">*</span></label>
+        <label className={LABEL}>Code <span className="text-danger-600">*</span></label>
         <input className={`${INPUT} max-w-xs font-mono uppercase`} value={form.code} maxLength={30} placeholder="e.g. SAFETY-01" onChange={(e) => set({ code: e.target.value.replace(/[^A-Za-z0-9_-]/g, '') })} />
         <p className="text-[11px] text-slate-500 mt-1">Letters, numbers, - and _ only. Each quest needs its own code.</p>
       </div>
 
       <div>
-        <label className={LABEL}>Title <span className="text-red-400">*</span></label>
+        <label className={LABEL}>Title <span className="text-danger-600">*</span></label>
         <input className={INPUT} value={form.title} maxLength={255} onChange={(e) => set({ title: e.target.value })} />
         <p className="text-[11px] text-slate-500 mt-1">Up to 255 characters ({form.title.length}/255)</p>
       </div>
 
       <div>
-        <label className={LABEL}>Description <span className="text-red-400">*</span></label>
+        <label className={LABEL}>Description <span className="text-danger-600">*</span></label>
         <textarea className={`${INPUT} h-28`} value={form.description} maxLength={2000} onChange={(e) => set({ description: e.target.value })} />
         <p className="text-[11px] text-slate-500 mt-1">Up to 2,000 characters ({form.description.length}/2,000)</p>
       </div>
 
  
 
-      <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-x-6 gap-y-5 pt-2 border-t border-red-900/30">
+      <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-x-6 gap-y-5 pt-2 border-t border-slate-200">
         <span className={`${LABEL} md:pt-2.5`}>Send Quest</span>
         <div className="flex flex-wrap gap-6 md:pt-2">
           <Radio checked={form.sendMode === 'now'} onChange={() => set({ sendMode: 'now' })} label="Send Now" />
@@ -316,7 +316,7 @@ function SettingsStep({ form, set }) {
 
         {form.sendMode === 'date' && (
           <>
-            <span className={`${LABEL} md:pt-2.5`}>Start Date / Time <span className="text-red-400">*</span></span>
+            <span className={`${LABEL} md:pt-2.5`}>Start Date / Time <span className="text-danger-600">*</span></span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
               <DatePicker name="startDate" value={form.startDate} onChange={dateChange} placeholder="Select date" />
               <TimePicker name="startTime" value={form.startTime} onChange={(e) => set({ startTime: e.target.value })} />
@@ -324,13 +324,13 @@ function SettingsStep({ form, set }) {
           </>
         )}
 
-        <span className={`${LABEL} md:pt-2.5`}>End Date / Time <span className="text-red-400">*</span></span>
+        <span className={`${LABEL} md:pt-2.5`}>End Date / Time <span className="text-danger-600">*</span></span>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
           <DatePicker name="endDate" value={form.endDate} onChange={dateChange} placeholder="Select date" minDate={form.sendMode === 'date' && form.startDate > localToday() ? form.startDate : 'today'} />
           <TimePicker name="endTime" value={form.endTime} min={form.endDate === localToday() ? localNowTime() : undefined} onChange={(e) => set({ endTime: e.target.value })} />
         </div>
 
-        <span className={`${LABEL} md:pt-2.5`}>Assign To <span className="text-red-400">*</span></span>
+        <span className={`${LABEL} md:pt-2.5`}>Assign To <span className="text-danger-600">*</span></span>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-6 md:pt-2">
             <Radio checked={form.assignType === 'all'} onChange={() => set({ assignType: 'all' })} label="Send to all" />
@@ -351,16 +351,16 @@ function SettingsStep({ form, set }) {
                   onChange={(e) => { setMemberSearch(e.target.value); setPickerOpen(true); }}
                 />
                 {pickerOpen && (
-                  <div className="absolute z-30 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-red-900/40 bg-[#0B0D13] shadow-2xl shadow-black/60">
-                    {employeesState === 'loading' && <div className="px-3.5 py-3 text-xs text-slate-400">Loading employees...</div>}
+                  <div className="absolute z-30 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 shadow-2xl shadow-slate-300">
+                    {employeesState === 'loading' && <div className="px-3.5 py-3 text-xs text-slate-500">Loading employees...</div>}
                     {employeesState === 'error' && (
-                      <div className="px-3.5 py-3 text-xs text-red-300">
+                      <div className="px-3.5 py-3 text-xs text-danger-700">
                         Unable to load employees.{' '}
                         <button type="button" onClick={() => setEmployeesState('idle')} className="underline cursor-pointer">Try again</button>
                       </div>
                     )}
                     {employeesState === 'ready' && matches.length === 0 && (
-                      <div className="px-3.5 py-3 text-xs text-slate-400">
+                      <div className="px-3.5 py-3 text-xs text-slate-500">
                         {available.length === 0 ? 'Every employee is already selected' : 'No employees match your search'}
                       </div>
                     )}
@@ -369,9 +369,9 @@ function SettingsStep({ form, set }) {
                         key={e.id}
                         type="button"
                         onClick={() => addMember(e)}
-                        className="w-full text-left px-3.5 py-2 text-sm text-slate-200 hover:bg-red-950/40 border-b border-red-900/20 last:border-b-0 cursor-pointer flex items-center gap-3"
+                        className="w-full text-left px-3.5 py-2 text-sm text-slate-800 hover:bg-violet-50 border-b border-slate-200 last:border-b-0 cursor-pointer flex items-center gap-3"
                       >
-                        <span className="font-mono text-xs text-red-400 shrink-0">{e.code}</span>
+                        <span className="font-mono text-xs text-violet-600 shrink-0">{e.code}</span>
                         <span className="min-w-0">
                           <span className="block font-bold truncate">{e.name}</span>
                           <span className="block text-[11px] text-slate-500 truncate">{[e.department, e.email].filter(Boolean).join(' • ')}</span>
@@ -383,9 +383,9 @@ function SettingsStep({ form, set }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {form.members.map((m) => (
-                  <span key={m.id} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/60 border border-red-700/50 text-xs font-bold text-slate-200">
+                  <span key={m.id} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-100 border border-violet-300 text-xs font-bold text-slate-800">
                     {m.name}
-                    <button type="button" onClick={() => set({ members: form.members.filter((x) => x.id !== m.id) })} className="text-red-300 hover:text-white cursor-pointer" title="Remove">
+                    <button type="button" onClick={() => set({ members: form.members.filter((x) => x.id !== m.id) })} className="text-danger-700 hover:text-slate-900 cursor-pointer" title="Remove">
                       <X size={12} />
                     </button>
                   </span>
@@ -398,7 +398,7 @@ function SettingsStep({ form, set }) {
         </div>
 
         <span className={`${LABEL} md:pt-2.5`}>Approval</span>
-        <div className="md:pt-2 text-sm text-slate-200">
+        <div className="md:pt-2 text-sm text-slate-800">
           <span className="font-bold">Auto Approve</span>
           <span className="block text-[11px] text-slate-500 mt-0.5">An employee who passes the quest on time is approved automatically and receives the points (and the reward, if any).</span>
         </div>
@@ -421,39 +421,39 @@ function QuizModal({ initial, onSave, onClose }) {
     onSave({ ...data, timeLimitMinutes: mins });
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#141722] border border-red-900/40 rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-red-900/30">
-          <h3 className="text-base font-extrabold text-white uppercase tracking-wide">{initial ? 'Edit Quiz' : 'Add Quiz'}</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white cursor-pointer"><X size={18} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h3 className="text-base font-extrabold text-slate-900 uppercase tracking-wide">{initial ? 'Edit Quiz' : 'Add Quiz'}</h3>
+          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900 cursor-pointer"><X size={18} /></button>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className={LABEL}>Quiz Title <span className="text-red-400">*</span></label>
+            <label className={LABEL}>Quiz Title <span className="text-danger-600">*</span></label>
             <input className={INPUT} value={data.title} onChange={(e) => setData({ ...data, title: e.target.value })} />
           </div>
           <div>
-            <label className={LABEL}>Description <span className="text-red-400">*</span></label>
+            <label className={LABEL}>Description <span className="text-danger-600">*</span></label>
             <textarea className={`${INPUT} h-20`} value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })} />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-300">Time limit</span>
+            <span className="text-sm text-slate-700">Time limit</span>
             <input type="number" min="1" max="600" className={`${INPUT} w-24`} value={data.timeLimitMinutes} onChange={(e) => setData({ ...data, timeLimitMinutes: e.target.value })} />
-            <span className="text-sm text-slate-300">minutes</span>
+            <span className="text-sm text-slate-700">minutes</span>
           </div>
           <div>
-            <label className={LABEL}>Quiz edit type <span className="text-red-400">*</span></label>
+            <label className={LABEL}>Quiz edit type <span className="text-danger-600">*</span></label>
             <div className="flex flex-wrap gap-6">
               <Radio checked={data.editType === 'can_edit'} onChange={() => setData({ ...data, editType: 'can_edit' })} label="Can edit later" />
               <Radio checked={data.editType === 'no_edit'} onChange={() => setData({ ...data, editType: 'no_edit' })} label="No edit allow" />
             </div>
             {data.editType === 'no_edit' && (
-              <p className="text-[11px] text-amber-400 mt-1.5">Once the quest has started, this quiz can no longer be changed.</p>
+              <p className="text-[11px] text-amber-600 mt-1.5">Once the quest has started, this quiz can no longer be changed.</p>
             )}
           </div>
-          {error && <p className="text-xs font-bold text-red-400">{error}</p>}
+          {error && <p className="text-xs font-bold text-danger-600">{error}</p>}
         </div>
-        <div className="flex justify-between px-6 py-4 border-t border-red-900/30">
+        <div className="flex justify-between px-6 py-4 border-t border-slate-200">
           <button type="button" onClick={onClose} className={BTN_GHOST}>Cancel</button>
           <button type="button" onClick={submit} className={BTN_PRIMARY}>Confirm</button>
         </div>
@@ -481,7 +481,7 @@ function QuestionEditor({ q, update }) {
   return (
     <div className="space-y-5">
       <div>
-        <label className={LABEL}>Question type <span className="text-red-400">*</span></label>
+        <label className={LABEL}>Question type <span className="text-danger-600">*</span></label>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {QUESTION_TYPES.map((t) => (
             <Radio key={t.value} checked={q.type === t.value} onChange={() => setType(t.value)} label={t.label} />
@@ -490,7 +490,7 @@ function QuestionEditor({ q, update }) {
       </div>
 
       <div>
-        <label className={LABEL}>Title <span className="text-red-400">*</span></label>
+        <label className={LABEL}>Title <span className="text-danger-600">*</span></label>
         <input className={INPUT} value={q.title} onChange={(e) => update({ title: e.target.value })} />
       </div>
 
@@ -507,19 +507,19 @@ function QuestionEditor({ q, update }) {
       {(
         <div>
           <label className={LABEL}>
-            Choice <span className="text-red-400">*</span>
+            Choice <span className="text-danger-600">*</span>
             <span className="text-slate-500 normal-case font-medium ml-2">
               {q.type === 'multi' ? '(tick every correct answer)' : '(select the correct answer)'}
             </span>
           </label>
-          <div className="rounded-xl bg-[#0B0D13] border border-red-900/30 p-3 space-y-2">
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
             {q.choices.map((c) => (
-              <div key={c.key} className="flex items-center gap-3 rounded-xl bg-[#141722] border border-red-900/30 px-3 py-2.5">
+              <div key={c.key} className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-3 py-2.5">
                 <input
                   type={q.type === 'multi' ? 'checkbox' : 'radio'}
                   checked={c.isCorrect}
                   onChange={() => markCorrect(c.key)}
-                  className="w-4 h-4 accent-red-500 cursor-pointer"
+                  className="w-4 h-4 accent-violet-500 cursor-pointer"
                   title="Correct answer"
                 />
                 <input
@@ -533,7 +533,7 @@ function QuestionEditor({ q, update }) {
                     type="button"
                     disabled={q.choices.length <= 2}
                     onClick={() => update({ choices: q.choices.filter((x) => x.key !== c.key) })}
-                    className="text-slate-400 hover:text-red-400 disabled:opacity-30 cursor-pointer"
+                    className="text-slate-500 hover:text-violet-600 disabled:opacity-30 cursor-pointer"
                     title="Remove choice"
                   >
                     <Trash2 size={16} />
@@ -545,7 +545,7 @@ function QuestionEditor({ q, update }) {
               <button
                 type="button"
                 onClick={() => update({ choices: [...q.choices, { key: uid(), text: '', isCorrect: false }] })}
-                className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 cursor-pointer px-1 py-1"
+                className="flex items-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-700 cursor-pointer px-1 py-1"
               >
                 <Plus size={14} /> Add choice
               </button>
@@ -574,49 +574,49 @@ function SectionCard({ index, total, section, patch, onMove, onRemove, onEditMet
   };
 
   return (
-    <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-red-900/30">
-        <div className="flex items-center gap-3 text-white font-extrabold">
-          <HelpCircle size={18} className="text-red-400" />
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200">
+        <div className="flex items-center gap-3 text-slate-900 font-extrabold">
+          <HelpCircle size={18} className="text-violet-600" />
           <span>Section {index + 1}: Quiz</span>
         </div>
-        <div className="flex items-center gap-2 text-slate-400">
-          <button type="button" onClick={onRemove} className="p-1.5 hover:text-red-400 cursor-pointer" title="Delete quiz"><Trash2 size={16} /></button>
-          <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="p-1.5 hover:text-white disabled:opacity-30 cursor-pointer" title="Move up"><ChevronUp size={18} /></button>
-          <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="p-1.5 hover:text-white disabled:opacity-30 cursor-pointer" title="Move down"><ChevronDown size={18} /></button>
+        <div className="flex items-center gap-2 text-slate-500">
+          <button type="button" onClick={onRemove} className="p-1.5 hover:text-danger-600 cursor-pointer" title="Delete quiz"><Trash2 size={16} /></button>
+          <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="p-1.5 hover:text-slate-900 disabled:opacity-30 cursor-pointer" title="Move up"><ChevronUp size={18} /></button>
+          <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="p-1.5 hover:text-slate-900 disabled:opacity-30 cursor-pointer" title="Move down"><ChevronDown size={18} /></button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 border-b border-red-900/30">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 border-b border-slate-200">
         <div className="min-w-0">
-          <div className="font-extrabold text-white truncate">{section.title}</div>
-          <div className="text-xs text-slate-400 mt-0.5">
+          <div className="font-extrabold text-slate-900 truncate">{section.title}</div>
+          <div className="text-xs text-slate-500 mt-0.5">
             {section.timeLimitMinutes} minutes • {section.questions.length} Questions
-            {section.editType === 'no_edit' && <span className="ml-2 text-amber-400">• No edit allow</span>}
+            {section.editType === 'no_edit' && <span className="ml-2 text-amber-600">• No edit allow</span>}
           </div>
           <div className="text-xs text-slate-500 mt-1 line-clamp-2">{section.description}</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-extrabold text-white">{section.questions.length}</div>
-          <div className="text-[11px] text-slate-400 uppercase tracking-wide">Questions</div>
+          <div className="text-lg font-extrabold text-slate-900">{section.questions.length}</div>
+          <div className="text-[11px] text-slate-500 uppercase tracking-wide">Questions</div>
         </div>
         <button type="button" onClick={onEditMeta} className={BTN_GHOST}>Edit</button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr]">
-        <div className="border-b lg:border-b-0 lg:border-r border-red-900/30 flex flex-col">
+        <div className="border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col">
           <div className="flex-1 p-3 space-y-2">
             {section.questions.map((q, i) => (
               <div
                 key={q.key}
                 onClick={() => setSelected(i)}
                 className={`rounded-xl px-3 py-2.5 border cursor-pointer flex items-start justify-between gap-2 ${
-                  i === qIndex ? 'bg-red-950/60 border-red-600/60' : 'bg-[#0B0D13] border-red-900/30 hover:bg-red-950/30'
+                  i === qIndex ? 'bg-violet-100 border-violet-400' : 'bg-slate-50 border-slate-200 hover:bg-violet-50'
                 }`}
               >
                 <div className="min-w-0">
-                  <div className="text-[11px] text-slate-400">Question #{i + 1} • {TYPE_LABEL[q.type]}</div>
-                  <div className={`text-sm font-bold truncate ${q.title.trim() ? 'text-white' : 'text-red-400 italic'}`}>
+                  <div className="text-[11px] text-slate-500">Question #{i + 1} • {TYPE_LABEL[q.type]}</div>
+                  <div className={`text-sm font-bold truncate ${q.title.trim() ? 'text-slate-900' : 'text-violet-600 italic'}`}>
                     {q.title.trim() || '* (Empty Question Title)'}
                   </div>
                 </div>
@@ -624,7 +624,7 @@ function SectionCard({ index, total, section, patch, onMove, onRemove, onEditMet
                   type="button"
                   disabled={section.questions.length <= 1}
                   onClick={(e) => { e.stopPropagation(); removeQuestion(i); }}
-                  className="p-1 text-slate-500 hover:text-red-400 disabled:opacity-30 cursor-pointer"
+                  className="p-1 text-slate-500 hover:text-violet-600 disabled:opacity-30 cursor-pointer"
                   title="Delete question"
                 >
                   <Trash2 size={14} />
@@ -632,7 +632,7 @@ function SectionCard({ index, total, section, patch, onMove, onRemove, onEditMet
               </div>
             ))}
           </div>
-          <div className="p-3 border-t border-red-900/30">
+          <div className="p-3 border-t border-slate-200">
             <button type="button" onClick={addQuestion} className={`${BTN_GHOST} w-full flex items-center justify-center gap-2`}>
               <Plus size={14} /> Add Question
             </button>
@@ -640,7 +640,7 @@ function SectionCard({ index, total, section, patch, onMove, onRemove, onEditMet
         </div>
 
         <div className="p-5">
-          <h4 className="text-lg font-extrabold text-white mb-4">Question #{qIndex + 1}</h4>
+          <h4 className="text-lg font-extrabold text-slate-900 mb-4">Question #{qIndex + 1}</h4>
           {current && <QuestionEditor q={current} update={updateQuestion} />}
         </div>
       </div>
@@ -660,8 +660,8 @@ function ContentStep({ form, set }) {
   return (
     <div className="space-y-5">
       {form.sections.length === 0 ? (
-        <div className="py-16 flex flex-col items-center gap-4 text-slate-400">
-          <ListChecks size={56} className="text-slate-600" />
+        <div className="py-16 flex flex-col items-center gap-4 text-slate-500">
+          <ListChecks size={56} className="text-slate-400" />
           <p className="text-sm">No quest content created</p>
         </div>
       ) : (
@@ -741,7 +741,7 @@ function RewardStep({ form, set }) {
             value={form.passCount}
             onChange={(e) => set({ passCount: e.target.value })}
           />
-          <span className="text-sm text-slate-300">out of {totalQuestions} question(s)</span>
+          <span className="text-sm text-slate-700">out of {totalQuestions} question(s)</span>
         </div>
         <p className="text-[11px] text-slate-500 mt-1">Leave empty to require every question to be correct.</p>
       </div>
@@ -765,13 +765,13 @@ function RewardStep({ form, set }) {
             </option>
           ))}
         </select>
-        {rewardsState === 'error' && <p className="text-[11px] text-red-300 mt-1">Unable to load rewards. Reload the page to try again.</p>}
+        {rewardsState === 'error' && <p className="text-[11px] text-danger-700 mt-1">Unable to load rewards. Reload the page to try again.</p>}
         {chosen && (
-          <div className="mt-3 flex items-center gap-3 rounded-xl border border-red-900/30 bg-[#0B0D13] p-3 max-w-md">
-            {chosen.imageUrl ? <img src={chosen.imageUrl} alt="" className="w-14 h-14 rounded-lg object-cover" /> : <div className="w-14 h-14 rounded-lg bg-red-950/50" />}
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 max-w-md">
+            {chosen.imageUrl ? <img src={chosen.imageUrl} alt="" className="w-14 h-14 rounded-lg object-cover" /> : <div className="w-14 h-14 rounded-lg bg-violet-100" />}
             <div className="min-w-0">
-              <div className="font-bold text-white truncate">{chosen.title}</div>
-              <div className="text-[11px] text-slate-400">Normally {chosen.pointsRequired} points — free for employees who pass</div>
+              <div className="font-bold text-slate-900 truncate">{chosen.title}</div>
+              <div className="text-[11px] text-slate-500">Normally {chosen.pointsRequired} points — free for employees who pass</div>
             </div>
           </div>
         )}
@@ -785,9 +785,9 @@ function SummaryStep({ form }) {
   const total = Number(form.rewardPoints) || 0;
   const assignLabel = form.assignType === 'all' ? 'All employees' : form.assignType === 'new_employee' ? 'New employees' : `${form.members.length} selected member(s)`;
   const Row = ({ label, children }) => (
-    <div className="grid grid-cols-[170px_1fr] gap-4 py-3 border-b border-red-900/20 text-sm">
-      <span className="text-slate-400 font-bold uppercase text-xs tracking-wider pt-0.5">{label}</span>
-      <span className="text-slate-100 break-words">{children}</span>
+    <div className="grid grid-cols-[170px_1fr] gap-4 py-3 border-b border-slate-200 text-sm">
+      <span className="text-slate-500 font-bold uppercase text-xs tracking-wider pt-0.5">{label}</span>
+      <span className="text-slate-900 break-words">{children}</span>
     </div>
   );
   return (
@@ -800,7 +800,7 @@ function SummaryStep({ form }) {
       <Row label="End">{`${form.endDate} ${form.endTime}`}</Row>
       <Row label="Assign to">
         {assignLabel}
-        {form.assignType === 'members' && <span className="block text-xs text-slate-400 mt-1">{form.members.map((m) => m.name).join(', ')}</span>}
+        {form.assignType === 'members' && <span className="block text-xs text-slate-500 mt-1">{form.members.map((m) => m.name).join(', ')}</span>}
       </Row>
       <Row label="Approval">Auto approve points</Row>
       <Row label="Pass score">{form.passCount === '' ? 'All questions correct' : `${form.passCount} correct answer(s) or more`}</Row>
@@ -814,8 +814,8 @@ function SummaryStep({ form }) {
         ))}
       </Row>
       <Row label="Points">
-        <span className="font-extrabold text-white">{total}</span>
-        <span className="text-slate-400"> in total for everyone who passes</span>
+        <span className="font-extrabold text-slate-900">{total}</span>
+        <span className="text-slate-500"> in total for everyone who passes</span>
       </Row>
     </div>
   );
@@ -928,19 +928,19 @@ export default function QuestWizard({ questId, onClose, onSaved, notify }) {
     <div className="flex flex-col gap-6">
       <Stepper step={step} setStep={jumpTo} maxStep={maxStep} />
 
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg">
         <div className="px-6 pt-6">
-          <h2 className="text-xl font-black text-white uppercase tracking-wide">
+          <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">
             {isNew ? 'New Quest' : 'Edit Quest'} — {STEPS[step].label}
           </h2>
         </div>
         <div className="p-6">{stepBody}</div>
 
         {error && (
-          <div className="mx-6 mb-4 px-4 py-3 rounded-xl bg-red-950/60 border border-red-700/50 text-sm font-bold text-red-300">{error}</div>
+          <div className="mx-6 mb-4 px-4 py-3 rounded-xl bg-danger-50 border border-danger-200 text-sm font-bold text-danger-700">{error}</div>
         )}
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-red-900/30">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200">
           <button type="button" onClick={step === 0 ? onClose : () => { setError(''); setStep(step - 1); }} className={BTN_GHOST}>
             {step === 0 ? 'Cancel' : 'Go Back'}
           </button>

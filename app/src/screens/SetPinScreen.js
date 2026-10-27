@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Animated,
+  Image,
   StatusBar,
   Alert,
   ActivityIndicator,
@@ -15,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
+import { waveLogoUri } from '../assets/logoBase64';
 import { authService } from '../services/authService';
 import { pinService } from '../services/pinService';
 import { navigationHistory } from '../services/navigationHistory';
@@ -138,7 +140,7 @@ export default function SetPinScreen({ navigation, route }) {
       setLoading(false);
 
       Alert.alert(
-        'ตั้งรหัส PIN สำเร็จ 🎉',
+        'ตั้งรหัส PIN สำเร็จ',
         'บัญชีของคุณได้รับการตั้งรหัส PIN 6 หลักเรียบร้อยแล้ว สามารถใช้ปลดล็อกเพื่อเข้าใช้งานได้อย่างสะดวกรวดเร็ว',
         [
           {
@@ -175,11 +177,7 @@ export default function SetPinScreen({ navigation, route }) {
     return 'ยืนยันรหัส PIN 6 หลักอีกครั้ง';
   };
 
-  const getStepSubtitle = () => {
-    if (step === 'current') return 'เพื่อความปลอดภัย กรุณายืนยันรหัส PIN ปัจจุบันของคุณก่อนเปลี่ยน';
-    if (step === 'new') return 'เลือกตัวเลข 6 หลักที่คุณจำได้ง่ายและปลอดภัยสำหรับบัญชีนี้';
-    return 'กรุณากรอกรหัส PIN 6 หลักตัวเดิมเพื่อยืนยันความถูกต้อง';
-  };
+  
 
   const activeCode = getActiveCode();
 
@@ -238,21 +236,16 @@ export default function SetPinScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Shield Icon Badge with Glowing Aura */}
+        {/* App logo (wave) badge with glowing aura */}
         <View style={styles.iconOuterRing}>
-          <LinearGradient
-            colors={['#7C3AED', '#3B82F6']}
-            style={styles.iconGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="shield-checkmark" size={32} color="#FFFFFF" />
-          </LinearGradient>
+          <View style={styles.iconGradient}>
+            <Image source={{ uri: waveLogoUri }} style={styles.logoImage} resizeMode="contain" />
+          </View>
         </View>
 
         {/* Title & Instructions */}
         <Text testID="txt-set-pin-title" style={styles.title}>{getStepTitle()}</Text>
-        <Text style={styles.subtitle}>{getStepSubtitle()}</Text>
+        
 
         {/* 6 Modern PIN Indicator Dots */}
         <View style={styles.dotsRow}>
@@ -452,9 +445,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   iconGradient: {
-    width: 52,
+    width: 76,
     height: 52,
     borderRadius: 26,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#7C3AED',
@@ -462,6 +456,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
+  },
+  logoImage: {
+    width: 52,
+    height: 28,
   },
   title: {
     fontSize: 19,

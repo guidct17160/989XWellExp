@@ -146,14 +146,8 @@ const ThemeContext = createContext({
 });
 
 export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem('wellx989_dark_mode') === 'true';
-      }
-    } catch (e) {}
-    return false;
-  });
+  // Dark mode switch was removed from Settings: always light (a value saved earlier is ignored)
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [language, setLanguageState] = useState(() => {
     try {

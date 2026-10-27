@@ -102,19 +102,6 @@ export default function PinLockScreen({ navigation }) {
     }
   };
 
-  const handleBiometric = () => {
-    Alert.alert(
-      'Face ID / Touch ID',
-      'เข้าสู่ระบบด้วยชีวมาตร (Biometrics) สำเร็จ',
-      [
-        {
-          text: 'เข้าสู่แอป',
-          onPress: () => navigation.replace('MainTabs'),
-        },
-      ]
-    );
-  };
-
   const handleLoginWithPassword = () => {
     Alert.alert(
       'ออกจากระบบ',
@@ -229,15 +216,8 @@ export default function PinLockScreen({ navigation }) {
             ))}
 
             <View style={styles.keypadRow}>
-              {/* Biometric Icon Button */}
-              <TouchableOpacity
-                testID="btn-pin-biometric"
-                style={styles.keypadActionBtn}
-                onPress={handleBiometric}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="finger-print-outline" size={28} color={colors.primary} />
-              </TouchableOpacity>
+              {/* empty cell keeps the 0 key centred */}
+              <View style={styles.keypadActionBtn} />
 
               {/* Number 0 */}
               <TouchableOpacity

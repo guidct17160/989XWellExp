@@ -132,15 +132,6 @@ export default function QuestPlayScreen({ navigation, route }) {
         <>
           <ScrollView contentContainerStyle={styles.content}>
             {!!quest.description && <Text style={styles.intro}>{quest.description}</Text>}
-            <View style={styles.rule}>
-              <Ionicons name="information-circle-outline" size={18} color="#0369A1" />
-              <Text style={styles.ruleText}>
-                ต้องตอบถูกอย่างน้อย {quest.passCount} จาก {quest.questionCount} ข้อ จึงจะผ่านและได้รับ {quest.totalPoints} แต้ม
-                {quest.rewardTitle ? ` พร้อมรางวัลฟรี "${quest.rewardTitle}"` : ''} • หมดเขต {quest.endDate} {quest.endTime}
-                {'\n'}ทำได้ครั้งเดียว ถ้าไม่ผ่านจะทำซ้ำไม่ได้
-              </Text>
-            </View>
-
             {questions.map((q, i) => (
               <View key={q.id} style={styles.qCard}>
                 <Text style={styles.qTitle}>{i + 1}. {q.title}</Text>

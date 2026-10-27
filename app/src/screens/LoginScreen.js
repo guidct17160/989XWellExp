@@ -95,7 +95,7 @@ export default function LoginScreen({ navigation }) {
       if (!hasPin) {
         // As requested: after username/password login, prompt to set PIN
         Alert.alert(
-          'เข้าสู่ระบบสำเร็จ 🎉',
+          'เข้าสู่ระบบสำเร็จ',
           `ยินดีต้อนรับคุณ ${res.user?.name || cleanUser}\n\nกรุณาตั้งรหัส PIN 6 หลัก เพื่อใช้เข้าใช้งานแอปในครั้งถัดไป`,
           [
             {
@@ -113,10 +113,6 @@ export default function LoginScreen({ navigation }) {
       setErrorMsg(msg);
       Alert.alert('เข้าสู่ระบบไม่สำเร็จ', msg);
     }
-  };
-
-  const handleFaceId = () => {
-    Alert.alert('Face ID', 'เชื่อมต่อ Face ID SDK ตรงนี้');
   };
 
   return (
@@ -272,48 +268,6 @@ export default function LoginScreen({ navigation }) {
               )}
             </TouchableOpacity>
 
-            {/* เส้นคั่น "หรือ" */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* ปุ่ม Face ID */}
-            <TouchableOpacity
-              testID="login-face-id-btn"
-              style={[styles.faceIdButton, { marginBottom: 12 }]}
-              onPress={handleFaceId}
-            >
-              <Ionicons
-                name="scan-outline"
-                size={22}
-                color={colors.faceIdText}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.faceIdText}>Log in with Face ID</Text>
-            </TouchableOpacity>
-
-            {/* ปุ่มเข้าสู่ระบบด้วยรหัส PIN */}
-            <TouchableOpacity
-              testID="login-pin-btn"
-              style={[styles.faceIdButton, { borderColor: '#0074C4', backgroundColor: '#F0F9FF' }]}
-              onPress={() => navigation?.navigate('PinLock')}
-            >
-              <Ionicons
-                name="keypad-outline"
-                size={22}
-                color="#0074C4"
-                style={{ marginRight: 8 }}
-              />
-              <Text style={[styles.faceIdText, { color: '#0074C4', fontWeight: '700' }]}>
-                เข้าสู่ระบบด้วยรหัส PIN (6 หลัก)
-              </Text>
-            </TouchableOpacity>
-
-            
-
-            
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

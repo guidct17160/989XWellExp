@@ -68,7 +68,7 @@ export default function NotificationsScreen({ navigation }) {
       } else if (notif.screen === 'LeaveRequest') {
         navigation.navigate('LeaveRequest');
       } else if (notif.screen === 'Announcements') {
-        navigation.navigate('Announcements');
+        navigation.navigate('Announcements', { selectedAnnouncement: notif.announcement || null, openTimestamp: Date.now(), fromNotifications: true });
       } else if (notif.screen) {
         navigation.navigate(notif.screen);
       }
@@ -99,6 +99,12 @@ export default function NotificationsScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {notifications.length === 0 && (
+            <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+              <Ionicons name="notifications-off-outline" size={44} color="#94A3B8" />
+              <Text style={{ marginTop: 10, fontSize: 14, color: '#64748B' }}>ยังไม่มีการแจ้งเตือน</Text>
+            </View>
+          )}
           {notifications.map((notif) => (
             <TouchableOpacity
               testID={`notifications-item-${notif.id}`}
@@ -136,7 +142,7 @@ export default function NotificationsScreen({ navigation }) {
                   {notif.screen && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600', marginRight: 2 }}>
-                        ไปยังหน้า {notif.tab === 'requests' || notif.activeTab === 'requests' ? 'สถานะคำขอ' : notif.screen === 'TimeCorrection' ? 'ปรับปรุงเวลา' : notif.screen === 'LeaveRequest' ? 'การลางาน' : 'รายละเอียด'}
+                        ไปยังหน้า {notif.tab === 'requests' || notif.activeTab === 'requests' ? 'สถานะคำขอ' : notif.screen === 'TimeCorrection' ? 'ปรับปรุงเวลา' : notif.screen === 'LeaveRequest' ? 'การลางาน' : notif.screen === 'Announcements' ? 'ประกาศ' : notif.screen === 'ManagerApproval' ? 'อนุมัติคำขอ' : 'รายละเอียด'}
                       </Text>
                       <Ionicons name="chevron-forward" size={14} color={colors.primary} />
                     </View>

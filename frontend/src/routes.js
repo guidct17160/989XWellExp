@@ -8,9 +8,12 @@ export const MENU_PATHS = {
   'all-employee': '/employees',
   points: '/points',
   attendance: '/attendance',
-  'work-locations': '/attendance/work-locations',
-  'leave-policy': '/leave-policies',
+  // Settings: set once, changed rarely
+  'attendance-settings': '/settings/work-time',
+  'work-locations': '/settings/work-locations',
+  'leave-policy': '/settings/leave-policies',
   mission: '/missions',
+  announcements: '/announcements',
   reward: '/rewards',
   'reward-categories': '/rewards/categories',
 };
@@ -24,6 +27,24 @@ const LEGACY_TABS = {
   section: 'all-employee',
   kpi: 'all-employee',
   corrections: 'attendance',
+};
+
+// Pages that moved into Settings: the old address keeps working and is redirected (detail ids are kept)
+const MOVED = [
+  ['/attendance/work-locations', MENU_PATHS['work-locations']],
+  ['/attendance/settings', MENU_PATHS['attendance-settings']],
+  ['/leave-policies', MENU_PATHS['leave-policy']],
+];
+
+// '/attendance/work-locations/abc' -> '/settings/work-locations/abc'; '/settings' -> first Settings page; otherwise null
+export const movedPath = (pathname) => {
+  const clean = String(pathname || '').replace(/\/+$/, '') || '/';
+  if (clean === '/settings') return MENU_PATHS['attendance-settings'];
+  for (const [from, to] of MOVED) {
+    if (clean === from) return to;
+    if (clean.startsWith(`${from}/`)) return to + clean.slice(from.length);
+  }
+  return null;
 };
 
 // Longest base first, so /rewards/categories is not mistaken for /rewards

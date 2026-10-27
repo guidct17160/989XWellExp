@@ -23,6 +23,7 @@ import TopNavbar from '../components/TopNavbar';
 import { tryFetchApi } from '../services/apiClient';
 import { pickAttachment, uploadLeaveAttachment } from '../services/attachmentService';
 import { getPublicHolidayName, fetchHolidaysFromBackend } from '../utils/thaiHolidays';
+import { todayIsoBkk } from '../utils/bangkokDate';
 
 const { width } = Dimensions.get('window');
 
@@ -36,8 +37,8 @@ export default function LeaveRequestScreen({ navigation }) {
   const [isPoliciesModalVisible, setIsPoliciesModalVisible] = useState(false);
   const [policiesList, setPoliciesList] = useState([]);
   const [selectedType, setSelectedType] = useState('annual');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(todayIsoBkk());
+  const [endDate, setEndDate] = useState(todayIsoBkk());
   const [reason, setReason] = useState('');
   // uploaded attachment: { id, url, fileName } (already stored on the server)
   const [attachedFile, setAttachedFile] = useState(null);
@@ -257,7 +258,7 @@ export default function LeaveRequestScreen({ navigation }) {
       setIsModalVisible(false);
 
       // Reset form
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = todayIsoBkk();
       setStartDate(todayStr);
       setEndDate(todayStr);
       setSelectedDays(1);
@@ -325,7 +326,7 @@ export default function LeaveRequestScreen({ navigation }) {
                 className="bg-white mx-4 my-2 p-4 rounded-2xl border border-slate-100 shadow-sm"
                 onPress={() => {
                   if (isExhausted) return;
-                  const todayStr = new Date().toISOString().split('T')[0];
+                  const todayStr = todayIsoBkk();
                   setSelectedType(type.id);
                   setStartDate(todayStr);
                   setSelectedDays(1);

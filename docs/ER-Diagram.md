@@ -133,7 +133,10 @@ erDiagram
         varchar status_color
         numeric latitude
         numeric longitude
-        text location_name
+        text location_name "ตำแหน่งตอนเข้างาน"
+        numeric check_out_latitude "ตำแหน่งตอนออกงาน"
+        numeric check_out_longitude
+        text check_out_location_name
         text photo_url
         varchar work_location_id "no FK, name kept in location_name"
         timestamp created_at
@@ -345,11 +348,18 @@ erDiagram
         varchar id PK
         varchar title
         text content
-        varchar category
+        varchar category "เลิกใช้แล้ว"
         varchar author
         boolean is_pinned
         text image_url
+        varchar start_date "เริ่มแสดง YYYY-MM-DD"
+        varchar start_time
+        varchar end_date "ว่าง = ไม่มีวันสิ้นสุด"
+        varchar end_time
+        bytea image_data "รูป PNG/GIF"
+        varchar image_type
         timestamp created_at
+        timestamp updated_at
     }
 
     audit_logs {

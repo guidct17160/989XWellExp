@@ -45,7 +45,8 @@ export default function App() {
     const params = new URLSearchParams(location.search);
     return !!params.get('token') && (location.pathname.includes('/set-password') || !!params.get('email'));
   })();
-  const [timeoutNotice, setTimeoutNotice] = useState(null);
+  // Set when the session ends (idle / 8 hours / server says 401): a popup covers the page, OK signs out and opens /login
+  const [sessionExpired, setSessionExpired] = useState(null);
 
   const lastActivityRef = useRef(Date.now());
 
@@ -62,7 +63,7 @@ export default function App() {
     const now = Date.now();
     setUser(userData);
     setIsLoggedIn(true);
-    setTimeoutNotice(null);
+    setSessionExpired(null);
     navigate(HOME_PATH, { replace: true });
     try {
       localStorage.setItem('wellx989_user', JSON.stringify(userData));
@@ -76,12 +77,9 @@ export default function App() {
     lastActivityRef.current = now;
   };
 
-  const handleLogout = useCallback((reason) => {
+  const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     setUser(null);
-    if (reason) {
-      setTimeoutNotice(reason);
-    }
     try {
       localStorage.removeItem('wellx989_user');
       localStorage.removeItem('wellx989_token');
@@ -92,11 +90,29 @@ export default function App() {
     } catch (e) {
       console.error('Failed to clear session', e);
     }
+    window.dispatchEvent(new Event('wellx989:session-cleared'));
   }, []);
+
+  const expireSession = useCallback((reason) => {
+    setSessionExpired((current) => current || reason);
+  }, []);
+
+  // main.jsx reports a 401 from the server
+  useEffect(() => {
+    const onExpired = (e) => expireSession((e.detail && e.detail.reason) || 'Your login is no longer valid.');
+    window.addEventListener('wellx989:session-expired', onExpired);
+    return () => window.removeEventListener('wellx989:session-expired', onExpired);
+  }, [expireSession]);
+
+  const confirmSessionExpired = () => {
+    setSessionExpired(null);
+    handleLogout();
+    navigate(LOGIN_PATH, { replace: true });
+  };
 
   // Activity event listener & periodic session check
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || sessionExpired) return;
 
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
@@ -114,14 +130,14 @@ export default function App() {
       // 1. Check Idle Timeout (30 minutes)
       const lastAct = lastActivityRef.current || now;
       if (now - lastAct >= IDLE_TIMEOUT_MS) {
-        handleLogout('Session expired due to 30 minutes of inactivity (Idle Timeout)');
+        expireSession('You were inactive for 30 minutes.');
         return;
       }
 
       // 2. Check Absolute Timeout (8 hours)
       const loginTime = Number(localStorage.getItem('wellx989_login_time') || now);
       if (now - loginTime >= ABSOLUTE_TIMEOUT_MS) {
-        handleLogout('Session expired after 8 hours of use (Absolute Timeout - end of the working day)');
+        expireSession('You have been signed in for 8 hours (end of the working day).');
         return;
       }
     }, 10000);
@@ -130,7 +146,7 @@ export default function App() {
       activityEvents.forEach((event) => window.removeEventListener(event, updateActivity));
       clearInterval(intervalId);
     };
-  }, [isLoggedIn, handleLogout]);
+  }, [isLoggedIn, sessionExpired, expireSession]);
 
   const handleSetPasswordComplete = () => {
     navigate('/', { replace: true });
@@ -154,7 +170,7 @@ export default function App() {
     if (authPath === FORGOT_PATH) {
       return <ForgotPasswordPage onNavigate={goToAuthPath} initialIdentifier={forgotPrefill} />;
     }
-    return <LoginPage onLoginSuccess={handleLoginSuccess} initialNotice={timeoutNotice} onNavigate={goToAuthPath} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={goToAuthPath} />;
   }
 
   // Signed in: the sign-in pages are not reachable
@@ -162,5 +178,26 @@ export default function App() {
     return <Navigate to={HOME_PATH} replace />;
   }
 
-  return <DashboardPage user={user} onLogout={() => handleLogout()} />;
+  return (
+    <>
+      <DashboardPage user={user} onLogout={() => handleLogout()} />
+      {sessionExpired && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" data-testid="session-expired-popup">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="session-expired-title" className="w-full max-w-sm rounded-2xl border border-violet-500/30 bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-violet-500/15 border border-violet-500/40 flex items-center justify-center text-violet-700 text-xl font-black">!</div>
+            <h3 id="session-expired-title" className="text-lg font-black text-slate-900">Session expired</h3>
+            <p className="mt-2 text-sm text-slate-700">{sessionExpired} Please sign in again to continue.</p>
+            <button
+              type="button"
+              autoFocus
+              onClick={confirmSessionExpired}
+              className="mt-6 w-full px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm cursor-pointer"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

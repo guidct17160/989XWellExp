@@ -112,6 +112,8 @@ export default function CustomAlertModal({
   };
 
   const defaultButtons = buttons.length > 0 ? buttons : [{ text: 'ตกลง', style: 'default' }];
+  // 3 or more choices (e.g. camera / gallery / cancel) read better stacked, one full-width button per line
+  const stacked = defaultButtons.length > 2;
 
   return (
     <Modal
@@ -136,7 +138,7 @@ export default function CustomAlertModal({
               {message ? <Text style={styles.messageText}>{message}</Text> : null}
 
               {/* Buttons Container */}
-              <View style={styles.buttonContainer}>
+              <View style={[styles.buttonContainer, stacked && styles.buttonContainerStacked]}>
                 {defaultButtons.map((btn, index) => {
                   const isCancel = btn.style === 'cancel';
                   const isDestructive = btn.style === 'destructive';
@@ -158,7 +160,10 @@ export default function CustomAlertModal({
                       activeOpacity={0.8}
                       style={[
                         btnStyle,
-                        defaultButtons.length > 1 && { flex: 1, marginHorizontal: 4 },
+                        stacked
+                          ? styles.stackedButton
+                          : defaultButtons.length > 1 && { flex: 1, marginHorizontal: 4 },
+                        stacked && index < defaultButtons.length - 1 && { marginBottom: 10 },
                       ]}
                       onPress={() => handleButtonPress(btn.onPress)}
                     >
@@ -225,6 +230,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     justifyContent: 'center',
+  },
+  buttonContainerStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+  stackedButton: {
+    width: '100%',
   },
   primaryButton: {
     width: '100%',

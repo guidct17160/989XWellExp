@@ -1,5 +1,6 @@
 import { notificationStorage } from './notificationStorage';
 import { tryFetchApi } from './apiClient';
+import { todayIsoBkk } from '../utils/bangkokDate';
 
 const getUserId = () => {
   try {
@@ -274,7 +275,7 @@ export const leaveStorage = {
 
   async addTimeCorrectionRequest(dateStr, inTime, outTime, reason, issueId = null, rawDate = null) {
     const today = new Date();
-    let isoDate = today.toISOString().split('T')[0];
+    let isoDate = todayIsoBkk();
     if (rawDate && typeof rawDate === 'string') {
       const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       const thaiMatch = rawDate.trim().match(/^(d{1,2})s+(S+?).?s+(d{4})$/);

@@ -11,15 +11,8 @@ import './index.css';
  */
 const rawFetch = window.fetch;
 
-// Expired / invalid token: clear the web session and return to the login page (once)
-const SESSION_KEYS = [
-  'wellx989_user',
-  'wellx989_token',
-  'wellx989_is_logged_in',
-  'wellx989_active_menu',
-  'wellx989_login_time',
-  'wellx989_last_activity',
-];
+// Expired / invalid token: App.jsx shows a "session expired" popup over the page the admin is on (once); pressing OK
+// signs out and opens the login page. The flag is reset when App.jsx has cleared the session.
 const PUBLIC_AUTH_PATHS = ['/auth/login', '/login', '/set-password', '/forgot-password', '/auth/forgot-password'];
 let sessionExpiredHandled = false;
 const handleUnauthorized = (url) => {
@@ -28,10 +21,10 @@ const handleUnauthorized = (url) => {
     if (!localStorage.getItem('wellx989_token')) return;
     if (PUBLIC_AUTH_PATHS.some((p) => url.includes(p))) return;
     sessionExpiredHandled = true;
-    SESSION_KEYS.forEach((k) => localStorage.removeItem(k));
-    window.location.reload();
+    window.dispatchEvent(new CustomEvent('wellx989:session-expired', { detail: { reason: 'Your login is no longer valid.' } }));
   } catch (e) {}
 };
+window.addEventListener('wellx989:session-cleared', () => { sessionExpiredHandled = false; });
 
 window.fetch = async (resource, config = {}) => {
   let url = '';

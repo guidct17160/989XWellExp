@@ -243,14 +243,14 @@ export default function OrgManagement({ type = 'department', initialTab }) {
           level: 2,
           name: 'Boss',
           label: '👔 Boss',
-          badge: 'bg-amber-950/90 text-amber-300 border-amber-700/60 shadow-md shadow-amber-950/50'
+          badge: 'bg-amber-50 text-amber-700 border-amber-200 shadow-md shadow-slate-300'
         };
       }
       return {
         level: 1,
         name: 'Employee',
         label: '👤 Employee',
-        badge: 'bg-[#1E293B] text-slate-300 border-slate-700'
+        badge: 'bg-slate-100 text-slate-700 border-slate-300'
       };
     };
 
@@ -271,90 +271,72 @@ export default function OrgManagement({ type = 'department', initialTab }) {
     });
 
     return (
-      <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
+      <div className="space-y-6 text-slate-900 font-sans animate-in fade-in duration-200">
         {/* Toast Notification */}
         {notification && (
           <div
             className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
               typeof notification === 'object' && notification?.type === 'error'
-                ? 'bg-red-950 border border-red-700/60 text-red-300'
-                : 'bg-emerald-950 border border-emerald-700/60 text-emerald-300'
+                ? 'bg-danger-50 border border-danger-200 text-danger-700'
+                : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
             }`}
           >
             {typeof notification === 'object' && notification?.type === 'error' ? (
-              <AlertCircle size={20} className="text-[#EF4444]" />
+              <AlertCircle size={20} className="text-danger-600" />
             ) : (
-              <CheckCircle size={20} className="text-emerald-400" />
+              <CheckCircle size={20} className="text-emerald-600" />
             )}
             <span>{typeof notification === 'object' ? notification.msg : notification}</span>
           </div>
         )}
 
         {/* Top Navigation & Breadcrumb */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
           <div className="flex items-center gap-4">
             <div>
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-[#EF4444] border border-red-800/40">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200">
                   {activeDetailDept.code || activeDetailDept.id}
                 </span>
-                <h1 className="text-xl font-black text-white uppercase tracking-wide">
+                <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">
                   {activeDetailDept.name || activeDetailDept.title}
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">Line details and all employees in this department</p>
+              <p className="text-xs text-slate-500 mt-0.5">Line details and all employees in this department</p>
             </div>
           </div>
         </div>
 
-        {/* Info Grid Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-          <div className="bg-[#141722] p-5 rounded-2xl border border-red-900/30 shadow flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+        {/* Member count + search in one bar, apart from the data table */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-lg flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="p-3 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
               <Users size={24} />
             </div>
             <div>
-              <p className="text-xs text-slate-400 font-medium">Employees in department</p>
-              <h3 className="text-2xl font-black text-white font-mono">{members.length} members</h3>
+              <p className="text-xs text-slate-500 font-medium">Employees in department</p>
+              <h3 className="text-2xl font-black text-slate-900 font-mono">{members.length} members</h3>
             </div>
+          </div>
+
+          <div className="relative w-full md:w-80">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search name, employee ID, or email..."
+              value={searchMemberTerm}
+              onChange={(e) => setSearchMemberTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-violet-500 transition-all"
+            />
           </div>
         </div>
 
-        {/* Member Search & List Section */}
-        <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden space-y-0">
-          <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-red-900/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
-                <Users size={20} />
-              </div>
-              <div>
-                <h2 className="text-base font-extrabold text-white uppercase tracking-wide">
-                  Employees in this department
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Found {filteredMembers.length} members
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative w-full md:w-80">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Search name, employee ID, or email..."
-                  value={searchMemberTerm}
-                  onChange={(e) => setSearchMemberTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs text-white placeholder-slate-500 outline-none focus:border-[#EF4444] transition-all"
-                />
-              </div>
-            </div>
-          </div>
-
+        {/* Member List Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden space-y-0">
           {filteredMembers.length === 0 ? (
             <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
-              <Users size={44} className="text-slate-600 mb-1" />
-              <p className="text-base font-bold text-slate-300">No employees found in this department</p>
+              <Users size={44} className="text-slate-400 mb-1" />
+              <p className="text-base font-bold text-slate-700">No employees found in this department</p>
               <p className="text-xs text-slate-500">
                 {searchMemberTerm ? 'Try searching with a different keyword' : 'No employees are registered in this department yet. You can add new employees on the Employee Management page.'}
               </p>
@@ -363,7 +345,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
-                  <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                     <th className="py-3.5 px-4">ID</th>
                     <th className="py-3.5 px-4">First Name</th>
                     <th className="py-3.5 px-4">Last Name</th>
@@ -374,7 +356,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                     <th className="py-3.5 px-4 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+                <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
                   {filteredMembers.map((emp) => {
                     const roleInfo = getRoleLevelInfo(emp.role);
                     const isResign = emp.status === 'Resign' || emp.status === 'Resigned';
@@ -382,16 +364,16 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                     const firstName = emp.firstName || nameParts[0] || '-';
                     const lastName = emp.lastName || nameParts.slice(1).join(' ') || '-';
                     return (
-                      <tr key={emp.id} className="hover:bg-red-950/20 transition-colors whitespace-nowrap">
+                      <tr key={emp.id} className="hover:bg-violet-50 transition-colors whitespace-nowrap">
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-[#EF4444] border border-red-800/40">
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200">
                             {emp.code || emp.id}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">{firstName}</td>
-                        <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">{lastName}</td>
-                        <td className="py-3.5 px-4 text-xs text-slate-300 whitespace-nowrap">{emp.email || '-'}</td>
-                        <td className="py-3.5 px-4 text-xs text-slate-300 font-mono whitespace-nowrap">
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">{firstName}</td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">{lastName}</td>
+                        <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap">{emp.email || '-'}</td>
+                        <td className="py-3.5 px-4 text-xs text-slate-700 font-mono whitespace-nowrap">
                           {emp.phone && emp.phone !== '-' ? emp.phone : '-'}
                         </td>
                         <td className="py-3.5 px-4 whitespace-nowrap">
@@ -399,9 +381,9 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                             {roleInfo.label} (Level {roleInfo.level})
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-400 text-xs font-mono font-semibold whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-slate-500 text-xs font-mono font-semibold whitespace-nowrap">
                           {isResign ? (
-                            <span className="text-rose-400 font-semibold">Resigned: {emp.resignDate || emp.startDate || '-'}</span>
+                            <span className="text-danger-600 font-semibold">Resigned: {emp.resignDate || emp.startDate || '-'}</span>
                           ) : (
                             emp.startDate || '-'
                           )}
@@ -410,10 +392,10 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                           <span
                             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${
                               isResign
-                                ? 'bg-rose-950/90 text-rose-300 border border-rose-700/60'
+                                ? 'bg-violet-100 text-violet-700 border border-violet-300'
                                 : emp.status === 'Active'
-                                ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50'
-                                : 'bg-amber-950/80 text-amber-400 border border-amber-800/50'
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-600 border border-amber-200'
                             }`}
                           >
                             ● {emp.status || 'Active'}
@@ -438,25 +420,25 @@ export default function OrgManagement({ type = 'department', initialTab }) {
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-bounce ${
             typeof notification === 'object' && notification?.type === 'error'
-              ? 'bg-red-950 border border-red-700/60 text-red-300'
-              : 'bg-emerald-950 border border-emerald-700/60 text-emerald-300'
+              ? 'bg-danger-50 border border-danger-200 text-danger-700'
+              : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
           }`}
         >
           {typeof notification === 'object' && notification?.type === 'error' ? (
-            <AlertCircle size={20} className="text-[#EF4444]" />
+            <AlertCircle size={20} className="text-danger-600" />
           ) : (
-            <CheckCircle size={20} className="text-emerald-400" />
+            <CheckCircle size={20} className="text-emerald-600" />
           )}
           <span>{typeof notification === 'object' ? notification.msg : notification}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">{info.icon}</div>
+          <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">{info.icon}</div>
           <div>
-            <h1 className="text-xl font-black text-white uppercase tracking-wide">{info.title}</h1>
+            <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">{info.title}</h1>
             
           </div>
         </div>
@@ -464,7 +446,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
         <div className="flex items-center gap-3">
           <button
             onClick={fetchData}
-            className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 text-slate-700 transition-colors"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -476,7 +458,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
         right={
           <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
+          className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
           <Plus size={16} />
           <span>Add New Department</span>
@@ -500,18 +482,18 @@ export default function OrgManagement({ type = 'department', initialTab }) {
       />
 
       {/* List / Data Table */}
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
                 <th className="py-4 px-6">Code</th>
                 <th className="py-4 px-6">Name</th>
                 <th className="py-4 px-6 text-center">Member</th>
                 <th className="py-4 px-6 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan="4" className="py-12 text-center text-slate-500 font-mono">Loading data...</td>
@@ -525,15 +507,15 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                   <tr
                     key={item.id}
                     onClick={() => openDetailView(item)}
-                    className="hover:bg-red-950/20 transition-colors cursor-pointer group"
+                    className="hover:bg-violet-50 transition-colors cursor-pointer group"
                   >
                     <td className="py-4 px-6">
-                      <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-red-950/80 text-[#EF4444] border border-red-800/40">
+                      <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-violet-100 text-violet-700 border border-violet-200">
                         {item.code || item.id}
                       </span>
                     </td>
-                    <td className="py-4 px-6 font-bold text-white group-hover:text-[#EF4444] transition-colors">{item.name || item.title}</td>
-                    <td className="py-4 px-6 text-center font-bold text-[#EF4444] font-mono">
+                    <td className="py-4 px-6 font-bold text-slate-900 group-hover:text-violet-700 transition-colors">{item.name || item.title}</td>
+                    <td className="py-4 px-6 text-center font-bold text-violet-700 font-mono">
                       {typeof item.employeeCount === 'number' ? item.employeeCount : (typeof item.memberCount === 'number' ? item.memberCount : 0)}
                     </td>
                     <td className="py-4 px-6 text-center">
@@ -543,7 +525,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                             e.stopPropagation();
                             openEditModal(item);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                           title="Edit"
                         >
                           <Edit size={16} />
@@ -553,7 +535,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                             e.stopPropagation();
                             openDeleteModal(item);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/50 rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 text-slate-500 hover:text-violet-600 hover:bg-violet-100 rounded-lg transition-colors cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 size={16} />
@@ -570,13 +552,13 @@ export default function OrgManagement({ type = 'department', initialTab }) {
 
       {/* Add Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b border-red-900/30">
-              <h3 className="text-lg font-black text-white uppercase tracking-wide">Add New Department</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900">
+            <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Add New Department</h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-1.5 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={18} />
               </button>
@@ -584,40 +566,40 @@ export default function OrgManagement({ type = 'department', initialTab }) {
 
             <form onSubmit={handleAddSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Code</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Code</label>
                 <input
                   type="text"
                   placeholder="Leave blank to auto-generate a code"
                   value={extraInput}
                   onChange={(e) => setExtraInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Name *</label>
                 <input
                   type="text"
                   placeholder={info.placeholder}
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs transition-colors"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   onClick={handleAddSubmit}
-                  className="px-5 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide cursor-pointer"
                 >
                   Save
                 </button>
@@ -629,13 +611,13 @@ export default function OrgManagement({ type = 'department', initialTab }) {
 
       {/* EDIT ITEM MODAL */}
       {showEditModal && editTargetItem && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 animate-pop-in">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b border-red-900/30">
-              <h3 className="text-lg font-black text-white uppercase tracking-wide">Edit Department ({editTargetItem.code || editTargetItem.id})</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900 animate-pop-in">
+            <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Edit Department ({editTargetItem.code || editTargetItem.id})</h3>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-1.5 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={18} />
               </button>
@@ -643,31 +625,31 @@ export default function OrgManagement({ type = 'department', initialTab }) {
 
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Code</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Code</label>
                 <input
                   type="text"
                   value={editExtraInput}
                   onChange={(e) => setEditExtraInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Name *</label>
                 <input
                   type="text"
                   value={editNameInput}
                   onChange={(e) => setEditNameInput(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 transition-all"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -684,21 +666,21 @@ export default function OrgManagement({ type = 'department', initialTab }) {
         </div>
       )}
       {showDeleteModal && deleteTargetItem && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
             {/* Warning Red Trash Icon */}
-            <div className="w-14 h-14 rounded-2xl bg-red-950/90 text-red-500 border border-red-700/60 flex items-center justify-center mb-5 shadow-lg shadow-red-950/50">
+            <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 border border-violet-300 flex items-center justify-center mb-5 shadow-lg shadow-slate-300">
               <Trash2 size={28} />
             </div>
 
             {/* Header/Title */}
-            <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-wide mb-2">
               Confirm deletion of {info.title.split(' ')[0]} ({deleteTargetItem.name || deleteTargetItem.title})?
             </h3>
 
             {/* Body/Description */}
-            <p className="text-sm text-slate-300 leading-relaxed mb-7 bg-[#0B0D13] p-4 rounded-2xl border border-red-900/30">
-              You are about to delete <span className="font-bold text-white">{deleteTargetItem.name || deleteTargetItem.title}</span> ({deleteTargetItem.code || deleteTargetItem.id}) from the system. This data cannot be recovered.
+            <p className="text-sm text-slate-700 leading-relaxed mb-7 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              You are about to delete <span className="font-bold text-slate-900">{deleteTargetItem.name || deleteTargetItem.title}</span> ({deleteTargetItem.code || deleteTargetItem.id}) from the system. This data cannot be recovered.
             </p>
 
             {/* Buttons */}
@@ -710,7 +692,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
                   setShowDeleteModal(false);
                   setDeleteTargetItem(null);
                 }}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1A1D2C] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all"
               >
                 Cancel
               </button>
@@ -718,7 +700,7 @@ export default function OrgManagement({ type = 'department', initialTab }) {
               <button
                 type="button"
                 onClick={handleDeleteSubmit}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-danger-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
               >
                 <Trash2 size={16} />
                 <span>Confirm Delete</span>

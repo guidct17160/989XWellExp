@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { tryFetchApi } from './apiClient';
+import { todayIsoBkk } from '../utils/bangkokDate';
+import { workRules } from './workRules';
 
 const defaultHistory = [];
 
@@ -17,13 +19,8 @@ function calculateCorrectedDuration(inStr, outStr) {
   let outH = parseInt(outParts[0], 10) || 17;
   let outM = parseInt(outParts[1], 10) || 0;
 
-  // Rule: Work counting starts at 08:00 AM if checked in earlier
-  if (inH < 8) {
-    inH = 8;
-    inM = 0;
-  }
-
-  const startSec = inH * 3600 + inM * 60;
+  // Rule: work counting starts at the "count from" time (set by HR, default 08:00) if checked in earlier
+  const startSec = Math.max(inH * 3600 + inM * 60, workRules.workStartMinutes() * 60);
   const endSec = outH * 3600 + outM * 60;
   const diffSec = Math.max(0, endSec - startSec);
 
@@ -74,6 +71,25 @@ const syncPreviousDayState = () => {
       saveState();
       listeners.forEach((l) => l(globalState));
       syncWithBackend();
+      return;
+    }
+  }
+
+  // The home card shows TODAY's punches only. After midnight, yesterday's clock-in / clock-out (already saved on the
+  // server, they show in the history) must not stay on the card as if they were today's.
+  if (!globalState.isCheckedIn) {
+    const fromOtherDay = (value) => {
+      if (!value) return false;
+      const d = new Date(value);
+      return !isNaN(d.getTime()) && d.toDateString() !== now.toDateString() && d < now;
+    };
+    if (fromOtherDay(globalState.checkInTime) || fromOtherDay(globalState.checkOutTime)) {
+      globalState = { ...globalState, checkInTime: null, checkOutTime: null };
+      try {
+        // not defined yet while the module is still loading (loadLocalState runs first): the next read saves it
+        saveState();
+        listeners.forEach((l) => l(globalState));
+      } catch (e) { /* module still initialising */ }
     }
   }
 };
@@ -131,16 +147,16 @@ const normalizeServerAttendance = (r) => {
   const rawStatus = r.status || '';
   const isLate = rawStatus === 'สาย' || rawStatus.includes('เข้างานสาย') || !!r.isLate;
   // A past-day record that never got a clock-out is incomplete (backend may leave it open)
-  const staleOpen = !checkOut && !!dateIso && dateIso < new Date().toISOString().split('T')[0];
-  const isIncomplete = !!r.isIncomplete || rawStatus.includes('ไม่ลงเวลา') || staleOpen;
-  let status = staleOpen && !rawStatus.includes('ไม่ลงเวลา') ? 'ไม่ลงเวลาออกงาน' : rawStatus;
+  const staleOpen = !checkOut && !!dateIso && dateIso < todayIsoBkk();
+  const isIncomplete = !!r.isIncomplete || staleOpen;
+  let status = rawStatus;
   let statusColor = staleOpen ? '#EF4444' : r.statusColor;
   if (!isIncomplete) {
     if (checkOut) {
       // late first; only an on-time record is checked for the worked hours (under 9 hours = not enough)
       const m = String(r.duration || '').match(/(\d+):(\d+)/);
       const workedSec = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 : null;
-      const shortHours = workedSec !== null && workedSec > 0 && workedSec < 9 * 3600;
+      const shortHours = workedSec !== null && workedSec > 0 && workedSec < workRules.requiredSeconds();
       status = isLate ? 'เข้างานสาย' : shortHours ? 'ทำงานไม่ครบเวลา' : 'ลงเวลาเข้า-ออกครบถ้วน';
     } else {
       status = isLate ? 'เข้างานสาย (กำลังทำงาน)' : 'เข้างานตรงเวลา (กำลังทำงาน)';
@@ -167,6 +183,7 @@ const normalizeServerAttendance = (r) => {
 
 // Async sync with backend API database (server is the source of truth for history)
 const syncWithBackend = async () => {
+  workRules.refresh(); // keep the start time / required hours HR set up to date
   try {
     const res = await tryFetchApi('/attendance/history');
     if (res && res.ok) {
@@ -176,7 +193,7 @@ const syncWithBackend = async () => {
         globalState.history = serverHistory;
 
         // Restore today's clocked-in state from the server (e.g. new device / cleared storage)
-        const todayIso = new Date().toISOString().split('T')[0];
+        const todayIso = todayIsoBkk();
         const todayRecords = serverHistory.filter((h) => h.dateIso === todayIso);
         if (todayRecords.length > 0) {
           const openRecord = todayRecords.find((h) => h.checkIn && h.checkIn !== '--:--' && !h.checkOut);
@@ -241,7 +258,7 @@ const getCurrentPosition = async () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
         () => resolve(null),
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge 0: every punch reads a fresh position, never a cached one
       );
     });
   } catch (e) {
@@ -279,7 +296,8 @@ export const attendanceStorage = {
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'ไม่สามารถบันทึกเวลาได้ กรุณาลองใหม่อีกครั้ง');
     }
-    return data.attendance || null;
+    // pointsAwarded = bonus for checking in on time AND working the full hours (paid at clock-out, 0 otherwise)
+    return { ...(data.attendance || {}), pointsAwarded: Number(data.pointsAwarded) || 0 };
   },
 
   /** Current device position { latitude, longitude } or null (permission denied / GPS off) */
@@ -322,15 +340,14 @@ export const attendanceStorage = {
   async clockIn(latitude, longitude, locationName) {
     const nowObj = new Date();
     const nowTime = nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
-    const dateIsoStr = nowObj.toISOString().split('T')[0];
+    const dateIsoStr = todayIsoBkk();
     const formattedDateStr = nowObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
     const dayThaiStr = nowObj.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Work schedule: 08:00 - 17:00. Must check in before 09:00 AM.
-    // If checking in after 09:00:00 (h > 9 || (h === 9 && m > 0)), status is 'สาย'
+    // Late = checking in after the work start time HR set in Work Time Settings (default 09:00)
     const h = nowObj.getHours();
     const m = nowObj.getMinutes();
-    const isLate = h > 9 || (h === 9 && m > 0);
+    const isLate = workRules.isLateAt(h, m);
 
     const todayRecord = {
       id: 'att_' + nowObj.getTime(),
@@ -364,7 +381,7 @@ export const attendanceStorage = {
   async clockOut(latitude, longitude, locationName) {
     const nowObj = new Date();
     const nowTime = nowObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
-    const dateIsoStr = nowObj.toISOString().split('T')[0];
+    const dateIsoStr = todayIsoBkk();
 
     await this.punch('clock-out', { latitude, longitude, locationName });
 

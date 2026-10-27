@@ -22,6 +22,8 @@ import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
 import { useTheme } from '../context/ThemeContext';
 import { tryFetchApi } from '../services/apiClient';
+import { workRules } from '../services/workRules';
+import { todayIsoBkk } from '../utils/bangkokDate';
 
 const attendanceIssues = [];
 
@@ -262,7 +264,7 @@ export default function TimeCorrectionScreen({ navigation, route }) {
       }
 
       const inDate = inPunch ? new Date(inPunch.timestamp) : new Date(outPunch.timestamp);
-      const isLate = inDate.getHours() > 9 || (inDate.getHours() === 9 && inDate.getMinutes() > 0);
+      const isLate = workRules.isLateAt(inDate.getHours(), inDate.getMinutes());
       const isShort = outPunch ? diffSec < 14400 : false;
       const isMissingOut = !outPunch;
 
@@ -313,7 +315,7 @@ export default function TimeCorrectionScreen({ navigation, route }) {
     if (record.isComplete || record.status === 'ลงเวลาเข้า-ออกครบถ้วน') return;
     if (record.dateIso && processedPunchDates.has(record.dateIso)) return;
     // Still clocked in today (no check-out yet) is not an issue to correct
-    if (!record.checkOut && record.dateIso === new Date().toISOString().split('T')[0]) return;
+    if (!record.checkOut && record.dateIso === todayIsoBkk()) return;
 
     if (record.isIncomplete || record.status?.includes('สาย') || record.status?.includes('ไม่ครบ') || record.status?.includes('ออกก่อน')) {
       let recordDate = new Date();
@@ -440,12 +442,8 @@ export default function TimeCorrectionScreen({ navigation, route }) {
     let outH = parseInt(outParts[0], 10) || 0;
     let outM = parseInt(outParts[1], 10) || 0;
 
-    if (inH < 8) {
-      inH = 8;
-      inM = 0;
-    }
-
-    const startSec = inH * 3600 + inM * 60;
+    // counted from the "count from" time HR set (default 08:00) when the employee came earlier
+    const startSec = Math.max(inH * 3600 + inM * 60, workRules.workStartMinutes() * 60);
     const endSec = outH * 3600 + outM * 60;
     const diffSec = endSec - startSec;
 
@@ -456,13 +454,13 @@ export default function TimeCorrectionScreen({ navigation, route }) {
       };
     }
 
-    const minRequiredSec = 9 * 3600;
+    const minRequiredSec = workRules.requiredSeconds();
     if (diffSec < minRequiredSec) {
       const currentH = Math.floor(diffSec / 3600);
       const currentM = Math.floor((diffSec % 3600) / 60);
       return {
         isValid: false,
-        errorMsg: `เวลาทำงานรวมต้องไม่น้อยกว่า 9 ชั่วโมง (เริ่มนับจาก 08:00 น.) ปัจจุบันคำนวณได้เพียง ${currentH} ชม. ${currentM} นาที`,
+        errorMsg: `เวลาทำงานรวมต้องไม่น้อยกว่า ${workRules.requiredHoursLabel()} ชั่วโมง (เริ่มนับจาก ${workRules.get().workStartTime} น.) ปัจจุบันคำนวณได้เพียง ${currentH} ชม. ${currentM} นาที`,
       };
     }
 
@@ -569,9 +567,6 @@ export default function TimeCorrectionScreen({ navigation, route }) {
             </TouchableOpacity>
             <View style={{ alignItems: 'center' }}>
               <Text style={styles.monthText}>{thaiMonths[activeMonth]} {activeYear + 543}</Text>
-              <Text style={{ fontSize: 12, color: filteredIssues.length > 0 ? '#F5A623' : '#10B981', fontWeight: '700', marginTop: 2 }}>
-                {filteredIssues.length > 0 ? `พบ ${filteredIssues.length} รายการที่ต้องปรับปรุงเวลา` : 'ไม่มีรายการต้องปรับปรุง'}
-              </Text>
             </View>
             <TouchableOpacity testID="time-correction-next-month-btn" onPress={handleNextMonth} style={styles.navBtn}>
               <Ionicons name="chevron-forward" size={20} color={colors.primary} />

@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#0B0D13] text-slate-100 font-sans min-h-screen antialiased selection:bg-[#DC2626] selection:text-white;
+    @apply bg-slate-50 text-slate-900 font-sans min-h-screen antialiased selection:bg-[#7C3AED] selection:text-white;
   }
 }
 
@@ -33,10 +33,10 @@
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(220, 38, 38, 0.2);
+    box-shadow: 0 0 15px rgba(124, 58, 237, 0.2);
   }
   50% {
-    box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 25px rgba(167, 139, 250, 0.5);
   }
 }
 
@@ -53,7 +53,7 @@
 }
 .glow-hover:hover {
   transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 12px 30px -10px rgba(220, 38, 38, 0.35);
+  box-shadow: 0 12px 30px -10px rgba(124, 58, 237, 0.35);
 }
 
 .card-ultra-smooth {
@@ -61,22 +61,22 @@
 }
 .card-ultra-smooth:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 40px -15px rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 20px 40px -15px rgba(167, 139, 250, 0.25);
+  border-color: rgba(167, 139, 250, 0.5);
 }
 
-/* Tactical Dark Scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0B0D13;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #7F1D1D;
+  background: #C4B5FD;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #DC2626;
+  background: #7C3AED;
 }

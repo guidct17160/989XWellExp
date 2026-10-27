@@ -157,44 +157,42 @@ export default function RewardManagement() {
   const totalStock = rewards.reduce((acc, curr) => acc + (Number(curr.stock ?? curr.stockQuantity) || 0), 0);
 
   return (
-    <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
+    <div className="space-y-6 text-slate-900 font-sans animate-in fade-in duration-200">
       {/* Toast Notification */}
       {notification && (
         <div
           className={`fixed top-5 right-5 z-50 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-2.5 animate-bounce border ${
             notification.type === 'error'
-              ? 'bg-red-950 border-red-700/60 text-red-300'
-              : 'bg-emerald-950 border-emerald-700/60 text-emerald-300'
+              ? 'bg-danger-50 border-danger-200 text-danger-700'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
           }`}
         >
-          <CheckCircle size={18} className={notification.type === 'error' ? 'text-[#EF4444]' : 'text-emerald-400'} />
+          <CheckCircle size={18} className={notification.type === 'error' ? 'text-danger-600' : 'text-emerald-600'} />
           <span>{notification.msg}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+          <div className="p-3 rounded-2xl bg-violet-100 text-violet-700 border border-violet-200">
             <Gift size={26} />
           </div>
           <div>
             <div className="flex items-center gap-2">
 
-              <h1 className="text-xl font-black text-white uppercase tracking-wide">
+              <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">
                  Reward Management 
               </h1>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Create rewards, set redemption points, check remaining stock and employee coupon redemption history
-            </p>
+            
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={fetchRewards}
-            className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 text-slate-700 transition-colors"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -203,33 +201,33 @@ export default function RewardManagement() {
 
       {/* Overview Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-[#141722] p-5 rounded-2xl border border-red-900/30 shadow flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-amber-950/80 text-amber-400 border border-amber-800/40">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
             <Gift size={24} />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-medium">Total rewards</p>
-            <h3 className="text-2xl font-black text-amber-400 font-mono">{rewards.length} items</h3>
+            <p className="text-xs text-slate-500 font-medium">Total rewards</p>
+            <h3 className="text-2xl font-black text-amber-600 font-mono">{rewards.length} items</h3>
           </div>
         </div>
 
-        <div className="bg-[#141722] p-5 rounded-2xl border border-red-900/30 shadow flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
             <Package size={24} />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-medium">Total remaining stock</p>
-            <h3 className="text-2xl font-black text-emerald-400 font-mono">{totalStock} pcs</h3>
+            <p className="text-xs text-slate-500 font-medium">Total remaining stock</p>
+            <h3 className="text-2xl font-black text-emerald-600 font-mono">{totalStock} pcs</h3>
           </div>
         </div>
 
-        <div className="bg-[#141722] p-5 rounded-2xl border border-red-900/30 shadow flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-sky-950/80 text-sky-400 border border-sky-800/40">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-sky-50 text-sky-600 border border-sky-200">
             <Ticket size={24} />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-medium">Coupons redeemed by the signed-in account</p>
-            <h3 className="text-2xl font-black text-sky-400 font-mono">{redeemedCouponsCount} items</h3>
+            <p className="text-xs text-slate-500 font-medium">Coupons redeemed by the signed-in account</p>
+            <h3 className="text-2xl font-black text-sky-600 font-mono">{redeemedCouponsCount} items</h3>
           </div>
         </div>
       </div>
@@ -239,7 +237,7 @@ export default function RewardManagement() {
         right={
           <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
+          className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
           <Plus size={16} />
           <span>Add New Reward</span>
@@ -270,11 +268,11 @@ export default function RewardManagement() {
       />
 
       {/* Rewards Catalog Table */}
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4 whitespace-nowrap">Code</th>
                 <th className="py-3.5 px-4 w-full">Reward</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Category</th>
@@ -284,7 +282,7 @@ export default function RewardManagement() {
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-slate-500 font-mono">Loading...</td>
@@ -295,11 +293,11 @@ export default function RewardManagement() {
                 </tr>
               ) : (
                 filteredRewards.map((item) => (
-                  <tr key={item.id} className="hover:bg-red-950/20 transition-colors">
+                  <tr key={item.id} className="hover:bg-violet-50 transition-colors">
                     <td className="py-3 px-4 align-middle">
                       <span
                         title={item.id}
-                        className="block max-w-[8.5rem] truncate whitespace-nowrap text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-red-950/80 text-[#EF4444] border border-red-800/40"
+                        className="block max-w-[8.5rem] truncate whitespace-nowrap text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-violet-100 text-violet-700 border border-violet-200"
                       >
                         {item.id}
                       </span>
@@ -310,33 +308,33 @@ export default function RewardManagement() {
                           <img
                             src={item.imageUrl}
                             alt={item.title}
-                            className="w-12 h-12 rounded-lg object-cover border border-red-900/40 shrink-0"
+                            className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
                           />
                         ) : null}
-                        <span className="font-bold text-white leading-snug">{item.title}</span>
+                        <span className="font-bold text-slate-900 leading-snug">{item.title}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4 align-middle whitespace-nowrap">
-                      <span className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-950/70 text-violet-300 border border-violet-700/50">
+                      <span className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-300">
                         {item.category || '-'}
                       </span>
                     </td>
                     <td className="py-3 px-4 align-middle w-64 max-w-[16rem]">
-                      <div className="text-xs text-slate-400 leading-snug line-clamp-2" title={item.description}>{item.description || '-'}</div>
+                      <div className="text-xs text-slate-500 leading-snug line-clamp-2" title={item.description}>{item.description || '-'}</div>
                     </td>
-                    <td className="py-3 px-4 align-middle text-center font-bold text-amber-400 font-mono whitespace-nowrap">
+                    <td className="py-3 px-4 align-middle text-center font-bold text-amber-600 font-mono whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
                         <Award size={15} />
                         {Number(item.pointsRequired ?? item.pointsCost ?? item.points ?? 0).toLocaleString()} Points
                       </span>
                     </td>
-                    <td className="py-3 px-4 align-middle text-center font-bold text-emerald-400 font-mono whitespace-nowrap">
+                    <td className="py-3 px-4 align-middle text-center font-bold text-emerald-600 font-mono whitespace-nowrap">
                       {Number(item.stock ?? item.stockQuantity ?? 0).toLocaleString()} pcs
                     </td>
                     <td className="py-3 px-4 align-middle text-center">
                       <button
                         onClick={() => setDeleteTarget(item)}
-                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
                         title="Delete"
                       >
                         <Trash2 size={16} />
@@ -352,25 +350,25 @@ export default function RewardManagement() {
 
       {/* Delete confirmation */}
       {deleteTarget && createPortal(
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" data-testid="delete-reward-confirm">
-          <div className="bg-[#141722] rounded-3xl max-w-sm w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 text-center">
-            <div className="mx-auto mb-4 w-12 h-12 rounded-2xl bg-red-950/80 text-[#EF4444] border border-red-800/40 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4" data-testid="delete-reward-confirm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-7 shadow-2xl border border-danger-200 text-slate-900 text-center">
+            <div className="mx-auto mb-4 w-12 h-12 rounded-2xl bg-danger-50 text-danger-600 border border-danger-200 flex items-center justify-center">
               <AlertTriangle size={24} />
             </div>
-            <h3 className="text-lg font-black text-white">Delete "{deleteTarget.title}"?</h3>
-            <p className="text-xs text-slate-400 mt-2">
+            <h3 className="text-lg font-black text-slate-900">Delete "{deleteTarget.title}"?</h3>
+            <p className="text-xs text-slate-500 mt-2">
               This reward will be removed from the catalog. A reward that employees have already redeemed cannot be deleted.
             </p>
             <div className="flex justify-center gap-3 mt-6">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-danger-200 bg-slate-50 text-slate-700 hover:bg-danger-50 font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteReward(deleteTarget.id)}
-                className="px-5 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-red-600/30 uppercase tracking-wide cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-danger-600/30 uppercase tracking-wide cursor-pointer"
               >
                 Delete
               </button>
@@ -382,18 +380,18 @@ export default function RewardManagement() {
 
       {/* Add Reward Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/40 text-slate-100">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b border-red-900/30">
-              <h3 className="text-lg font-black text-white uppercase tracking-wide">Add New Reward</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900">
+            <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Add New Reward</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-slate-900">
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleAddReward} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Code
                 </label>
                 <input
@@ -402,13 +400,13 @@ export default function RewardManagement() {
                   value={codeInput}
                   maxLength={30}
                   onChange={(e) => setCodeInput(e.target.value.replace(/[^A-Za-z0-9_-]/g, ''))}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-mono text-white outline-none focus:border-[#EF4444]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-violet-500"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">Letters, numbers, - and _ only (up to 30). Each reward needs its own code.</p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Reward Title *
                 </label>
                 <input
@@ -416,19 +414,19 @@ export default function RewardManagement() {
                   placeholder="e.g. ☕ Starbucks gift card 200 THB"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm text-white outline-none focus:border-[#EF4444]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-violet-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Category *
                 </label>
                 <select
                   value={categoryInput}
                   onChange={(e) => setCategoryInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm text-white outline-none focus:border-[#EF4444] cursor-pointer"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-violet-500 cursor-pointer"
                   required
                 >
                   <option value="" disabled>Select a category</option>
@@ -437,61 +435,61 @@ export default function RewardManagement() {
                   ))}
                 </select>
                 {categories.length === 0 && (
-                  <p className="text-[11px] text-amber-400 mt-1">No categories yet. Create one first in Reward → Reward Categories.</p>
+                  <p className="text-[11px] text-amber-600 mt-1">No categories yet. Create one first in Reward → Reward Categories.</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Reward Description
                 </label>
                 <textarea
                   placeholder="Reward details and terms of use..."
                   value={descInput}
                   onChange={(e) => setDescInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-xs text-white outline-none focus:border-[#EF4444] h-20"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 outline-none focus:border-violet-500 h-20"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Points Required
                   </label>
                   <input
                     type="number"
                     value={pointsInput}
                     onChange={(e) => setPointsInput(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-mono text-white outline-none focus:border-[#EF4444]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-violet-500"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Stock Quantity
                   </label>
                   <input
                     type="number"
                     value={stockInput}
                     onChange={(e) => setStockInput(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-mono text-white outline-none focus:border-[#EF4444]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 outline-none focus:border-violet-500"
                     required
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-red-600/30 uppercase tracking-wide"
+                  className="px-5 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs shadow-lg shadow-violet-600/30 uppercase tracking-wide"
                 >
                   Save Reward
                 </button>

@@ -140,7 +140,6 @@ export default function RewardsScreen({ navigation, route }) {
   // Full Screen Leaderboard Modal States
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState('week'); // 'week' | 'month' | 'year'
-  const [leaderboardSubTab, setLeaderboardSubTab] = useState('activity'); // 'activity' | 'transfer'
 
   // Dynamically hide Bottom Tab Bar when any Popup or Fullscreen Modal is active
   useEffect(() => {
@@ -1871,27 +1870,9 @@ export default function RewardsScreen({ navigation, route }) {
 
             {/* Podium Backdrop & List Data */}
             {(() => {
+              // points are shown with a star (the old round "WP" coin was removed)
               const WPCoinIcon = ({ size = 20 }) => (
-                <View
-                  style={{
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    backgroundColor: '#F59E0B',
-                    borderWidth: 1.5,
-                    borderColor: '#FCD34D',
-                    alignItems: 'center',
-                    justify: 'center',
-                    marginLeft: 5,
-                    shadowColor: '#D97706',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 2,
-                    elevation: 2,
-                  }}
-                >
-                  <Text style={{ fontSize: size * 0.42, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5 }}>WP</Text>
-                </View>
+                <Ionicons name="star" size={size} color="#FBBF24" style={{ marginLeft: 5 }} />
               );
 
               const currentData = dynamicLeaderboardData[leaderboardTab];
@@ -1981,24 +1962,8 @@ export default function RewardsScreen({ navigation, route }) {
                     </View>
                   </View>
 
-                  {/* Sub-Tab Toggle Switcher: กิจกรรม | โอนพอยต์ให้เพื่อน */}
-                  <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 3, marginBottom: 14, flexDirection: 'row' }}>
-                    <TouchableOpacity
-                      style={{ flex: 1, paddingVertical: 10, borderRadius: 14, backgroundColor: leaderboardSubTab === 'activity' ? '#3B4279' : 'transparent', alignItems: 'center' }}
-                      onPress={() => setLeaderboardSubTab('activity')}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: leaderboardSubTab === 'activity' ? '#FFFFFF' : '#3B4279' }}>กิจกรรม</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ flex: 1, paddingVertical: 10, borderRadius: 14, backgroundColor: leaderboardSubTab === 'transfer' ? '#3B4279' : 'transparent', alignItems: 'center' }}
-                      onPress={() => setLeaderboardSubTab('transfer')}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: leaderboardSubTab === 'transfer' ? '#FFFFFF' : '#3B4279' }}>โอนพอยต์ให้เพื่อน</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Leaderboard List Items (Rank 4, 5, 6, 7...) */}
-                  {list.map((item, idx) => (
+                  {/* Ranks 4 - 10 (the podium above shows 1 - 3) */}
+                  {list.slice(0, 7).map((item, idx) => (
                     <View
                       key={`${item.name}_${idx}`}
                       style={{
@@ -2009,10 +1974,10 @@ export default function RewardsScreen({ navigation, route }) {
                         marginBottom: 10,
                         flexDirection: 'row',
                         alignItems: 'center',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
                         {/* Rank Badge Circle */}
                         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#E82B74', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                           <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>{item.rank}</Text>
@@ -2020,7 +1985,7 @@ export default function RewardsScreen({ navigation, route }) {
                         {/* Avatar */}
                         <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12 }} />
                         {/* Name */}
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>{item.name}</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', flexShrink: 1 }} numberOfLines={1}>{item.name}</Text>
                       </View>
 
                       {/* Points */}

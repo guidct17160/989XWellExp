@@ -9,7 +9,6 @@ import {
   Animated,
   StatusBar,
   RefreshControl,
-  Modal,
   Alert,
   Image,
   ActivityIndicator,
@@ -51,7 +50,6 @@ export default function ProfileScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Modals state
-  const [showQrModal, setShowQrModal] = useState(false);
 
   const fetchProfileData = async () => {
     try {
@@ -233,8 +231,6 @@ export default function ProfileScreen({ navigation }) {
     }, 800);
   }, []);
 
-  const annualBalance = leaveState.leaveBalances.find((b) => b.id === 'annual')?.remaining || 8;
-
   const profileMenuItems = [
     {
       section: t('personalInfo') || 'ข้อมูลส่วนตัวและองค์กร (จัดการโดย Web Admin)',
@@ -249,12 +245,6 @@ export default function ProfileScreen({ navigation }) {
     {
       section: t('appPreferences') || 'การใช้งานบัญชี',
       items: [
-        {
-          icon: 'qr-code-outline',
-          label: 'บัตรพนักงานดิจิทัล & QR Code',
-          chevron: true,
-          onPress: () => setShowQrModal(true),
-        },
         {
           icon: 'settings-outline',
           label: t('settings') || 'การตั้งค่าระบบและแอปพลิเคชัน',
@@ -291,13 +281,6 @@ export default function ProfileScreen({ navigation }) {
       ],
     },
   ];
-
-  const displayPosition =
-    profile.role === 'SuperBoss'
-      ? 'ผู้อำนวยการฝ่ายเทคโนโลยี (SuperBoss)'
-      : profile.role === 'Boss'
-      ? 'ผู้จัดการฝ่าย (Boss)'
-      : (profile.position || 'พนักงาน');
 
   return (
     <SafeAreaView testID="screen-profile" style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -339,35 +322,7 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
 
           <Text style={[styles.nameText, { color: theme.text }]}>{profile.name}</Text>
-          <Text style={[styles.positionText, { color: theme.textSecondary }]}>{displayPosition}</Text>
-
-          <TouchableOpacity
-            style={[styles.idBadge, { backgroundColor: isDarkMode ? '#1E293B' : '#F0F9FF', borderColor: isDarkMode ? '#334155' : '#BAE6FD' }]}
-            onPress={() => setShowQrModal(true)}
-          >
-            <Ionicons name="id-card-outline" size={16} color={colors.primary} />
-            <Text style={[styles.idText, { color: colors.primary }]}>รหัส: {profile.code}</Text>
-            <Ionicons name="qr-code-outline" size={14} color={colors.primary} style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
         </View>
-
-        {/* Stats Summary Bar */}
-        <Animated.View style={[styles.statsCard, { backgroundColor: theme.surface, borderColor: theme.border, opacity: fadeAnim }]}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{annualBalance} วัน</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>วันลาพักร้อน</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile.role || 'Employee'}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>บทบาทระบบ</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: '#10B981' }]}>{profile.status || 'Active'}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>สถานะบัญชี</Text>
-          </View>
-        </Animated.View>
 
         {/* Menu Sections */}
         <Animated.View style={[styles.body, { opacity: fadeAnim }]}>
@@ -437,39 +392,6 @@ export default function ProfileScreen({ navigation }) {
           ))}
         </Animated.View>
       </ScrollView>
-
-      {/* DIGITAL ID CARD & QR CODE MODAL */}
-      <Modal visible={showQrModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.cardModalContainer, { backgroundColor: theme.surface }]}>
-            <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
-                <Text style={[styles.cardHeaderTitle, { color: theme.text }]}>WellX989 Digital ID</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowQrModal(false)}>
-                <Ionicons name="close" size={24} color={theme.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.cardBody}>
-              <Image source={{ uri: profile.avatarUrl }} style={styles.cardAvatar} />
-              <Text style={[styles.cardName, { color: theme.text }]}>{profile.name}</Text>
-              <Text style={[styles.cardPos, { color: theme.textSecondary }]}>{profile.position}</Text>
-              <Text style={[styles.cardDept, { color: colors.primary }]}>{profile.department}</Text>
-
-              {/* QR Code Container */}
-              <View style={[styles.qrContainer, { backgroundColor: '#FFFFFF' }]}>
-                <Ionicons name="qr-code" size={140} color="#0F172A" />
-                <Text style={styles.qrCodeText}>{profile.code}</Text>
-              </View>
-              <Text style={[styles.cardFooterText, { color: theme.textSecondary }]}>
-                สแกนเพื่อยืนยันตัวตนหรือบันทึกเวลาเข้างาน (Real DB)
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -487,7 +409,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingTop: 20,
-    paddingBottom: 28,
+    paddingBottom: 20,
     borderBottomWidth: 1,
   },
   avatarContainer: {
@@ -520,47 +442,7 @@ const styles = StyleSheet.create({
   },
   positionText: {
     fontSize: 14,
-    marginBottom: 10,
     fontWeight: '500',
-  },
-  idBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  idText: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: -16,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    paddingVertical: 16,
-    elevation: 3,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  statDivider: {
-    width: 1,
   },
   body: {
     paddingHorizontal: 16,
@@ -616,76 +498,5 @@ const styles = StyleSheet.create({
   menuValue: {
     fontSize: 13,
     marginRight: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  cardModalContainer: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 24,
-    padding: 24,
-    elevation: 8,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  cardHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  cardBody: {
-    alignItems: 'center',
-  },
-  cardAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    marginBottom: 12,
-  },
-  cardName: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  cardPos: {
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  cardDept: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  qrContainer: {
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginVertical: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  qrCodeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 8,
-    letterSpacing: 1,
-  },
-  cardFooterText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
   },
 });

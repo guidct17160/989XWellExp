@@ -23,6 +23,7 @@ import { notificationStorage } from '../services/notificationStorage';
 import TopNavbar from '../components/TopNavbar';
 import { useTheme } from '../context/ThemeContext';
 import { getPublicHolidayName, fetchHolidaysFromBackend } from '../utils/thaiHolidays';
+import { workRules } from '../services/workRules';
 
 export default function TimeAttendanceScreen({ navigation }) {
   const scrollViewRef = useRef(null);
@@ -186,8 +187,10 @@ export default function TimeAttendanceScreen({ navigation }) {
   const getEffectiveCheckInTime = (time) => {
     if (!time) return null;
     const effective = new Date(time);
-    if (effective.getHours() < 8) {
-      effective.setHours(8, 0, 0, 0);
+    const countFrom = new Date(time);
+    countFrom.setHours(Math.floor(workRules.workStartMinutes() / 60), workRules.workStartMinutes() % 60, 0, 0);
+    if (effective < countFrom) {
+      effective.setTime(countFrom.getTime());
     }
     return effective;
   };
@@ -278,7 +281,7 @@ export default function TimeAttendanceScreen({ navigation }) {
       if (!isNaN(d.getTime())) {
         const h = d.getHours();
         const m = d.getMinutes();
-        return h > 9 || (h === 9 && m > 0);
+        return workRules.isLateAt(h, m);
       }
     }
 
@@ -290,7 +293,7 @@ export default function TimeAttendanceScreen({ navigation }) {
       if (clean.toLowerCase().includes('pm') && h < 12) h += 12;
       if (clean.toLowerCase().includes('am') && h === 12) h = 0;
       if (!isNaN(h) && !isNaN(m)) {
-        return h > 9 || (h === 9 && m > 0);
+        return workRules.isLateAt(h, m);
       }
     }
     return false;
@@ -468,10 +471,10 @@ export default function TimeAttendanceScreen({ navigation }) {
       } else if (isWorkingNow) {
         const checkInDateObj = inPunch?.timestamp ? new Date(inPunch.timestamp) : (checkInTime instanceof Date ? checkInTime : new Date());
         let effectiveStartTs = checkInDateObj.getTime();
-        if (checkInDateObj.getHours() < 8) {
-          const effectiveDate = new Date(checkInDateObj);
-          effectiveDate.setHours(8, 0, 0, 0);
-          effectiveStartTs = effectiveDate.getTime();
+        const countFromDate = new Date(checkInDateObj);
+        countFromDate.setHours(Math.floor(workRules.workStartMinutes() / 60), workRules.workStartMinutes() % 60, 0, 0);
+        if (checkInDateObj < countFromDate) {
+          effectiveStartTs = countFromDate.getTime();
         }
         const diffSec = Math.max(0, Math.floor((currentTime.getTime() - effectiveStartTs) / 1000));
         const h = Math.floor(diffSec / 3600);
@@ -482,7 +485,7 @@ export default function TimeAttendanceScreen({ navigation }) {
 
       const lateCheck = isCheckInLate(checkInStr, inPunch?.timestamp);
       const totalDurationSec = parseDurSec(durationStr);
-      const isShortShift = totalDurationSec > 0 && totalDurationSec < 32400; // < 9 hours
+      const isShortShift = totalDurationSec > 0 && totalDurationSec < workRules.requiredSeconds(); // fewer than the required hours
 
       let currentStatus = 'เข้างานตรงเวลา';
       let currentStatusColor = '#27AE60'; // Green
@@ -505,7 +508,7 @@ export default function TimeAttendanceScreen({ navigation }) {
           currentStatus = 'เข้างานสาย';
           currentStatusColor = '#EF4444';
         } else if (isShortShift) {
-          currentStatus = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 9 ชม.)';
+          currentStatus = `ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง ${workRules.requiredHoursLabel()} ชม.)`;
           currentStatusColor = '#F5A623';
         } else {
           currentStatus = 'ลงเวลาเข้า-ออกครบถ้วน';
@@ -867,7 +870,7 @@ export default function TimeAttendanceScreen({ navigation }) {
                       return 0;
                     };
                     const durSec = parseSec(log.duration);
-                    const isShortShift = hasBothPunches && durSec > 0 && durSec < 32400; // < 9 hours
+                    const isShortShift = hasBothPunches && durSec > 0 && durSec < workRules.requiredSeconds(); // fewer than the required hours
 
                     const isLate = typeof log.isLate === 'boolean' ? log.isLate : (log.status?.includes('เข้างานสาย') || false);
                     const isCompleted = (log.status === 'ลงเวลาเข้า-ออกครบถ้วน' || log.isComplete) && !isShortShift && !isLate;
@@ -892,7 +895,7 @@ export default function TimeAttendanceScreen({ navigation }) {
                     } else if (isShortShift) {
                       cardBorderColor = '#F5A623';
                       statusColor = '#F5A623';
-                      statusTitle = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง 9 ชม.)';
+                      statusTitle = `ทำงานไม่ครบเวลา (ออกก่อนกำหนด / ไม่ถึง ${workRules.requiredHoursLabel()} ชม.)`;
                     } else if (isCompleted) {
                       cardBorderColor = '#27AE60';
                       statusColor = '#27AE60';

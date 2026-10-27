@@ -54,31 +54,31 @@ export default function ForgotPasswordPage({ onNavigate, initialIdentifier = '' 
   return (
     <AuthLayout>
       <form onSubmit={handleSubmit} className="flex flex-col">
-        <h2 className="text-lg font-extrabold text-white mb-1">Reset your password</h2>
+        <h2 className="text-lg font-extrabold text-slate-900 mb-1">Reset your password</h2>
         {done ? (
           <div className="mt-3 mb-6 space-y-3">
-            <div className="bg-emerald-950/70 border border-emerald-600/50 text-emerald-200 px-4 py-3 rounded-xl text-sm font-semibold">
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold">
               A password reset link has been sent{done.maskedEmail ? ` to ${done.maskedEmail}` : ' to your registered email'}.
               Open the email and follow the link to set a new password.
             </div>
             {done.resetUrl && (
-              <a href={done.resetUrl} className="block text-xs text-amber-300 underline break-all">
+              <a href={done.resetUrl} className="block text-xs text-amber-700 underline break-all">
                 Development only: open the reset link directly
               </a>
             )}
           </div>
         ) : (
           <>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-slate-500 mb-5">
               Enter your email, username or employee ID. We will email you a link to set a new password.
             </p>
             {error && (
-              <div className="bg-red-950/80 border border-red-600/50 text-red-300 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2">
+              <div className="bg-danger-50 border border-danger-300 text-danger-700 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2">
                 <span>⚠️</span>
                 <span>{error}</span>
               </div>
             )}
-            <label htmlFor="forgot-id" className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="forgot-id" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
               Email / username / ID
             </label>
             <input
@@ -89,12 +89,12 @@ export default function ForgotPasswordPage({ onNavigate, initialIdentifier = '' 
               placeholder="Enter email, username or employee ID"
               autoComplete="username"
               autoFocus
-              className="w-full h-12 px-4 mb-6 rounded-xl border border-red-900/40 bg-[#0B0D13] text-white font-medium placeholder:text-slate-500 focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 outline-none transition-all"
+              className="w-full h-12 px-4 mb-6 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-medium placeholder:text-slate-500 focus:border-violet-500 focus:ring-4 focus:ring-violet-200 outline-none transition-all"
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl text-base shadow-lg shadow-red-600/30 transition-all flex items-center justify-center gap-2 uppercase tracking-wide cursor-pointer"
+              className="w-full h-12 bg-gradient-to-r from-[#7C3AED] to-[#4C1D95] hover:from-[#A78BFA] hover:to-[#6D28D9] active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl text-base shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2 uppercase tracking-wide cursor-pointer"
             >
               {loading ? <span>Sending...</span> : <span>Send reset link</span>}
             </button>
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage({ onNavigate, initialIdentifier = '' 
         <button
           type="button"
           onClick={backToSignIn}
-          className="mt-4 text-xs font-semibold text-slate-400 hover:text-[#EF4444] transition-colors cursor-pointer self-center"
+          className="mt-4 text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer self-center"
         >
           Back to sign in
         </button>

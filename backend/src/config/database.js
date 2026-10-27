@@ -229,6 +229,11 @@ const initPostgresSchema = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- where the employee clocked OUT (latitude / longitude / location_name above are the clock-in position)
+      ALTER TABLE attendance ADD COLUMN IF NOT EXISTS check_out_latitude NUMERIC(10,8);
+      ALTER TABLE attendance ADD COLUMN IF NOT EXISTS check_out_longitude NUMERIC(11,8);
+      ALTER TABLE attendance ADD COLUMN IF NOT EXISTS check_out_location_name TEXT;
+
       -- High-Performance Enterprise Indexing
       CREATE INDEX IF NOT EXISTS idx_employees_dept ON employees(department, status);
       CREATE INDEX IF NOT EXISTS idx_attendance_emp_date ON attendance(employee_id, date_iso);
@@ -263,6 +268,12 @@ const initPostgresSchema = async () => {
         remark TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- approval history is per account: who gave the final answer, and which Boss approved at level 1
+      ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS decided_by VARCHAR(50);
+      ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS level1_by VARCHAR(50);
+      ALTER TABLE time_corrections ADD COLUMN IF NOT EXISTS decided_by VARCHAR(50);
+      ALTER TABLE time_corrections ADD COLUMN IF NOT EXISTS level1_by VARCHAR(50);
 
       CREATE TABLE IF NOT EXISTS quests (
         id VARCHAR(50) PRIMARY KEY,
@@ -419,6 +430,14 @@ const initPostgresSchema = async () => {
         image_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      -- publishing window + uploaded image (PNG / GIF of any size, kept in the database)
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS start_date VARCHAR(10);
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS start_time VARCHAR(5);
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS end_date VARCHAR(10);
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS end_time VARCHAR(5);
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_data BYTEA;
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_type VARCHAR(20);
+      ALTER TABLE announcements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
       CREATE TABLE IF NOT EXISTS notifications (
         id VARCHAR(50) PRIMARY KEY,

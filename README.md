@@ -78,17 +78,21 @@ npm run dev:all
 | All Employees | `/employees` |
 | Points Balance & History | `/points` |
 | Daily Attendance | `/attendance` |
-| Work Locations | `/attendance/work-locations` |
-| Leave Quotas & Policies | `/leave-policies` |
+| Settings → Work Locations | `/settings/work-locations` |
+| Settings → Work Time Settings | `/settings/work-time` |
+| Settings → Leave Quotas & Policies | `/settings/leave-policies` |
 | Quest Management | `/missions` (สร้าง `/missions/new`, แก้ `/missions/<code>`) |
+| Announcements | `/announcements` |
 | Rewards Catalog | `/rewards` |
-| Reward Categories | `/rewards/categories` (รายละเอียด `/rewards/categories/<code>`) |
+| Reward → Reward Categories | `/rewards/categories` (รายละเอียด `/rewards/categories/<code>`) |
 
 ลิงก์เก่าแบบ `/?tab=<เมนู>&id=<รหัส>` ยังเปิดได้และถูกแปลงเป็น path ใหม่เอง
 **ตอนขึ้นระบบจริง** เซิร์ฟเวอร์ต้องส่งทุก path กลับไปที่ `index.html` (SPA fallback) ไม่งั้น Refresh แล้วได้ 404
 
 ## ฟีเจอร์หลัก
 
+- **ตั้งเวลาทำงาน (Work Time Settings):** แอดมินตั้งเวลาเริ่มงาน (นับชั่วโมงจากเวลานี้), เวลาสาย (เข้าหลังเวลานี้ = สาย), ชั่วโมงทำงานต่อวัน และแต้ม ระบบแจกแต้มให้ตอนกดออกงาน ถ้าเข้างานตรงเวลาและทำงานครบชั่วโมง (วันละครั้ง) เว็บและแอปใช้ค่าเดียวกัน
+- **ประกาศ (Announcements):** แอดมินสร้างประกาศพร้อมรูป (PNG/GIF ขนาดเท่าไหร่ก็ได้ ไม่เกิน 5 MB) กำหนดช่วงเวลาแสดง (หรือไม่มีวันสิ้นสุด) พนักงานเห็นในแอปเฉพาะประกาศที่กำลังแสดงอยู่ ข้อมูลทั้งหมดมาจากฐานข้อมูลจริง
 - **ลงเวลา + สถานที่ (Work Locations):** แอดมินกำหนดสถานที่ รัศมี และผู้ใช้ได้ (ทุกคน/แผนก/รายบุคคล) บนแผนที่ พนักงานต้องอยู่ในรัศมีจึงลงเวลาได้ server คำนวณระยะเอง
   สถานะ: สาย (เข้าหลัง 09:00) → ทำงานไม่ครบ 9 ชั่วโมง → ปกติ
 - **ลา (Leave):** นโยบายตั้งที่เว็บ (โควตา เพศที่ใช้ได้ ต้องแนบเอกสาร) บังคับที่ server พนักงานแนบรูป/PDF/Word ไม่เกิน 5 MB จากแอป

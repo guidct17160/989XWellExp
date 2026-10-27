@@ -2,6 +2,23 @@ const db = require('../config/database');
 const memoryStore = require('./memoryStore');
 const httpError = require('../utils/httpError');
 const { bangkokParts, todayIso, durationUntilEndOfDay } = require('../utils/time');
+const workRules = require('../utils/workRules');
+
+// Run fn inside a PostgreSQL transaction (rolls back on any thrown error)
+const withTx = async (fn) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    throw e;
+  } finally {
+    client.release();
+  }
+};
 
 // attendance.employee_id may hold the employee id OR the employee code -> match both ($1 = id or code)
 const ATT_EMP_MATCH = `(employee_id = $1 OR employee_id IN (SELECT code FROM employees WHERE id = $1) OR employee_id IN (SELECT id FROM employees WHERE code = $1))`;
@@ -14,16 +31,8 @@ module.exports = function createAttendanceStore(storeRef) {
       const today = nowBkk.dateIso;
       const nowTime = nowBkk.timeLabel;
 
-      // Prevent double clock-in on the same day (PostgreSQL is the source of truth)
-      if (db.isPgConnected()) {
-        const dup = await db.query(
-          `SELECT id FROM attendance WHERE ${ATT_EMP_MATCH} AND date_iso = $2 LIMIT 1`,
-          [employeeId, today]
-        );
-        if (dup.rows && dup.rows.length > 0) {
-          throw httpError(400, 'คุณได้ลงเวลาเข้างานของวันนี้แล้ว');
-        }
-      } else if (memoryStore.memoryAttendance.some((a) => a.employeeId === employeeId && a.dateIso === today)) {
+      // Prevent double clock-in on the same day (PostgreSQL is checked again inside the insert transaction)
+      if (!db.isPgConnected() && memoryStore.memoryAttendance.some((a) => a.employeeId === employeeId && a.dateIso === today)) {
         throw httpError(400, 'คุณได้ลงเวลาเข้างานของวันนี้แล้ว');
       }
 
@@ -31,21 +40,28 @@ module.exports = function createAttendanceStore(storeRef) {
       let targetLat = null;
       let targetLng = null;
       let geofenceRadius = null;
-      let lateThreshold = '09:00';
+      let lateThreshold = workRules.DEFAULTS.lateAfterTime;
       try {
         const settings = await (storeRef ? storeRef.getSettings() : null);
         if (settings) {
           if (settings.geofenceLatitude !== undefined && settings.geofenceLatitude !== null) targetLat = Number(settings.geofenceLatitude);
           if (settings.geofenceLongitude !== undefined && settings.geofenceLongitude !== null) targetLng = Number(settings.geofenceLongitude);
           if (settings.geofenceRadius !== undefined && settings.geofenceRadius !== null) geofenceRadius = Number(settings.geofenceRadius);
-          if (/^\d{1,2}:\d{2}$/.test(String(settings.lateThresholdTime || ''))) lateThreshold = String(settings.lateThresholdTime);
+          lateThreshold = workRules.fromSettings(settings).lateAfterTime;
         }
       } catch (e) { /* ignore */ }
 
       // Work Schedule default 08:00 - 17:00; check-in after the threshold (default 09:00:00) is 'สาย' (Thai local time)
       const [thH, thM] = lateThreshold.split(':').map((n) => parseInt(n, 10));
       const nowSec = nowBkk.hour * 3600 + nowBkk.minute * 60 + nowBkk.second;
-      const isLate = nowSec > thH * 3600 + thM * 60;
+      // SuperBoss may clock in at any time: never late (the role is read from the employee record, not from the request)
+      let exempt = false;
+      try {
+        const emps = await (storeRef ? storeRef.getEmployees() : []);
+        const me = emps.find((e) => e && (e.id === employeeId || e.code === employeeId));
+        exempt = !!me && me.role === 'SuperBoss';
+      } catch (e) { /* treated as a normal employee */ }
+      const isLate = !exempt && nowSec > thH * 3600 + thM * 60;
 
       const currentLat = latitude !== undefined && latitude !== null ? Number(latitude) : null;
       const currentLng = longitude !== undefined && longitude !== null ? Number(longitude) : null;
@@ -82,12 +98,24 @@ module.exports = function createAttendanceStore(storeRef) {
 
       if (db.isPgConnected()) {
         try {
-          await db.query(
-            `INSERT INTO attendance (id, employee_id, date_iso, check_in, check_out, duration, status, status_color, latitude, longitude, location_name, photo_url, work_location_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-            [newAtt.id, newAtt.employeeId, newAtt.dateIso, newAtt.checkIn, newAtt.checkOut, newAtt.duration, newAtt.status, newAtt.statusColor, newAtt.latitude, newAtt.longitude, newAtt.locationName, newAtt.photoUrl, newAtt.workLocationId]
-          );
+          await withTx(async (client) => {
+            // lock the employee row first so two taps at the same moment cannot both punch in
+            await client.query('SELECT id FROM employees WHERE id = $1 OR code = $1 LIMIT 1 FOR UPDATE', [employeeId]);
+            const dup = await client.query(
+              `SELECT id FROM attendance WHERE ${ATT_EMP_MATCH} AND date_iso = $2 LIMIT 1`,
+              [employeeId, today]
+            );
+            if (dup.rows && dup.rows.length > 0) {
+              throw httpError(400, 'คุณได้ลงเวลาเข้างานของวันนี้แล้ว');
+            }
+            await client.query(
+              `INSERT INTO attendance (id, employee_id, date_iso, check_in, check_out, duration, status, status_color, latitude, longitude, location_name, photo_url, work_location_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              [newAtt.id, newAtt.employeeId, newAtt.dateIso, newAtt.checkIn, newAtt.checkOut, newAtt.duration, newAtt.status, newAtt.statusColor, newAtt.latitude, newAtt.longitude, newAtt.locationName, newAtt.photoUrl, newAtt.workLocationId]
+            );
+          });
         } catch (e) {
+          if (e && e.status) throw e;
           console.error('PG insert error in addClockIn:', e);
           throw new Error('ไม่สามารถบันทึกเวลาเข้างานลงฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
         }
@@ -97,25 +125,37 @@ module.exports = function createAttendanceStore(storeRef) {
       return newAtt;
     },
 
-    addClockOut: async ({ employeeId }) => {
+    addClockOut: async ({ employeeId, latitude, longitude, locationName }) => {
       const nowBkk = bangkokParts();
       const today = nowBkk.dateIso;
       const nowTime = nowBkk.timeLabel;
 
-      // Helper: calculate real duration from checkIn string to now (Thai local time)
-      const calcDuration = (checkInStr) => {
-        if (!checkInStr) return '00:00:00 ชม.';
-        const match = checkInStr.match(/(\d{1,2}):(\d{2})/);
-        if (!match) return '00:00:00 ชม.';
-        const ciH = parseInt(match[1], 10);
-        const ciM = parseInt(match[2], 10);
-        const diffSec = (nowBkk.hour * 3600 + nowBkk.minute * 60 + nowBkk.second) - (ciH * 3600 + ciM * 60);
+      let rules = { ...workRules.DEFAULTS };
+      try {
+        const settings = await (storeRef ? storeRef.getSettings() : null);
+        if (settings) rules = workRules.fromSettings(settings);
+      } catch (e) { /* keep the defaults */ }
+      const countFromSec = workRules.toSeconds(rules.workStartTime);
+
+      // Worked seconds from the check-in string to now (Thai local time); early arrivals count from the work start time
+      const workedSeconds = (checkInStr) => {
+        const match = String(checkInStr || '').match(/(\d{1,2}):(\d{2})/);
+        if (!match) return 0;
+        const ciSec = parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60;
+        return Math.max(0, (nowBkk.hour * 3600 + nowBkk.minute * 60 + nowBkk.second) - Math.max(ciSec, countFromSec));
+      };
+      const formatDuration = (diffSec) => {
         if (diffSec <= 0) return '00:00:00 ชม.';
         const hh = String(Math.floor(diffSec / 3600)).padStart(2, '0');
         const mm = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
         const ss = String(diffSec % 60).padStart(2, '0');
         return `${hh}:${mm}:${ss} ชม.`;
       };
+
+      const outLat = latitude !== undefined && latitude !== null && latitude !== '' ? Number(latitude) : null;
+      const outLng = longitude !== undefined && longitude !== null && longitude !== '' ? Number(longitude) : null;
+      const hasOut = Number.isFinite(outLat) && Number.isFinite(outLng);
+      const outLocationName = locationName || (hasOut ? `${outLat.toFixed(4)}, ${outLng.toFixed(4)}` : 'ไม่ระบุพิกัด');
 
       let found = null;
       if (db.isPgConnected()) {
@@ -138,6 +178,9 @@ module.exports = function createAttendanceStore(storeRef) {
             latitude: r.latitude,
             longitude: r.longitude,
             locationName: r.location_name,
+            checkOutLatitude: r.check_out_latitude,
+            checkOutLongitude: r.check_out_longitude,
+            checkOutLocationName: r.check_out_location_name,
             photoUrl: r.photo_url,
           };
         }
@@ -152,16 +195,43 @@ module.exports = function createAttendanceStore(storeRef) {
         throw httpError(400, 'คุณได้ลงเวลาออกงานของวันนี้แล้ว');
       }
 
+      const workedSec = workedSeconds(found.checkIn);
       found.checkOut = nowTime;
-      found.duration = calcDuration(found.checkIn);
+      found.duration = formatDuration(workedSec);
+      found.checkOutLatitude = hasOut ? outLat : null;
+      found.checkOutLongitude = hasOut ? outLng : null;
+      found.checkOutLocationName = outLocationName;
+
+      // Bonus points: checked in on time (not saved as late) AND worked the full required hours. Paid once, when the
+      // check-out is saved, in the same transaction as the check-out itself.
+      const earnsPoints = rules.onTimePoints > 0 && found.status === 'ปกติ' && workedSec >= rules.requiredHours * 3600;
+      let pointsAwarded = 0;
       if (db.isPgConnected()) {
         try {
-          await db.query('UPDATE attendance SET check_out = $1, duration = $2 WHERE id = $3', [nowTime, found.duration, found.id]);
+          pointsAwarded = await withTx(async (client) => {
+            const emp = await client.query('SELECT id FROM employees WHERE id = $1 OR code = $1 LIMIT 1 FOR UPDATE', [employeeId]);
+            const upd = await client.query(
+              "UPDATE attendance SET check_out = $1, duration = $2, check_out_latitude = $4, check_out_longitude = $5, check_out_location_name = $6 WHERE id = $3 AND (check_out IS NULL OR check_out = 'กำลังทำงาน...')",
+              [nowTime, found.duration, found.id, found.checkOutLatitude, found.checkOutLongitude, found.checkOutLocationName]
+            );
+            if (upd.rowCount === 0) throw httpError(400, 'คุณได้ลงเวลาออกงานของวันนี้แล้ว');
+            if (earnsPoints && emp.rows[0]) {
+              await client.query('UPDATE employees SET points = COALESCE(points, 0) + $1 WHERE id = $2', [rules.onTimePoints, emp.rows[0].id]);
+              await client.query(
+                'INSERT INTO point_transactions (id, employee_id, title, points, type, category) VALUES ($1, $2, $3, $4, $5, $6)',
+                [`pt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, emp.rows[0].id, `เข้างานตรงเวลาและทำงานครบเวลา (${today})`, rules.onTimePoints, 'earn', 'Attendance']
+              );
+              return rules.onTimePoints;
+            }
+            return 0;
+          });
         } catch (e) {
+          if (e && e.status) throw e;
           console.error('PG update error in addClockOut:', e);
           throw new Error('ไม่สามารถบันทึกเวลาออกงานลงฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
         }
       }
+      found.pointsAwarded = pointsAwarded;
       const memIdx = memoryStore.memoryAttendance.findIndex((a) => a.id === found.id);
       if (memIdx >= 0) {
         memoryStore.memoryAttendance[memIdx] = found;
@@ -178,7 +248,6 @@ module.exports = function createAttendanceStore(storeRef) {
         if (a.employeeId === employeeId && a.dateIso < today && (!a.checkOut || a.checkOut === 'กำลังทำงาน...')) {
           a.checkOut = '23:59 น.';
           a.duration = durationUntilEndOfDay(a.checkIn);
-          a.isIncomplete = true;
         }
       });
     },
@@ -209,6 +278,9 @@ module.exports = function createAttendanceStore(storeRef) {
               latitude: r.latitude,
               longitude: r.longitude,
               locationName: r.location_name,
+              checkOutLatitude: r.check_out_latitude,
+              checkOutLongitude: r.check_out_longitude,
+              checkOutLocationName: r.check_out_location_name,
               photoUrl: r.photo_url,
             };
           }
@@ -251,6 +323,9 @@ module.exports = function createAttendanceStore(storeRef) {
               latitude: r.latitude,
               longitude: r.longitude,
               locationName: r.location_name,
+              checkOutLatitude: r.check_out_latitude,
+              checkOutLongitude: r.check_out_longitude,
+              checkOutLocationName: r.check_out_location_name,
               photoUrl: r.photo_url,
             }));
           }
@@ -417,6 +492,23 @@ module.exports = function createAttendanceStore(storeRef) {
       }
       memoryStore.memoryTimeCorrections.unshift(newCorrection);
 
+      if (requester.role === 'SuperBoss' && storeRef && storeRef.processApprovalRequest) {
+        const done = await storeRef.processApprovalRequest({
+          requestType: 'time-correction',
+          id: newCorrection.id,
+          status: 'อนุมัติแล้ว',
+          approver: `${requester.name} (SuperBoss - ไม่ต้องรออนุมัติ)`,
+          approverId: requester.id,
+          approverRole: 'SuperBoss',
+          remark: 'SuperBoss ปรับปรุงเวลาได้เองโดยไม่ต้องรออนุมัติ',
+        });
+        newCorrection.status = done.status;
+        newCorrection.approvalLevel = 0;
+        newCorrection.currentApproverId = null;
+        newCorrection.currentApproverName = null;
+        return newCorrection;
+      }
+
       if (targetApprover) {
         const notifPayload = {
           id: `notif-${Date.now()}`,
@@ -520,7 +612,7 @@ module.exports = function createAttendanceStore(storeRef) {
     getHrAttendanceReport: async (month, date) => {
       if (db.isPgConnected()) {
         try {
-          let query = `SELECT a.*, COALESCE(e.name, a.employee_id) as employee_name, e.code as employee_code, e.department
+          let query = `SELECT a.*, COALESCE(e.name, a.employee_id) as employee_name, e.code as employee_code, e.department, e.role as employee_role, e.first_name, e.last_name
                        FROM attendance a
                        LEFT JOIN employees e ON a.employee_id = e.id OR a.employee_id = e.code`;
           const params = [];
@@ -539,6 +631,9 @@ module.exports = function createAttendanceStore(storeRef) {
               employeeId: r.employee_id,
               employeeCode: r.employee_code || r.employee_id,
               employeeName: r.employee_name,
+              role: r.employee_role,
+              firstName: r.first_name || (r.employee_name ? String(r.employee_name).split(' ')[0] : ''),
+              lastName: r.last_name || (r.employee_name ? String(r.employee_name).split(' ').slice(1).join(' ') : ''),
               department: r.department,
               dateIso: r.date_iso,
               checkIn: r.check_in,
@@ -547,6 +642,9 @@ module.exports = function createAttendanceStore(storeRef) {
               status: r.status,
               statusColor: r.status_color,
               locationName: r.location_name,
+              checkOutLatitude: r.check_out_latitude,
+              checkOutLongitude: r.check_out_longitude,
+              checkOutLocationName: r.check_out_location_name,
             }));
           }
         } catch (e) {

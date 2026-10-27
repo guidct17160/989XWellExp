@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,285 +6,105 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Animated,
+  Image,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import TopNavbar from '../components/TopNavbar';
-import { tryFetchApi } from '../services/apiClient';
 import { navigationHistory } from '../services/navigationHistory';
 import { useTheme } from '../context/ThemeContext';
 
-const getCategoryColor = (cat) => {
-  if (cat?.includes('สำคัญ') || cat?.toLowerCase().includes('important')) return '#EF4444';
-  if (cat?.includes('โปรโมชั่น') || cat?.toLowerCase().includes('promo')) return '#EC4899';
-  if (cat?.includes('ระบบ') || cat?.toLowerCase().includes('system')) return '#3B82F6';
-  return '#8B5CF6';
-};
-
+/**
+ * Announcement detail. There is no announcement list any more: an announcement reaches the employee as an item
+ * in the notification bell (NotificationsScreen / the banner open this screen with it).
+ */
 export default function AnnouncementsScreen({ navigation, route }) {
-  const { theme, isDarkMode, t, language } = useTheme();
-  const scrollViewRef = useRef(null);
+  const { theme, isDarkMode, language } = useTheme();
+  const selectedItem = route?.params?.selectedAnnouncement || null;
 
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(language === 'en' ? 'All' : 'ทั้งหมด');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  const categories = language === 'en'
-    ? ['All', 'Announcements', 'Promotions & Events', 'System Updates']
-    : ['ทั้งหมด', 'ประกาศสำคัญ', 'โปรโมชั่น & กิจกรรม', 'อัปเดตระบบ'];
-
+  // opened without an announcement (e.g. the web page was refreshed): nothing to show, go to the notifications
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 450,
-      useNativeDriver: true,
-    }).start();
-
-    // Fetch from real PostgreSQL database API
-    const fetchAnnouncements = async () => {
-      setLoading(true);
-      try {
-        const res = await tryFetchApi('/announcements');
-        if (res && res.ok) {
-          const data = await res.json();
-          if (data && data.success && Array.isArray(data.announcements)) {
-            const mapped = data.announcements.map((a) => ({
-              ...a,
-              desc: a.desc || a.content,
-              categoryColor: a.categoryColor || getCategoryColor(a.category),
-              time: a.time || (a.createdAt ? new Date(a.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH') : ''),
-            }));
-            setAnnouncements(mapped);
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching announcements:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAnnouncements();
-  }, [language]);
-
-  useEffect(() => {
-    if (route?.params?.selectedAnnouncement) {
-      setSelectedItem(route.params.selectedAnnouncement);
-    }
-  }, [route?.params?.selectedAnnouncement, route?.params?.openTimestamp]);
+    if (!selectedItem) navigation.navigate('Notifications');
+  }, [selectedItem, navigation]);
 
   const handleCloseDetail = () => {
-    setSelectedItem(null);
-    if (route?.params?.fromHome) {
-      navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'Home' });
-    }
+    // back and "รับทราบ" return to the notification list. This must go through the history (not a plain
+    // navigate('Notifications')), otherwise the notification list's own back button returns here again.
+    navigationHistory.goBackSafe(navigation, 'Notifications', {});
   };
 
-  const filteredItems = announcements.filter((item) => {
-    const matchCategory = selectedCategory === 'ทั้งหมด' || item.category === selectedCategory;
-    const matchSearch =
-      String(item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(item.desc || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
-  });
-
-  // If an announcement is selected, render full-screen detail view natively without Modal overlay
-  if (selectedItem) {
-    return (
-      <SafeAreaView testID="screen-announcement-detail" style={[styles.fullModalSafeArea, { backgroundColor: theme.background }]}>
-        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
-
-        {/* Full Screen Header */}
-        <View style={[styles.fullModalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-          <TouchableOpacity
-            testID="announcement-detail-back-btn"
-            style={[styles.fullModalBackBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
-            onPress={handleCloseDetail}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.fullModalHeaderTitle, { color: theme.text }]} numberOfLines={1}>
-            {language === 'en' ? 'Announcement Details' : 'รายละเอียดประกาศ'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* Modal Content ScrollView */}
-        <ScrollView
-          style={[styles.fullModalScroll, { backgroundColor: theme.background }]}
-          contentContainerStyle={styles.fullModalContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Category & Time Badge Row */}
-          <View style={styles.fullModalMetaBadgeRow}>
-            <View style={[styles.badge, { backgroundColor: (selectedItem?.categoryColor || '#1F4C9C') + '18' }]}>
-              <Text style={[styles.badgeText, { color: selectedItem?.categoryColor || '#1F4C9C' }]}>
-                {selectedItem?.category}
-              </Text>
-            </View>
-            <View style={styles.timeWrapper}>
-              <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
-              <Text style={[styles.timeText, { color: theme.textSecondary }]}>{selectedItem?.time}</Text>
-            </View>
-          </View>
-
-          {/* Title */}
-          <Text style={[styles.fullModalTitle, { color: theme.text }]}>{selectedItem?.title}</Text>
-
-          {/* Author info card */}
-          <View style={[styles.authorCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.authorAvatar}>
-              <Ionicons name="person" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.authorInfo}>
-              <Text style={[styles.authorLabel, { color: theme.textSecondary }]}>{language === 'en' ? 'Announcer' : 'ผู้ออกประกาศ'}</Text>
-              <Text style={[styles.authorName, { color: theme.text }]}>{selectedItem?.author}</Text>
-            </View>
-          </View>
-
-          <View style={[styles.fullModalDivider, { backgroundColor: theme.border }]} />
-
-          {/* Body Description */}
-          <Text style={[styles.fullModalBodyText, { color: theme.text }]}>{selectedItem?.desc || selectedItem?.content}</Text>
-        </ScrollView>
-
-        {/* Bottom Action Footer */}
-        <View style={[styles.fullModalFooter, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
-          <TouchableOpacity
-            testID="announcement-detail-close-btn"
-            style={styles.fullModalConfirmBtn}
-            onPress={handleCloseDetail}
-            activeOpacity={0.88}
-          >
-            <Text style={styles.fullModalConfirmText}>{language === 'en' ? 'Acknowledge & Close' : 'รับทราบ / ปิดหน้าต่าง'}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!selectedItem) return null;
 
   return (
-    <SafeAreaView testID="screen-announcements" style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView testID="screen-announcement-detail" style={[styles.fullModalSafeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
-      {/* Top Navbar */}
-      <TopNavbar navigation={navigation} title={t('announcements')} showBack />
+      {/* Full Screen Header */}
+      <View style={[styles.fullModalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          testID="announcement-detail-back-btn"
+          style={[styles.fullModalBackBtn, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}
+          onPress={handleCloseDetail}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[styles.fullModalHeaderTitle, { color: theme.text }]} numberOfLines={1}>
+          {language === 'en' ? 'Announcement Details' : 'รายละเอียดประกาศ'}
+        </Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-      <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: theme.background }]}>
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Ionicons name="search-outline" size={20} color={theme.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            testID="announcements-search-input"
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder={language === 'en' ? 'Search announcements...' : 'ค้นหาประกาศ หรือ โปรโมชั่น...'}
-            placeholderTextColor={theme.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery !== '' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
+      {/* Modal Content ScrollView */}
+      <ScrollView
+        style={[styles.fullModalScroll, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.fullModalContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Date */}
+        <View style={styles.fullModalMetaBadgeRow}>
+          <View style={styles.timeWrapper}>
+            <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
+            <Text style={[styles.timeText, { color: theme.textSecondary }]}>{selectedItem?.time || selectedItem?.createdDate}</Text>
+          </View>
         </View>
 
-        {/* Category Horizontal Filter */}
-        <ScrollView
-          testID="announcements-category-filter"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryContent}
+        {/* Picture uploaded by the admin */}
+        {!!selectedItem?.imageUrl && (
+          <Image source={{ uri: selectedItem.imageUrl }} style={{ width: '100%', aspectRatio: 1, borderRadius: 16, marginBottom: 14, backgroundColor: theme.border }} resizeMode="cover" />
+        )}
+
+        {/* Title */}
+        <Text style={[styles.fullModalTitle, { color: theme.text }]}>{selectedItem?.title}</Text>
+
+        {/* Author info card */}
+        <View style={[styles.authorCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.authorAvatar}>
+            <Ionicons name="person" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.authorInfo}>
+            <Text style={[styles.authorLabel, { color: theme.textSecondary }]}>{language === 'en' ? 'Announcer' : 'ผู้ออกประกาศ'}</Text>
+            <Text style={[styles.authorName, { color: theme.text }]}>{selectedItem?.author}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.fullModalDivider, { backgroundColor: theme.border }]} />
+
+        {/* Body Description */}
+        <Text style={[styles.fullModalBodyText, { color: theme.text }]}>{selectedItem?.desc || selectedItem?.content}</Text>
+      </ScrollView>
+
+      {/* Bottom Action Footer */}
+      <View style={[styles.fullModalFooter, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+        <TouchableOpacity
+          testID="announcement-detail-close-btn"
+          style={styles.fullModalConfirmBtn}
+          onPress={handleCloseDetail}
+          activeOpacity={0.88}
         >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              testID={`announcements-category-${cat}`}
-              key={cat}
-              style={[
-                styles.categoryChip,
-                { backgroundColor: selectedCategory === cat ? colors.primary : theme.surface, borderColor: theme.border },
-              ]}
-              onPress={() => setSelectedCategory(cat)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  { color: selectedCategory === cat ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Announcements List */}
-        <ScrollView
-          testID="announcements-list"
-          ref={scrollViewRef}
-          style={[styles.listScroll, { backgroundColor: theme.background }]}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {loading ? (
-            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : filteredItems.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="newspaper-outline" size={48} color={theme.textSecondary} style={{ marginBottom: 12 }} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{t('noAnnouncements')}</Text>
-            </View>
-          ) : (
-            filteredItems.map((item) => (
-              <TouchableOpacity
-                testID={`announcement-item-${item.id}`}
-                key={item.id}
-                style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                activeOpacity={0.88}
-                onPress={() => setSelectedItem(item)}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={[styles.badge, { backgroundColor: (item.categoryColor || '#1F4C9C') + '18' }]}>
-                    <Text style={[styles.badgeText, { color: item.categoryColor || '#1F4C9C' }]}>
-                      {item.category}
-                    </Text>
-                  </View>
-
-                  <View style={styles.timeWrapper}>
-                    <Ionicons name="calendar-outline" size={13} color={theme.textSecondary} style={{ marginRight: 4 }} />
-                    <Text style={[styles.timeText, { color: theme.textSecondary }]}>{item.time}</Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-
-                <Text style={[styles.cardDesc, { color: theme.textSecondary }]} numberOfLines={3}>
-                  {item.desc || item.content}
-                </Text>
-
-                <View style={styles.cardFooter}>
-                  <Text style={[styles.authorText, { color: theme.textSecondary }]}>{language === 'en' ? 'By' : 'โดย'}: {item.author}</Text>
-                  <View style={styles.readMoreBtn}>
-                    <Text style={[styles.readMoreText, { color: colors.primary }]}>{language === 'en' ? 'Read more' : 'อ่านเพิ่มเติม'}</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </Animated.View>
+          <Text style={styles.fullModalConfirmText}>{language === 'en' ? 'Acknowledge & Close' : 'รับทราบ / ปิดหน้าต่าง'}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }

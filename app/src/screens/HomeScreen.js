@@ -21,6 +21,9 @@ import { notificationStorage } from '../services/notificationStorage';
 import { tryFetchApi } from '../services/apiClient';
 import TopNavbar from '../components/TopNavbar';
 import PunchLocationModal from '../components/PunchLocationModal';
+import { todayIsoBkk } from '../utils/bangkokDate';
+import { workRules } from '../services/workRules';
+import { pointsStorage } from '../services/pointsStorage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -37,7 +40,6 @@ const menuItems = [
   { icon: 'calendar-outline', label: 'ลางาน', color: '#F5A623', screen: 'LeaveRequest' },
   { icon: 'people-outline', label: 'ทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory' },
   { icon: 'sync-outline', label: 'ปรับเวลา', color: '#00B8D4', screen: 'TimeCorrection' },
-  { icon: 'trophy-outline', label: 'ภารกิจ', color: '#F59E0B', screen: 'Quests' },
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -51,23 +53,29 @@ export default function HomeScreen({ navigation }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [attendance, setAttendance] = useState(attendanceStorage.getState());
   const [unreadCount, setUnreadCount] = useState(notificationStorage.getUnreadCount());
-  const [announcements, setAnnouncements] = useState([]);
+  // Quests the employee can still do (not passed / failed yet)
+  const [quests, setQuests] = useState([]);
 
-  const fetchAnnouncements = async () => {
+  const fetchQuests = async () => {
     try {
-      const res = await tryFetchApi('/announcements');
+      const res = await tryFetchApi('/my-quests');
       if (res && res.ok) {
         const data = await res.json();
-        if (data && data.success && Array.isArray(data.announcements)) {
-          setAnnouncements(data.announcements);
+        if (data && data.success && Array.isArray(data.quests)) {
+          setQuests(data.quests.filter((q) => !q.passed && !q.failed));
         }
       }
     } catch (e) {}
   };
 
+  // While the home screen is open: reload quests, and check every minute for a new announcement
+  // (it lands in the notification bell, see notificationStorage.sync)
   useFocusEffect(
     useCallback(() => {
-      fetchAnnouncements();
+      fetchQuests();
+      notificationStorage.sync();
+      const timer = setInterval(() => notificationStorage.sync(), 60000);
+      return () => clearInterval(timer);
     }, [])
   );
 
@@ -98,6 +106,7 @@ export default function HomeScreen({ navigation }) {
     // Update current time every second
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      attendanceStorage.getState(); // drops yesterday's punches from the card once midnight passes
     }, 1000);
 
     return () => {
@@ -139,7 +148,12 @@ export default function HomeScreen({ navigation }) {
     if (isNaN(startDate.getTime())) return '00:00:00';
     const endDate = checkOutTime ? (checkOutTime instanceof Date ? checkOutTime : new Date(checkOutTime)) : currentTime;
 
-    const diff = Math.max(0, Math.floor((endDate - startDate) / 1000)); // seconds
+    // arriving before the work start time HR set (e.g. 08:00) still counts from that time
+    const countFrom = new Date(startDate);
+    countFrom.setHours(Math.floor(workRules.workStartMinutes() / 60), workRules.workStartMinutes() % 60, 0, 0);
+    const effectiveStart = startDate < countFrom ? countFrom : startDate;
+
+    const diff = Math.max(0, Math.floor((endDate - effectiveStart) / 1000)); // seconds
     const hours = Math.floor(diff / 3600);
     const minutes = Math.floor((diff % 3600) / 60);
     const seconds = diff % 60;
@@ -151,10 +165,12 @@ export default function HomeScreen({ navigation }) {
     const checkIn = checkInDateObj instanceof Date ? checkInDateObj : new Date(checkInDateObj);
     const checkOut = checkOutDateObj instanceof Date ? checkOutDateObj : new Date(checkOutDateObj);
 
-    // 1. Start counting at 08:00 AM of that day
+    // 1. Start counting at the "count from" time (set by HR, default 08:00) of that day when the check-in is earlier
     const effectiveStart = new Date(checkIn);
-    if (effectiveStart.getHours() < 8) {
-      effectiveStart.setHours(8, 0, 0, 0);
+    const countFrom = new Date(checkIn);
+    countFrom.setHours(Math.floor(workRules.workStartMinutes() / 60), workRules.workStartMinutes() % 60, 0, 0);
+    if (effectiveStart < countFrom) {
+      effectiveStart.setTime(countFrom.getTime());
     }
 
     // 2. Total duration in seconds from effective start (08:00 AM)
@@ -167,10 +183,10 @@ export default function HomeScreen({ navigation }) {
     // 3. Late Check (Must check in before 09:00 AM)
     const inHour = checkIn.getHours();
     const inMin = checkIn.getMinutes();
-    const isLate = inHour > 9 || (inHour === 9 && inMin > 0);
+    const isLate = workRules.isLateAt(inHour, inMin);
 
-    // 4. Incomplete Hours Check (Must work at least 9 hours = 32,400 seconds)
-    const isIncompleteHours = diffInSeconds < 9 * 3600;
+    // 4. Incomplete Hours Check (must work at least the required hours HR set, default 9)
+    const isIncompleteHours = diffInSeconds < workRules.requiredSeconds();
 
     let status = 'ลงเวลาเข้า-ออกครบถ้วน';
     let isIncomplete = false;
@@ -182,7 +198,7 @@ export default function HomeScreen({ navigation }) {
       isIncomplete = true;
       statusColor = '#EF4444'; // Red
     } else if (isIncompleteHours) {
-      status = 'ทำงานไม่ครบเวลา (ออกก่อนกำหนด / น้อยกว่า 9 ชม.)';
+      status = `ทำงานไม่ครบเวลา (ออกก่อนกำหนด / น้อยกว่า ${workRules.requiredHoursLabel()} ชม.)`;
       isIncomplete = true;
       statusColor = '#F5A623'; // Amber
     }
@@ -218,13 +234,22 @@ export default function HomeScreen({ navigation }) {
 
     // บันทึกลงเซิร์ฟเวอร์ก่อน — ถ้าไม่สำเร็จจะไม่บันทึกเวลาในเครื่อง (ไม่มีข้อมูลค้างเฉพาะบนอุปกรณ์)
     isPunchingRef.current = true;
+    let punched = null;
     try {
-      await attendanceStorage.punch(state.isCheckedIn ? 'clock-out' : 'clock-in', locationExtra);
+      punched = await attendanceStorage.punch(state.isCheckedIn ? 'clock-out' : 'clock-in', locationExtra);
     } catch (e) {
       Alert.alert(state.isCheckedIn ? 'บันทึกเวลาออกงานไม่สำเร็จ' : 'บันทึกเวลาเข้างานไม่สำเร็จ', e.message);
+      // the server may know something this screen does not (e.g. already clocked in): re-sync so the button is correct
+      attendanceStorage.refresh();
       return;
     } finally {
       isPunchingRef.current = false;
+    }
+
+    // on-time bonus: HR gives points to everyone who checks in on time
+    if (punched && punched.pointsAwarded > 0) {
+      pointsStorage.syncWithBackend();
+      Alert.alert('เข้างานตรงเวลาและทำงานครบเวลา 🎉', `คุณได้รับ ${punched.pointsAwarded} แต้ม`);
     }
 
     const now = new Date();
@@ -234,7 +259,7 @@ export default function HomeScreen({ navigation }) {
       month: 'short',
       year: 'numeric',
     });
-    const dateIsoStr = now.toISOString().split('T')[0];
+    const dateIsoStr = todayIsoBkk();
     const dayThaiStr = now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     if (!state.isCheckedIn) {
@@ -315,7 +340,7 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(true);
     attendanceStorage.refresh();
     notificationStorage.clearAndSync();
-    fetchAnnouncements();
+    fetchQuests();
     setAttendance(attendanceStorage.getState());
     setUnreadCount(notificationStorage.getUnreadCount());
     setCurrentTime(new Date());
@@ -453,37 +478,40 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
 
-          {/* ประกาศ / โปรโมท */}
-          <View testID="home-announcements-section" style={styles.sectionHeader} className="flex-row items-center justify-between mb-3 px-1">
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>📌 {t('announcements')}</Text>
-            <TouchableOpacity testID="home-announcements-see-all-btn" onPress={() => navigation.navigate('Announcements', { selectedAnnouncement: null })}>
-              <Text style={styles.seeAll}>{language === 'en' ? 'See all' : 'ดูทั้งหมด'}</Text>
+          {/* ภารกิจที่ทำได้ตอนนี้ */}
+          <View testID="home-quests-section" style={styles.sectionHeader} className="flex-row items-center justify-between mb-3 px-1">
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>🎯 ภารกิจ</Text>
+            <TouchableOpacity testID="home-quests-see-all-btn" onPress={() => navigation.navigate('Quests')}>
+              <Text style={styles.seeAll}>ดูทั้งหมด</Text>
             </TouchableOpacity>
           </View>
 
-          {announcements.length === 0 ? (
-            <View style={[styles.announcementCard, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'center', paddingVertical: 18 }]}>
-              <Text style={{ fontSize: 13, color: theme.textSecondary }}>{t('noAnnouncements')}</Text>
+          {quests.length === 0 ? (
+            <View style={[styles.questCard, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'center', paddingVertical: 18 }]}>
+              <Text style={{ fontSize: 13, color: theme.textSecondary }}>ยังไม่มีภารกิจที่เปิดให้ทำในขณะนี้</Text>
             </View>
           ) : (
-            announcements.slice(0, 3).map((item) => (
+            quests.slice(0, 3).map((q) => (
               <TouchableOpacity
-                testID={`home-announcement-item-${item.id}`}
-                key={item.id}
-                style={[styles.announcementCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => navigation.navigate('Announcements', { selectedAnnouncement: item, openTimestamp: Date.now(), fromHome: true })}
+                testID={`home-quest-item-${q.id}`}
+                key={q.id}
+                style={[styles.questCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => navigation.navigate('QuestPlay', { questId: q.id, title: q.title })}
                 activeOpacity={0.85}
               >
-                <View style={styles.announcementHeader} className="flex-row items-center justify-between mb-2">
-                  <Text style={[styles.announcementTitle, { color: theme.text }]} className="text-sm font-bold flex-1 mr-2" numberOfLines={1}>{item.title}</Text>
-                  {(item.isPinned || item.isNew) && (
-                    <View style={styles.newBadge} className="bg-pink-light border border-pink px-2 py-0.5 rounded-full">
-                      <Text style={styles.newBadgeText} className="text-[10px] font-bold text-pink">{item.isPinned ? (language === 'en' ? 'Pinned' : 'ปักหมุด') : (language === 'en' ? 'New' : 'ใหม่')}</Text>
-                    </View>
-                  )}
+                <View style={styles.questHeader}>
+                  <Text style={[styles.questTitle, { color: theme.text }]} numberOfLines={1}>{q.title}</Text>
+                  <View style={styles.questPointsBadge}>
+                    <Ionicons name="star" size={11} color="#D97706" />
+                    <Text style={styles.questPointsText}>{q.totalPoints} แต้ม</Text>
+                  </View>
                 </View>
-                <Text style={[styles.announcementDesc, { color: theme.textSecondary }]} className="text-xs mb-2 leading-4" numberOfLines={2}>{item.desc || item.content}</Text>
-                <Text style={[styles.announcementTime, { color: theme.textSecondary }]} className="text-[11px]">{item.time || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '')}</Text>
+                {!!q.description && (
+                  <Text style={[styles.questDesc, { color: theme.textSecondary }]} numberOfLines={2}>{q.description}</Text>
+                )}
+                <Text style={[styles.questTime, { color: theme.textSecondary }]}>
+                  ต้องตอบถูก {q.passCount}/{q.questionCount} ข้อ · หมดเขต {q.endDate} {q.endTime}
+                </Text>
               </TouchableOpacity>
             ))
           )}
@@ -752,51 +780,54 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-  // Announcements
-  announcementCard: {
+  // Quests
+  questCard: {
     backgroundColor: colors.backgroundCard,
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
+    borderLeftColor: '#F59E0B',
     shadowColor: colors.cardShadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
     elevation: 2,
   },
-  announcementHeader: {
+  questHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  announcementTitle: {
+  questTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.title,
     flex: 1,
+    marginRight: 8,
   },
-  newBadge: {
-    backgroundColor: colors.errorLight,
+  questPointsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    marginLeft: 8,
   },
-  newBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.error,
+  questPointsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
   },
-  announcementDesc: {
+  questDesc: {
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 20,
     marginBottom: 4,
   },
-  announcementTime: {
+  questTime: {
     fontSize: 11,
     color: colors.label,
   },

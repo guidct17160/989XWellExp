@@ -13,17 +13,43 @@ import {
   RefreshControl,
   Animated,
   StatusBar,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { tryFetchApi } from '../services/apiClient';
 import { navigationHistory } from '../services/navigationHistory';
 import { authService } from '../services/authService';
 import { useTheme } from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+// Colours for the initials circle of people without a profile picture (stable per employee code)
+const AVATAR_COLORS = ['#7C3AED', '#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#06B6D4'];
+const colorFor = (key) => {
+  const text = String(key || '');
+  let sum = 0;
+  for (let i = 0; i < text.length; i += 1) sum += text.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
+
+// What to show under the name: the position when HR set one, otherwise the role in plain words
+const ROLE_LABEL = { Employee: 'พนักงาน', Boss: 'Boss', SuperBoss: 'SuperBoss', 'HR Admin': 'HR Admin' };
+const roleLabel = (emp) => emp.position || ROLE_LABEL[emp.role] || emp.role || 'พนักงาน';
+const isLeader = (emp) => emp.role === 'Boss' || emp.role === 'SuperBoss';
+
+// The real profile picture, or the first letter of the name when there is none (no stock photos of strangers)
+function Avatar({ emp, size = 52 }) {
+  const [failed, setFailed] = useState(false);
+  const uri = emp.avatarUrl;
+  if (uri && !failed) {
+    return <Image source={{ uri }} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#E2E8F0' }} />;
+  }
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colorFor(emp.code || emp.id), alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: size * 0.4 }}>{String(emp.name || '?').trim()[0]}</Text>
+    </View>
+  );
+}
 
 export default function EmployeeDirectoryScreen({ navigation }) {
   const { theme, t } = useTheme();
@@ -53,7 +79,7 @@ export default function EmployeeDirectoryScreen({ navigation }) {
         if (data && data.success && Array.isArray(data.employees)) {
           const serverList = data.employees.map((emp) => ({
             ...emp,
-            avatarUrl: emp.avatarUrl || emp.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            avatarUrl: emp.avatarUrl || emp.avatar_url || null,
             phone: emp.phone || '-',
             email: emp.email || '-',
           }));
@@ -93,60 +119,59 @@ export default function EmployeeDirectoryScreen({ navigation }) {
     });
   };
 
-  // Filter strictly by the current user's department (only members of our department are shown)
-  const filteredEmployees = employees.filter((emp) => {
-    const empDept = String(emp.department || '').toLowerCase().trim();
-    const targetDept = String(userDept).toLowerCase().trim();
-    const isSameDept = !!empDept && !!targetDept && (empDept.includes(targetDept) || targetDept.includes(empDept) || empDept === targetDept);
-    if (!isSameDept) return false;
+  const isMe = (emp) => !!currentUser && (emp.id === currentUser.id || (emp.code && emp.code === currentUser.code));
 
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    const nameMatch = emp.name && emp.name.toLowerCase().includes(q);
-    const codeMatch = emp.code && emp.code.toLowerCase().includes(q);
-    const posMatch = emp.position && emp.position.toLowerCase().includes(q);
-    return nameMatch || codeMatch || posMatch;
-  });
+  // Filter strictly by the current user's department (only members of our department are shown)
+  const filteredEmployees = employees
+    .filter((emp) => {
+      const empDept = String(emp.department || '').toLowerCase().trim();
+      const targetDept = String(userDept).toLowerCase().trim();
+      const isSameDept = !!empDept && !!targetDept && (empDept.includes(targetDept) || targetDept.includes(empDept) || empDept === targetDept);
+      if (!isSameDept) return false;
+
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      const nameMatch = emp.name && emp.name.toLowerCase().includes(q);
+      const codeMatch = emp.code && emp.code.toLowerCase().includes(q);
+      const posMatch = emp.position && emp.position.toLowerCase().includes(q);
+      return nameMatch || codeMatch || posMatch;
+    })
+    // leaders first, then by employee code
+    .sort((a, b) => Number(isLeader(b)) - Number(isLeader(a)) || String(a.code || '').localeCompare(String(b.code || '')));
 
   return (
-    <SafeAreaView testID="screen-employee-directory" style={[styles.safeArea, { backgroundColor: theme.card }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.gradientStart} />
+    <SafeAreaView testID="screen-employee-directory" style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
 
-      {/* Top Header */}
-      <View style={styles.header}>
+      {/* Header */}
+      <LinearGradient colors={['#7C3AED', '#4F46E5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity
           testID="btn-back-directory"
           style={styles.backButton}
           onPress={() => navigationHistory.goBackSafe(navigation, 'MainTabs', { screen: 'HRDashboard' })}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
-            {t('myDepartmentTeam', 'ทีมงานแผนก')} {userDept}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {t('myDepartmentTeam', 'สมาชิกภายในแผนกเดียวกัน')} ({filteredEmployees.length} คน)
+          <Text style={styles.headerTitle}>{t('myDepartmentTeam', 'ทีมงานแผนก')}</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {userDept} · {filteredEmployees.length} คน
           </Text>
         </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{filteredEmployees.length}</Text>
-        </View>
-      </View>
+      </LinearGradient>
 
-      {/* Search Input Box */}
-      <View style={[styles.searchSection, { backgroundColor: theme.background }]}>
-        <View style={[styles.searchContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Ionicons name="search" size={20} color="#64748B" style={styles.searchIcon} />
+      {/* Search */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#7C3AED" style={styles.searchIcon} />
           <TextInput
             testID="employee-search-input"
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder={t('search', 'ค้นหาชื่อ, รหัสพนักงานในแผนก...')}
+            placeholder="ค้นหาชื่อ หรือรหัสพนักงาน"
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -172,58 +197,48 @@ export default function EmployeeDirectoryScreen({ navigation }) {
       >
         {filteredEmployees.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={56} color="#CBD5E1" />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              {t('noTeamMembers', 'ไม่พบสมาชิกในแผนกนี้')}
-            </Text>
-            <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-              พนักงานจะแสดงเฉพาะผู้ที่อยู่ในแผนก {userDept} เท่านั้น
-            </Text>
+            <View style={styles.emptyIconBg}>
+              <Ionicons name="people-outline" size={40} color="#A78BFA" />
+            </View>
+            <Text style={styles.emptyTitle}>{t('noTeamMembers', 'ไม่พบสมาชิกในแผนกนี้')}</Text>
+            <Text style={styles.emptyDesc}>พนักงานจะแสดงเฉพาะผู้ที่อยู่ในแผนก {userDept} เท่านั้น</Text>
           </View>
         ) : (
           filteredEmployees.map((emp) => (
             <TouchableOpacity
               key={emp.id || emp.code}
               testID={`employee-card-${emp.id || emp.code}`}
-              style={[styles.employeeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+              style={styles.employeeCard}
               onPress={() => setSelectedEmp(emp)}
               activeOpacity={0.85}
             >
-              <Image
-                source={{ uri: emp.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
-                style={styles.avatar}
-              />
+              <Avatar emp={emp} />
               <View style={styles.empInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={[styles.empName, { color: theme.text }]} numberOfLines={1}>{emp.name}</Text>
-                  <View style={styles.codeTag}>
-                    <Text style={styles.codeTagText}>{emp.code || emp.id}</Text>
-                  </View>
+                  <Text style={styles.empName} numberOfLines={1}>{emp.name}</Text>
+                  {isMe(emp) && (
+                    <View style={styles.meTag}>
+                      <Text style={styles.meTagText}>คุณ</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={[styles.empPosition, { color: theme.textSecondary }]} numberOfLines={1}>{emp.position || 'พนักงาน'}</Text>
-                <View style={styles.deptRow}>
-                  <Ionicons name="business-outline" size={13} color="#64748B" />
-                  <Text style={styles.empDept} numberOfLines={1}>{emp.department || userDept}</Text>
+                <View style={styles.metaRow}>
+                  <View style={[styles.roleTag, isLeader(emp) && styles.roleTagLeader]}>
+                    <Text style={[styles.roleTagText, isLeader(emp) && styles.roleTagTextLeader]} numberOfLines={1}>{roleLabel(emp)}</Text>
+                  </View>
+                  <Text style={styles.empCode}>{emp.code || emp.id}</Text>
                 </View>
               </View>
 
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
                 <TouchableOpacity
-                  testID={`btn-call-${emp.code || emp.id}`}
-                  style={styles.circleActionBtn}
-                  onPress={() => handleCall(emp.phone)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="call" size={18} color="#10B981" />
-                </TouchableOpacity>
-                <TouchableOpacity
                   testID={`btn-email-${emp.code || emp.id}`}
                   style={[styles.circleActionBtn, { backgroundColor: '#EEF2FF' }]}
                   onPress={() => handleEmail(emp.email)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="mail" size={18} color="#3B82F6" />
+                  <Ionicons name="mail" size={18} color="#4F46E5" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -251,12 +266,11 @@ export default function EmployeeDirectoryScreen({ navigation }) {
             {selectedEmp && (
               <>
                 <View style={styles.modalHeader}>
-                  <Image
-                    source={{ uri: selectedEmp.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
-                    style={styles.modalAvatar}
-                  />
+                  <View style={{ marginBottom: 12 }}>
+                    <Avatar emp={selectedEmp} size={76} />
+                  </View>
                   <Text style={styles.modalName}>{selectedEmp.name}</Text>
-                  <Text style={styles.modalPosition}>{selectedEmp.position || 'พนักงาน'}</Text>
+                  <Text style={styles.modalPosition}>{roleLabel(selectedEmp)}</Text>
                   <View style={styles.modalBadge}>
                     <Text style={styles.modalBadgeText}>{selectedEmp.department || 'ไม่ระบุฝ่าย'}</Text>
                   </View>
@@ -267,7 +281,7 @@ export default function EmployeeDirectoryScreen({ navigation }) {
                 <View style={styles.modalDetailsList}>
                   <View style={styles.detailRow}>
                     <View style={styles.detailIconBg}>
-                      <Ionicons name="card-outline" size={18} color="#3B82F6" />
+                      <Ionicons name="card-outline" size={18} color="#7C3AED" />
                     </View>
                     <View style={styles.detailTextCol}>
                       <Text style={styles.detailLabel}>รหัสพนักงาน</Text>
@@ -293,15 +307,15 @@ export default function EmployeeDirectoryScreen({ navigation }) {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <View style={[styles.detailIconBg, { backgroundColor: '#EFF6FF' }]}>
-                      <Ionicons name="mail-outline" size={18} color="#2563EB" />
+                    <View style={[styles.detailIconBg, { backgroundColor: '#EEF2FF' }]}>
+                      <Ionicons name="mail-outline" size={18} color="#4F46E5" />
                     </View>
                     <View style={styles.detailTextCol}>
                       <Text style={styles.detailLabel}>อีเมล</Text>
                       <Text style={styles.detailValue} numberOfLines={1}>{selectedEmp.email || '-'}</Text>
                     </View>
                     <TouchableOpacity
-                      style={[styles.inlineCallBtn, { backgroundColor: '#2563EB' }]}
+                      style={[styles.inlineCallBtn, { backgroundColor: '#4F46E5' }]}
                       onPress={() => handleEmail(selectedEmp.email)}
                     >
                       <Ionicons name="mail" size={16} color="#FFFFFF" />
@@ -331,21 +345,20 @@ export default function EmployeeDirectoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#7C3AED',
   },
   header: {
-    backgroundColor: '#1E3A8A',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 40,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -355,40 +368,32 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
     marginTop: 2,
   },
-  countBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  countBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  searchSection: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 16,
-    paddingBottom: 12,
+  // the search box overlaps the bottom of the header
+  searchWrap: {
+    marginTop: -26,
+    paddingHorizontal: 16,
+    zIndex: 2,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     paddingHorizontal: 14,
-    height: 46,
-    marginHorizontal: 16,
+    height: 50,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
   },
   searchIcon: {
     marginRight: 10,
@@ -398,69 +403,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
   },
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  filterChipActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterChipTextActive: {
-    color: '#FFFFFF',
-  },
   scrollView: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    marginTop: -26,
+    paddingTop: 26,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 22,
     paddingBottom: 40,
   },
   employeeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    borderColor: '#EEF2F7',
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#E2E8F0',
-    marginRight: 14,
   },
   empInfo: {
     flex: 1,
+    marginLeft: 14,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 6,
   },
   empName: {
     fontSize: 15,
@@ -469,31 +445,44 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     marginRight: 6,
   },
-  codeTag: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  meTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 8,
   },
-  codeTagText: {
+  meTagText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#3B82F6',
+    color: '#15803D',
   },
-  empPosition: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#475569',
-    marginBottom: 4,
-  },
-  deptRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
-  empDept: {
+  roleTag: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    flexShrink: 1,
+  },
+  roleTagLeader: {
+    backgroundColor: '#EDE9FE',
+  },
+  roleTagText: {
     fontSize: 11,
-    color: '#64748B',
+    fontWeight: '700',
+    color: '#475569',
+  },
+  roleTagTextLeader: {
+    color: '#6D28D9',
+  },
+  empCode: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -502,9 +491,9 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   circleActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
@@ -513,6 +502,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
+  },
+  emptyIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: 16,
@@ -529,7 +526,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -562,13 +559,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
-  modalAvatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#E2E8F0',
-    marginBottom: 12,
-  },
   modalName: {
     fontSize: 18,
     fontWeight: '700',
@@ -583,18 +573,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F5F3FF',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#DDD6FE',
   },
   modalBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2563EB',
+    color: '#6D28D9',
   },
   modalDivider: {
     height: 1,
@@ -612,7 +602,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F5F3FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,

@@ -181,9 +181,11 @@ classDiagram
         <<stores/systemStore.js>>
         +getSettings()
         +updateSettings(data)
-        +getAnnouncements()
+        +getAnnouncements(activeOnly)
         +getAnnouncementById(id)
+        +getAnnouncementImage(id)
         +addAnnouncement(data)
+        +updateAnnouncement(id, data)
         +deleteAnnouncement(id)
         +addNotification(data)
         +getNotifications(userId)
@@ -306,8 +308,8 @@ classDiagram
         +getRewardCategories +createRewardCategory +updateRewardCategory +deleteRewardCategory
     }
     class announcementController {
-        +getAnnouncements +getAnnouncementById
-        +createAnnouncement +deleteAnnouncement
+        +getAnnouncements +getAllAnnouncements +getAnnouncementById +getAnnouncementImage
+        +createAnnouncement +updateAnnouncement +deleteAnnouncement
     }
     class notificationController {
         +getNotifications +markAsRead +markAllRead +registerPushToken
@@ -316,7 +318,7 @@ classDiagram
         +getDashboardStats +getAttendanceReport
     }
     class settingsController {
-        +getSettings +updateSettings +changePassword
+        +getSettings +updateSettings +getWorkTime +updateWorkTime +changePassword
     }
     class auditController {
         +getLogs

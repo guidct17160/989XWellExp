@@ -118,32 +118,32 @@ export default function AuditTrailLogsPage() {
   const getActionBadgeClass = (action) => {
     const a = String(action || '').toUpperCase();
     if (a.includes('FAILED') || a.includes('DELETE') || a.includes('REJECT')) {
-      return 'bg-red-950 text-red-400 border-red-800/50';
+      return 'bg-violet-100 text-violet-600 border-violet-200';
     }
     if (a.includes('LOGIN')) {
-      return 'bg-blue-950 text-blue-400 border-blue-800/50';
+      return 'bg-blue-50 text-blue-600 border-blue-200';
     }
     if (a.includes('CREATE')) {
-      return 'bg-emerald-950 text-emerald-400 border-emerald-800/50';
+      return 'bg-emerald-50 text-emerald-600 border-emerald-200';
     }
     if (a.includes('UPDATE') || a.includes('APPROVE') || a.includes('RESIGN')) {
-      return 'bg-amber-950 text-amber-400 border-amber-800/50';
+      return 'bg-amber-50 text-amber-600 border-amber-200';
     }
     return 'bg-purple-950 text-purple-400 border-purple-800/50';
   };
 
   return (
-    <div className="space-y-6 text-slate-100 font-sans animate-in fade-in duration-200">
+    <div className="space-y-6 text-slate-900 font-sans animate-in fade-in duration-200">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+          <div className="p-3 rounded-2xl bg-violet-100 text-violet-700 border border-violet-200">
             <ShieldCheck size={26} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               
-              <h1 className="text-xl font-black text-white uppercase tracking-wide">
+              <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">
                 Enterprise Audit Trail & PDPA Logs (Security Activity Center)
               </h1>
             </div>
@@ -155,7 +155,7 @@ export default function AuditTrailLogsPage() {
           <button
             onClick={handleExportCSV}
             disabled={filteredLogs.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-600/50 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-300 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             title="Download the audit trail report for PDPA / ISO review"
           >
             <FileSpreadsheet size={16} />
@@ -163,7 +163,7 @@ export default function AuditTrailLogsPage() {
           </button>
           <button
             onClick={fetchLogs}
-            className="flex items-center gap-2 px-4 py-2.5 bg-red-950/60 hover:bg-red-900/60 border border-red-800/50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-100 hover:bg-violet-100 border border-violet-200 text-slate-900 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
@@ -190,10 +190,10 @@ export default function AuditTrailLogsPage() {
       />
 
       {/* Logs Table */}
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg p-6 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#0B0D13] text-slate-400 font-mono uppercase border-b border-red-900/30">
+            <thead className="bg-slate-50 text-slate-500 font-mono uppercase border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4">Timestamp</th>
                 <th className="py-3 px-4">Actor</th>
@@ -203,12 +203,12 @@ export default function AuditTrailLogsPage() {
                 <th className="py-3 px-4">IP Address</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
                   <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <RefreshCw size={24} className="animate-spin text-red-500" />
+                      <RefreshCw size={24} className="animate-spin text-violet-600" />
                       <span>Loading audit trail from PostgreSQL...</span>
                     </div>
                   </td>
@@ -217,7 +217,7 @@ export default function AuditTrailLogsPage() {
                 <tr>
                   <td colSpan="6" className="py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <AlertCircle size={24} className="text-slate-600" />
+                      <AlertCircle size={24} className="text-slate-400" />
                       <span>{loadError || 'No audit records match your search'}</span>
                     </div>
                   </td>
@@ -229,12 +229,12 @@ export default function AuditTrailLogsPage() {
                     : String(log.details || '-');
 
                   return (
-                    <tr key={log.id} className="hover:bg-red-950/20 transition-colors">
-                      <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">
+                    <tr key={log.id} className="hover:bg-violet-50 transition-colors">
+                      <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">
                         {log.createdAt ? new Date(log.createdAt).toLocaleString('th-TH') : '-'}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-200">{log.actorName || log.actorId || 'System'}</div>
+                        <div className="font-bold text-slate-800">{log.actorName || log.actorId || 'System'}</div>
                         <div className="text-[10px] text-slate-500 font-mono">
                           ID: {log.actorId} • Role: {log.actorRole || 'Unknown'}
                         </div>
@@ -244,16 +244,16 @@ export default function AuditTrailLogsPage() {
                           {log.action}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-mono text-slate-300">
+                      <td className="py-3 px-4 font-mono text-slate-700">
                         {log.resourceType ? (
                           <span>
-                            <span className="text-slate-400">{log.resourceType}:</span> {log.resourceId || 'ALL'}
+                            <span className="text-slate-500">{log.resourceType}:</span> {log.resourceId || 'ALL'}
                           </span>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="py-3 px-4 max-w-xs truncate text-slate-400 font-mono" title={detailsText}>
+                      <td className="py-3 px-4 max-w-xs truncate text-slate-500 font-mono" title={detailsText}>
                         {detailsText}
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-500 text-[11px] whitespace-nowrap">
@@ -269,9 +269,9 @@ export default function AuditTrailLogsPage() {
 
         {/* Pagination Bar */}
         {!loading && filteredLogs.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-red-900/30 text-xs">
-            <div className="text-slate-400 font-mono">
-              Showing <span className="font-bold text-white">{startIndex + 1}</span> - <span className="font-bold text-white">{Math.min(startIndex + pageSize, totalItems)}</span> of <span className="font-bold text-[#EF4444]">{totalItems}</span> records (page {currentPage} / {totalPages})
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-200 text-xs">
+            <div className="text-slate-500 font-mono">
+              Showing <span className="font-bold text-slate-900">{startIndex + 1}</span> - <span className="font-bold text-slate-900">{Math.min(startIndex + pageSize, totalItems)}</span> of <span className="font-bold text-violet-700">{totalItems}</span> records (page {currentPage} / {totalPages})
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -279,7 +279,7 @@ export default function AuditTrailLogsPage() {
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-violet-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 title="First page"
               >
                 <ChevronsLeft size={16} />
@@ -289,7 +289,7 @@ export default function AuditTrailLogsPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-violet-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
                 title="Previous page"
               >
                 <ChevronLeft size={16} />
@@ -304,8 +304,8 @@ export default function AuditTrailLogsPage() {
                     onClick={() => setCurrentPage(pageNum)}
                     className={`w-8 h-8 rounded-xl font-bold transition-all text-xs font-mono flex items-center justify-center ${
                       currentPage === pageNum
-                        ? 'bg-[#DC2626] text-white shadow-lg shadow-red-600/30 border border-red-500 scale-105'
-                        : 'bg-[#0B0D13] text-slate-400 hover:text-white border border-red-900/40 hover:bg-red-950/40'
+                        ? 'bg-[#7C3AED] text-white shadow-lg shadow-violet-600/30 border border-violet-500 scale-105'
+                        : 'bg-slate-50 text-slate-500 hover:text-white border border-slate-200 hover:bg-violet-50'
                     }`}
                   >
                     {pageNum}
@@ -317,7 +317,7 @@ export default function AuditTrailLogsPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-violet-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-bold"
                 title="Next page"
               >
                 <span className="hidden sm:inline">Next</span>
@@ -328,7 +328,7 @@ export default function AuditTrailLogsPage() {
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-xl bg-[#0B0D13] border border-red-900/40 text-slate-300 hover:text-white hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-violet-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 title="Last page"
               >
                 <ChevronsRight size={16} />

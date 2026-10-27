@@ -18,17 +18,14 @@ import { colors } from '../theme/colors';
 import TopNavbar from '../components/TopNavbar';
 import { authService } from '../services/authService';
 import { pinService } from '../services/pinService';
+import { notificationStorage } from '../services/notificationStorage';
 import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsScreen({ navigation }) {
-  const { isDarkMode, toggleDarkMode, language, setLanguage, t, theme } = useTheme();
+  const { isDarkMode, language, setLanguage, t, theme } = useTheme();
 
-  const [toggles, setToggles] = useState({
-    biometric: true,
-    notifications: true,
-    messages: true,
-    timeReminder: false,
-  });
+  // saved on this device per user; read by notificationStorage (banner + bell counter)
+  const [toggles, setToggles] = useState(() => notificationStorage.getPrefs());
 
   // Modals state
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -76,16 +73,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleToggle = (key) => {
-    setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // นโยบาย: พนักงานเปลี่ยน/รีเซ็ตรหัสผ่านเองไม่ได้ ต้องแจ้ง Admin ให้รีเซ็ตให้ (Admin กดที่เว็บ เมนู All Employees)
-  const handlePasswordResetViaEmail = () => {
-    Alert.alert(
-      t('changePassword') || 'เปลี่ยนรหัสผ่าน',
-      'พนักงานไม่สามารถรีเซ็ตรหัสผ่านด้วยตัวเองได้\n\nกรุณาแจ้งผู้ดูแลระบบ (Admin) หรือฝ่าย HR ให้รีเซ็ตรหัสผ่านให้ ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของคุณ',
-      [{ text: 'ตกลง' }]
-    );
+    setToggles(notificationStorage.setPrefs({ [key]: !toggles[key] }));
   };
 
   const handleLogout = () => {
@@ -147,41 +135,13 @@ export default function SettingsScreen({ navigation }) {
             }
           },
         },
-        {
-          icon: 'shield-outline',
-          label: t('lockScreen') || 'ล็อกหน้าจอด้วย PIN (Lock Screen)',
-          type: 'nav',
-          onPress: () => {
-            if (hasPin) {
-              navigation.navigate('PinLock');
-            } else {
-              Alert.alert('ยังไม่ได้ตั้งรหัส PIN', 'กรุณาตั้งรหัส PIN ก่อนใช้งานการล็อกหน้าจอ', [
-                { text: 'ตั้งค่า PIN', onPress: () => navigation.navigate('SetPin', { mode: 'setup' }) },
-                { text: t('cancel'), style: 'cancel' },
-              ]);
-            }
-          },
-        },
-        {
-          icon: 'lock-closed-outline',
-          label: t('changePassword') || 'เปลี่ยนรหัสผ่าน',
-          type: 'nav',
-          onPress: handlePasswordResetViaEmail,
-        },
-        {
-          icon: 'finger-print-outline',
-          label: 'Face ID / Touch ID',
-          type: 'toggle',
-          key: 'biometric',
-        },
       ],
     },
     {
       title: t('notifications') || 'การแจ้งเตือน',
       items: [
-        { icon: 'notifications-outline', label: 'การแจ้งเตือนทั่วไป', type: 'toggle', key: 'notifications' },
-        { icon: 'chatbubble-outline', label: 'แจ้งเตือนข้อความและข่าวสาร', type: 'toggle', key: 'messages' },
-        { icon: 'alarm-outline', label: 'เตือนบันทึกเวลาเข้า-ออกงาน', type: 'toggle', key: 'timeReminder' },
+        { icon: 'notifications-outline', label: 'การแจ้งเตือนทั่วไป', type: 'toggle', key: 'general' },
+        { icon: 'chatbubble-outline', label: 'แจ้งเตือนข้อความและข่าวสาร', type: 'toggle', key: 'news' },
       ],
     },
     {
@@ -193,11 +153,6 @@ export default function SettingsScreen({ navigation }) {
           type: 'value',
           value: language === 'en' ? 'English' : 'ไทย',
           onPress: () => setShowLanguageModal(true),
-        },
-        {
-          icon: isDarkMode ? 'moon' : 'moon-outline',
-          label: t('darkMode') || 'โหมดมืด (Dark Mode)',
-          type: 'darkToggle',
         },
       ],
     },
@@ -258,15 +213,13 @@ export default function SettingsScreen({ navigation }) {
                       iIndex < section.items.length - 1 && [styles.settingItemBorder, { borderBottomColor: theme.border }],
                     ]}
                     onPress={() => {
-                      if (item.type === 'darkToggle') {
-                        toggleDarkMode();
-                      } else if (item.type === 'toggle') {
+                      if (item.type === 'toggle') {
                         handleToggle(item.key);
                       } else if (item.onPress) {
                         item.onPress();
                       }
                     }}
-                    activeOpacity={item.type === 'toggle' || item.type === 'darkToggle' ? 1 : 0.7}
+                    activeOpacity={item.type === 'toggle' ? 1 : 0.7}
                   >
                     <View style={styles.settingLeft}>
                       <View style={[styles.settingIconBg, { backgroundColor: isDarkMode ? '#1E293B' : colors.primaryLight }]}>
@@ -275,18 +228,6 @@ export default function SettingsScreen({ navigation }) {
                       <Text style={[styles.settingLabel, { color: theme.text }]}>{item.label}</Text>
                     </View>
 
-                    {item.type === 'darkToggle' && (
-                      <Switch
-                        testID="settings-toggle-dark-mode"
-                        value={isDarkMode}
-                        onValueChange={toggleDarkMode}
-                        trackColor={{
-                          false: '#CBD5E1',
-                          true: colors.primary + '80',
-                        }}
-                        thumbColor={isDarkMode ? colors.primary : '#FFFFFF'}
-                      />
-                    )}
 
                     {item.type === 'toggle' && (
                       <Switch
@@ -332,7 +273,7 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
 
           <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-            WellX989 Enterprise HRM • Connect Real DB
+            WellX989 Enterprise HRM
           </Text>
         </ScrollView>
       </Animated.View>

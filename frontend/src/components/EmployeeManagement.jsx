@@ -379,12 +379,13 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
   const handleExportCSV = () => {
     if (filteredEmployees.length === 0) return;
-    const headers = ['ID', 'First Name', 'Last Name', 'Department', 'Gender', 'Role', 'Start Date', 'Status'];
+    const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Department', 'Gender', 'Role', 'Start Date', 'Status'];
     const q = (v) => `"${String(v ?? '-').replace(/"/g, '""')}"`;
     const rows = filteredEmployees.map((item) => [
       q(item.code || '-'),
       q(item.firstName || '-'),
       q(item.lastName || '-'),
+      q(item.email || '-'),
       q(item.department || '-'),
       q(item.gender || '-'),
       q(item.role || '-'),
@@ -410,28 +411,28 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border text-sm font-bold animate-bounce transition-all ${
             notification.type === 'error'
-              ? 'bg-red-950 border-red-700/60 text-red-300'
-              : 'bg-emerald-950 border border-emerald-700/60 text-emerald-300'
+              ? 'bg-danger-50 border-danger-200 text-danger-700'
+              : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
           }`}
         >
           {notification.type === 'error' ? (
-            <AlertCircle size={20} className="text-[#EF4444]" />
+            <AlertCircle size={20} className="text-danger-600" />
           ) : (
-            <CheckCircle size={20} className="text-emerald-400" />
+            <CheckCircle size={20} className="text-emerald-600" />
           )}
           <span>{notification.msg}</span>
         </div>
       )}
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141722] p-6 rounded-2xl border border-red-900/30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-lg">
         <div>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+            <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
               <Users size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-black text-white uppercase tracking-wide">All Employees</h1>
+              <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">All Employees</h1>
               
             </div>
           </div>
@@ -441,7 +442,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
           <button
             onClick={handleExportCSV}
             disabled={filteredEmployees.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-600/50 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-300 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             title="Export the filtered employees"
           >
             <FileSpreadsheet size={16} />
@@ -450,7 +451,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
           <button
             onClick={fetchEmployees}
-            className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 text-slate-700 transition-colors"
             title="Refresh data"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -464,7 +465,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
         right={
           <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
+          className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
           <UserPlus size={16} />
           <span>Create / Register New Employee</span>
@@ -505,14 +506,15 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
       />
 
       {/* Employee Data Table */}
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
-              <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4">ID</th>
                 <th className="py-3.5 px-4">First Name</th>
                 <th className="py-3.5 px-4">Last Name</th>
+                <th className="py-3.5 px-4">Email</th>
                 <th className="py-3.5 px-4 w-full">Department</th>
                 <th className="py-3.5 px-4">Gender</th>
                 <th className="py-3.5 px-4">Role</th>
@@ -521,35 +523,36 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-500 font-mono">
+                  <td colSpan="10" className="py-12 text-center text-slate-500 font-mono">
                     Loading employees...
                   </td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-500 font-mono">
+                  <td colSpan="10" className="py-12 text-center text-slate-500 font-mono">
                     No employees match the filters
                   </td>
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-red-950/20 transition-colors">
-                    {/* ID / First Name / Last Name / Department */}
-                    <td className="py-3.5 px-4 font-mono text-xs font-semibold text-[#EF4444]">{emp.code}</td>
-                    <td className="py-3.5 px-4 font-bold text-white max-w-[10rem] truncate" title={emp.firstName}>{emp.firstName || '-'}</td>
-                    <td className="py-3.5 px-4 font-bold text-white max-w-[12rem] truncate" title={emp.lastName}>{emp.lastName || '-'}</td>
-                    <td className="py-3.5 px-4 text-slate-300 whitespace-normal min-w-[12rem]">{emp.department || '-'}</td>
+                  <tr key={emp.id} className="hover:bg-violet-50 transition-colors">
+                    {/* ID / First Name / Last Name / Email / Department */}
+                    <td className="py-3.5 px-4 font-mono text-xs font-semibold text-violet-700">{emp.code}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900 max-w-[10rem] truncate" title={emp.firstName}>{emp.firstName || '-'}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900 max-w-[12rem] truncate" title={emp.lastName}>{emp.lastName || '-'}</td>
+                    <td className="py-3.5 px-4 text-xs text-slate-700 max-w-[16rem] truncate" title={emp.email}>{emp.email || '-'}</td>
+                    <td className="py-3.5 px-4 text-slate-700 whitespace-normal min-w-[12rem]">{emp.department || '-'}</td>
 
                     {/* Gender Badge */}
                     <td className="py-3.5 px-4">
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
                           (emp.gender || 'Male') === 'Female' || emp.gender === 'หญิง'
-                            ? 'bg-pink-950/80 text-pink-300 border border-pink-700/50'
-                            : 'bg-blue-950/80 text-blue-300 border border-blue-700/50'
+                            ? 'bg-pink-50 text-pink-700 border border-pink-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
                         }`}
                       >
                         {(emp.gender || 'Male') === 'Female' || emp.gender === 'หญิง' ? '👩 Female' : '👨 Male'}
@@ -561,17 +564,17 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
                           emp.role === 'Admin' || emp.role === 'HR Admin'
-                            ? 'bg-red-950 text-red-400 border border-red-700/60'
-                            : 'bg-[#0B0D13] text-slate-300 border border-red-900/40'
+                            ? 'bg-violet-100 text-violet-600 border border-violet-300'
+                            : 'bg-slate-50 text-slate-700 border border-slate-200'
                         }`}
                       >
-                        <ShieldCheck size={13} className="text-[#EF4444]" />
+                        <ShieldCheck size={13} className="text-violet-700" />
                         {emp.role || 'Employee'}
                       </span>
                     </td>
 
                     {/* Start Date */}
-                    <td className="py-3.5 px-4 text-slate-400 text-xs font-mono font-semibold">
+                    <td className="py-3.5 px-4 text-slate-500 text-xs font-mono font-semibold">
                       {emp.startDate}
                     </td>
 
@@ -582,19 +585,19 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                         onClick={() => handleRequestStatusToggle(emp)}
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-sm border ${
                           emp.status === 'Resign' || emp.status === 'Resigned'
-                            ? 'bg-rose-950/90 text-rose-300 border-rose-700/60 cursor-not-allowed opacity-90'
+                            ? 'bg-violet-100 text-violet-700 border-violet-300 cursor-not-allowed opacity-90'
                             : emp.status === 'Active'
-                            ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600/70 hover:bg-emerald-900 hover:border-emerald-500 cursor-pointer hover:scale-105 active:scale-95'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer hover:scale-105 active:scale-95'
                             : emp.status === 'Inactive'
-                            ? 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200 hover:border-slate-500 cursor-pointer hover:scale-105 active:scale-95'
-                            : 'bg-amber-950/80 text-amber-300 border-amber-700/60 hover:bg-amber-900 cursor-pointer hover:scale-105 active:scale-95'
+                            ? 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 hover:text-slate-800 hover:border-slate-500 cursor-pointer hover:scale-105 active:scale-95'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer hover:scale-105 active:scale-95'
                         }`}
                         title={emp.status === 'Resign' || emp.status === 'Resigned' ? 'Status: Resign (left the company)' : `Current status: ${emp.status} (click to change)`}
                       >
                         <span
                           className={`w-2 h-2 rounded-full ${
                             emp.status === 'Resign' || emp.status === 'Resigned'
-                              ? 'bg-rose-500'
+                              ? 'bg-violet-500'
                               : emp.status === 'Active'
                               ? 'bg-emerald-400 animate-pulse'
                               : emp.status === 'Inactive'
@@ -604,7 +607,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                         />
                         <span>
                           {emp.status === 'Pending' || emp.status === 'Pending Password'
-                            ? 'Pending (awaiting password setup)'
+                            ? 'Pending'
                             : emp.status === 'Resign' || emp.status === 'Resigned'
                             ? 'Resign'
                             : emp.status}
@@ -618,7 +621,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                         {emp.status !== 'Resign' && emp.status !== 'Resigned' && (
                           <button
                             onClick={() => handleOpenEdit(emp)}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-violet-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit employee"
                           >
                             <Edit size={16} />
@@ -627,7 +630,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                         {emp.status !== 'Resign' && emp.status !== 'Resigned' && (
                           <button
                             onClick={() => setResetTarget(emp)}
-                            className="p-2 text-slate-400 hover:text-amber-300 hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
+                            className="p-2 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                             title="Reset password"
                             aria-label={`Reset password for ${emp.name}`}
                           >
@@ -639,7 +642,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                             setSelectedEmployee(emp);
                             setShowDeleteModal(true);
                           }}
-                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/60 rounded-lg transition-colors cursor-pointer"
+                          className="p-2 text-slate-500 hover:text-violet-600 hover:bg-violet-100 rounded-lg transition-colors cursor-pointer"
                           title="Delete employee"
                         >
                           <Trash2 size={16} />
@@ -656,21 +659,21 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* CREATE / REGISTER EMPLOYEE MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-900/30">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-slate-200 text-slate-900 my-8">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+                <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
                   <UserPlus size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Create / Register New Employee</h3>
-                  <p className="text-xs text-slate-400">Enter employee details to add them to the HR Admin system</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Create / Register New Employee</h3>
+                  <p className="text-xs text-slate-500">Enter employee details to add them to the HR Admin system</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={20} />
               </button>
@@ -686,12 +689,12 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
                 if (isEmailDup) {
                   return (
-                    <div className="bg-red-950/90 border-2 border-red-500 rounded-2xl p-4 mb-1 flex items-start gap-3 shadow-xl text-red-100 animate-in fade-in zoom-in-95 duration-150">
-                      <AlertCircle size={24} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="bg-violet-100 border-2 border-violet-500 rounded-2xl p-4 mb-1 flex items-start gap-3 shadow-xl text-violet-900 animate-in fade-in zoom-in-95 duration-150">
+                      <AlertCircle size={24} className="text-danger-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-sm text-red-200">❌ This email cannot be used (duplicate email)</h4>
-                        <p className="text-xs text-red-300 mt-1">
-                          Email <strong className="font-mono text-white underline decoration-red-400">{formData.email}</strong> already exists in the database and cannot be reused. Please use a different email.
+                        <h4 className="font-bold text-sm text-violet-800">❌ This email cannot be used (duplicate email)</h4>
+                        <p className="text-xs text-danger-700 mt-1">
+                          Email <strong className="font-mono text-slate-900 underline decoration-danger-400">{formData.email}</strong> already exists in the database and cannot be reused. Please use a different email.
                         </p>
                       </div>
                     </div>
@@ -700,12 +703,12 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
                 if (isCodeDup) {
                   return (
-                    <div className="bg-red-950/90 border-2 border-red-500 rounded-2xl p-4 mb-1 flex items-start gap-3 shadow-xl text-red-100 animate-in fade-in zoom-in-95 duration-150">
-                      <AlertCircle size={24} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="bg-violet-100 border-2 border-violet-500 rounded-2xl p-4 mb-1 flex items-start gap-3 shadow-xl text-violet-900 animate-in fade-in zoom-in-95 duration-150">
+                      <AlertCircle size={24} className="text-danger-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-sm text-red-200">❌ This employee ID cannot be used (duplicate ID)</h4>
-                        <p className="text-xs text-red-300 mt-1">
-                          Employee ID <strong className="font-mono text-white underline decoration-red-400">{formData.code}</strong> already exists in the database and cannot be reused. Please use a different ID.
+                        <h4 className="font-bold text-sm text-violet-800">❌ This employee ID cannot be used (duplicate ID)</h4>
+                        <p className="text-xs text-danger-700 mt-1">
+                          Employee ID <strong className="font-mono text-slate-900 underline decoration-danger-400">{formData.code}</strong> already exists in the database and cannot be reused. Please use a different ID.
                         </p>
                       </div>
                     </div>
@@ -717,7 +720,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Employee ID *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Employee ID *</label>
                   {(() => {
                     const cleanTypedCode = formData.code ? formData.code.trim().toUpperCase() : '';
                     const isCodeDup = cleanTypedCode !== '' && employees.some((e) => e.code && e.code.trim().toUpperCase() === cleanTypedCode);
@@ -730,13 +733,13 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                           onChange={handleInputChange}
                           className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
                             isCodeDup
-                              ? 'bg-red-950/60 border-red-500 text-red-100 ring-4 ring-red-500/30'
-                              : 'bg-[#0B0D13] border-red-900/40 text-white focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20'
+                              ? 'bg-violet-100 border-violet-500 text-violet-900 ring-4 ring-violet-200'
+                              : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-violet-500 focus:ring-4 focus:ring-violet-200'
                           }`}
                           required
                         />
                         {isCodeDup && (
-                          <p className="text-xs font-bold text-red-400 mt-1 flex items-center gap-1">
+                          <p className="text-xs font-bold text-violet-600 mt-1 flex items-center gap-1">
                             <AlertCircle size={13} />
                             <span>This employee ID is already in use</span>
                           </p>
@@ -747,33 +750,33 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">First Name *</label>
                   <input
                     type="text"
                     name="firstName"
                     placeholder="e.g. Somchai"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Last Name *</label>
                   <input
                     type="text"
                     name="lastName"
                     placeholder="e.g. Jaidee"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Employee Email (required - used as app username) *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email *</label>
                   {(() => {
                     const cleanTypedEmail = formData.email ? formData.email.trim().toLowerCase() : '';
                     const isDup = cleanTypedEmail !== '' && employees.some((e) => e.email && e.email.trim().toLowerCase() === cleanTypedEmail);
@@ -787,13 +790,13 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                           onChange={handleInputChange}
                           className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
                             isDup
-                              ? 'bg-red-950/60 border-red-500 text-red-100 ring-4 ring-red-500/30'
-                              : 'bg-[#0B0D13] border-red-900/40 text-white focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20'
+                              ? 'bg-violet-100 border-violet-500 text-violet-900 ring-4 ring-violet-200'
+                              : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-violet-500 focus:ring-4 focus:ring-violet-200'
                           }`}
                           required
                         />
                         {isDup && (
-                          <p className="text-xs font-bold text-red-400 mt-1 flex items-center gap-1">
+                          <p className="text-xs font-bold text-violet-600 mt-1 flex items-center gap-1">
                             <AlertCircle size={13} />
                             <span>This email is already in use</span>
                           </p>
@@ -804,24 +807,24 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Phone Number</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Phone Number</label>
                   <input
                     type="text"
                     name="phone"
                     placeholder="081-234-5678"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Gender *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Gender *</label>
                   <select
                     name="gender"
                     value={formData.gender || 'Male'}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   >
                     <option value="Male">👨 Male</option>
@@ -830,12 +833,12 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Department *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Department *</label>
                   <select
                     name="department"
                     value={formData.department}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   >
                     <option value="">-- Please select a department --</option>
@@ -846,19 +849,19 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                     ))}
                   </select>
                   {departments.length === 0 && (
-                    <p className="text-xs text-amber-400 mt-1">
+                    <p className="text-xs text-amber-600 mt-1">
                       ⚠️ No departments yet. Please add one first under "Organization Structure ➔ Departments".
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Role</label>
                   <select
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                   >
                     <option value="Employee">👤 Employee (general staff - clock in, request leave)</option>
                     <option value="Boss">👔 Boss (line manager - approves staff in the same line)</option>
@@ -867,7 +870,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Start Date</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Start Date</label>
                   <DatePicker
                     name="startDate"
                     value={formData.startDate}
@@ -877,18 +880,18 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save and Create Employee
                 </button>
@@ -900,41 +903,41 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* CONFIRMATION POPUP MODAL (Anti-Double-Submit & Single-Click Protection) */}
       {showConfirmAddModal && (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-800/60 text-slate-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-red-900/30">
-              <div className="p-3 rounded-2xl bg-red-950/80 text-[#EF4444] border border-red-800/50 flex-shrink-0">
+        <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-violet-200 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-slate-200">
+              <div className="p-3 rounded-2xl bg-violet-100 text-violet-700 border border-violet-200 flex-shrink-0">
                 <Mail size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-black text-white">Confirm Employee Creation</h3>
-                <p className="text-xs text-slate-400">Review the details before sending the password setup email</p>
+                <h3 className="text-lg font-black text-slate-900">Confirm Employee Creation</h3>
+                <p className="text-xs text-slate-500">Review the details before sending the password setup email</p>
               </div>
             </div>
 
             {/* Summary Details */}
-            <div className="bg-[#0B0D13] rounded-2xl p-4 border border-red-900/30 space-y-2.5 text-xs text-slate-300 mb-4">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
-                <span className="text-slate-400">Employee ID:</span>
-                <span className="font-mono font-bold text-[#EF4444]">{formData.code}</span>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2.5 text-xs text-slate-700 mb-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500">Employee ID:</span>
+                <span className="font-mono font-bold text-violet-700">{formData.code}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
-                <span className="text-slate-400">Full Name:</span>
-                <span className="font-bold text-white">{`${formData.firstName || ''} ${formData.lastName || ''}`.trim() || formData.name}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500">Full Name:</span>
+                <span className="font-bold text-slate-900">{`${formData.firstName || ''} ${formData.lastName || ''}`.trim() || formData.name}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
-                <span className="text-slate-400">Email (Username):</span>
-                <span className="font-semibold text-blue-400">{formData.email}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500">Email (Username):</span>
+                <span className="font-semibold text-blue-600">{formData.email}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400">Department:</span>
-                <span className="font-medium text-slate-200">{formData.department}</span>
+                <span className="text-slate-500">Department:</span>
+                <span className="font-medium text-slate-800">{formData.department}</span>
               </div>
             </div>
 
             {/* Warning Callout */}
-            <div className="bg-red-950/40 border border-red-800/50 rounded-xl p-3 mb-6 text-xs text-red-200 flex items-start gap-2.5">
-              <CheckCircle size={16} className="text-[#EF4444] flex-shrink-0 mt-0.5" />
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-6 text-xs text-violet-800 flex items-start gap-2.5">
+              <CheckCircle size={16} className="text-violet-700 flex-shrink-0 mt-0.5" />
               <span>
                 On confirmation, the employee will be added to the database and a password setup email will be sent to <strong>{formData.email}</strong> immediately.
               </span>
@@ -946,7 +949,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setShowConfirmAddModal(false)}
-                className="px-4 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs transition-colors disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-xs transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -954,7 +957,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleConfirmCreateEmployee}
-                className="px-5 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all flex items-center gap-2 uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs shadow-lg shadow-violet-600/30 transition-all flex items-center gap-2 uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
@@ -975,27 +978,27 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* DUPLICATE EMAIL ALERT MODAL POPUP */}
       {showDuplicateEmailAlertModal && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-600/80 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-red-900/40">
-              <div className="p-3 rounded-2xl bg-red-950/90 text-red-400 border border-red-700/60 flex-shrink-0">
+        <div className="fixed inset-0 z-[70] bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-violet-400 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-slate-200">
+              <div className="p-3 rounded-2xl bg-violet-100 text-violet-600 border border-violet-300 flex-shrink-0">
                 <AlertCircle size={28} />
               </div>
               <div>
-                <h3 className="text-lg font-black text-white">Duplicate Email!</h3>
-                <p className="text-xs text-red-300">This email cannot be registered</p>
+                <h3 className="text-lg font-black text-slate-900">Duplicate Email!</h3>
+                <p className="text-xs text-danger-700">This email cannot be registered</p>
               </div>
             </div>
 
-            <div className="bg-red-950/50 rounded-2xl p-4 border border-red-800/60 text-xs text-red-200 leading-relaxed mb-5">
-              Email <strong className="font-mono text-white underline decoration-red-400">{formData.email}</strong> already exists in the system, so a new employee cannot be created with the same email. Please use a different email.
+            <div className="bg-violet-100 rounded-2xl p-4 border border-violet-200 text-xs text-violet-800 leading-relaxed mb-5">
+              Email <strong className="font-mono text-slate-900 underline decoration-violet-400">{formData.email}</strong> already exists in the system, so a new employee cannot be created with the same email. Please use a different email.
             </div>
 
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowDuplicateEmailAlertModal(false)}
-                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
+                className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide"
               >
                 OK, Got It
               </button>
@@ -1006,27 +1009,27 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* DUPLICATE CODE ALERT MODAL POPUP */}
       {showDuplicateCodeAlertModal && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-600/80 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-red-900/40">
-              <div className="p-3 rounded-2xl bg-red-950/90 text-red-400 border border-red-700/60 flex-shrink-0">
+        <div className="fixed inset-0 z-[70] bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-violet-400 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3.5 mb-4 pb-3 border-b border-slate-200">
+              <div className="p-3 rounded-2xl bg-violet-100 text-violet-600 border border-violet-300 flex-shrink-0">
                 <AlertCircle size={28} />
               </div>
               <div>
-                <h3 className="text-lg font-black text-white">Duplicate Employee ID!</h3>
-                <p className="text-xs text-red-300">This employee ID cannot be registered</p>
+                <h3 className="text-lg font-black text-slate-900">Duplicate Employee ID!</h3>
+                <p className="text-xs text-danger-700">This employee ID cannot be registered</p>
               </div>
             </div>
 
-            <div className="bg-red-950/50 rounded-2xl p-4 border border-red-800/60 text-xs text-red-200 leading-relaxed mb-5">
-              Employee ID <strong className="font-mono text-white underline decoration-red-400">{formData.code}</strong> already exists in the system, so a new employee cannot be created with the same ID. Please use a different ID.
+            <div className="bg-violet-100 rounded-2xl p-4 border border-violet-200 text-xs text-violet-800 leading-relaxed mb-5">
+              Employee ID <strong className="font-mono text-slate-900 underline decoration-violet-400">{formData.code}</strong> already exists in the system, so a new employee cannot be created with the same ID. Please use a different ID.
             </div>
 
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowDuplicateCodeAlertModal(false)}
-                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
+                className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide"
               >
                 OK, Got It
               </button>
@@ -1037,21 +1040,21 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* EDIT EMPLOYEE MODAL */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#141722] rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-red-900/40 text-slate-100 my-8">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-900/30">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-7 shadow-2xl border border-slate-200 text-slate-900 my-8">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+                <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
                   <Edit size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-wide">Edit Employee</h3>
-                  <p className="text-xs text-slate-400">{formData.name} ({formData.code})</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Edit Employee</h3>
+                  <p className="text-xs text-slate-500">{formData.name} ({formData.code})</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-red-950/40"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-violet-50"
               >
                 <X size={20} />
               </button>
@@ -1060,48 +1063,48 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">First Name</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">First Name</label>
                   <input
                     type="text"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Last Name</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Last Name</label>
                   <input
                     type="text"
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Email</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email</label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Gender *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Gender *</label>
                   <select
                     name="gender"
                     value={formData.gender || 'Male'}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   >
                     <option value="Male">👨 Male</option>
@@ -1110,12 +1113,12 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Department *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Department *</label>
                   <select
                     name="department"
                     value={formData.department}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all"
                     required
                   >
                     <option value="">-- Please select a department --</option>
@@ -1126,19 +1129,19 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                     ))}
                   </select>
                   {departments.length === 0 && (
-                    <p className="text-xs text-amber-400 mt-1">
+                    <p className="text-xs text-amber-600 mt-1">
                       ⚠️ No departments yet. Please add one first under "Organization Structure ➔ Departments".
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Role</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Role</label>
                   <select
                     name="role"
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all cursor-pointer"
                   >
                     <option value="Employee">👤 Employee (general staff)</option>
                     <option value="Boss">👔 Boss (line manager)</option>
@@ -1147,12 +1150,12 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Status</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-200 transition-all cursor-pointer"
                   >
                     <option value="Active">Active (currently employed)</option>
                     <option value="Inactive">Inactive (no longer active)</option>
@@ -1163,8 +1166,8 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 <div>
                   {formData.status === 'Resign' || formData.status === 'Resigned' ? (
                     <>
-                      <label className="block text-xs font-bold text-rose-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block"></span>
+                      <label className="block text-xs font-bold text-violet-600 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-violet-500 animate-ping inline-block"></span>
                         Resignation Date *
                       </label>
                       <DatePicker
@@ -1180,7 +1183,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                     </>
                   ) : (
                     <>
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Start Date</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Start Date</label>
                       <DatePicker
                         name="startDate"
                         value={formData.startDate}
@@ -1192,17 +1195,17 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-red-900/30">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-sm transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 font-bold text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide"
+                  className="px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide"
                 >
                   Save Changes
                 </button>
@@ -1215,43 +1218,43 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
       {/* DELETE CONFIRMATION MODAL */}
       {/* RESET PASSWORD CONFIRMATION MODAL */}
       {resetTarget && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-amber-800/40 text-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-amber-200 text-slate-900">
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-amber-950/80 text-amber-300 border border-amber-700/50 flex items-center justify-center shrink-0">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
                 <KeyRound size={28} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-wide">Reset Password</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Send a set-password link to this employee</p>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-wide">Reset Password</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Send a set-password link to this employee</p>
               </div>
             </div>
 
-            <div className="bg-[#0B0D13] p-4 rounded-2xl border border-red-900/40 mb-6 flex flex-col gap-2.5 text-xs text-slate-400">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 flex flex-col gap-2.5 text-xs text-slate-500">
               <div className="flex items-center justify-between">
                 <span>Employee Name:</span>
-                <span className="font-bold text-white text-sm">{resetTarget.name}</span>
+                <span className="font-bold text-slate-900 text-sm">{resetTarget.name}</span>
               </div>
-              <div className="flex items-center justify-between border-t border-red-900/20 pt-2">
+              <div className="flex items-center justify-between border-t border-slate-200 pt-2">
                 <span>Employee ID:</span>
-                <span className="font-mono font-bold text-[#EF4444]">{resetTarget.code || resetTarget.id}</span>
+                <span className="font-mono font-bold text-violet-700">{resetTarget.code || resetTarget.id}</span>
               </div>
-              <div className="flex items-center justify-between border-t border-red-900/20 pt-2">
+              <div className="flex items-center justify-between border-t border-slate-200 pt-2">
                 <span>Email:</span>
-                <span className="font-semibold text-slate-200">{resetTarget.email || '-'}</span>
+                <span className="font-semibold text-slate-800">{resetTarget.email || '-'}</span>
               </div>
-              <p className="border-t border-red-900/20 pt-2.5 text-slate-300">
+              <p className="border-t border-slate-200 pt-2.5 text-slate-700">
                 The employee receives an email with a link (valid for 15 minutes) to set a new password in the app.
                 Employees cannot reset their own password.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-red-900/20">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setResetTarget(null)}
                 disabled={resetting}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1E293B] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1259,7 +1262,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 type="button"
                 onClick={handleResetPassword}
                 disabled={resetting}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/30 flex items-center gap-2 disabled:opacity-60"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#4C1D95] hover:from-[#A78BFA] hover:to-[#6D28D9] text-white font-bold text-sm shadow-lg shadow-violet-600/30 flex items-center gap-2 disabled:opacity-60"
               >
                 <KeyRound size={16} />
                 <span>{resetting ? 'Sending...' : 'Send reset link'}</span>
@@ -1270,55 +1273,55 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
       )}
 
       {showDeleteModal && selectedEmployee && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-7 shadow-2xl border border-red-900/50 text-slate-100 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
             {/* Warning Red Trash Icon */}
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-red-950/90 text-[#EF4444] border border-red-700/60 flex items-center justify-center shadow-lg shadow-red-950/60 shrink-0">
+              <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-700 border border-violet-300 flex items-center justify-center shadow-lg shadow-slate-300 shrink-0">
                 <Trash2 size={28} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-wide">
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-wide">
                   Confirm Employee Deletion
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Confirmation Required</p>
+                <p className="text-xs text-slate-500 mt-0.5">Confirmation Required</p>
               </div>
             </div>
 
             {/* Body/Description Box */}
-            <div className="bg-[#0B0D13] p-4.5 rounded-2xl border border-red-900/40 mb-6 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-200 mb-6 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>Employee Name:</span>
-                <span className="font-bold text-white text-sm">{selectedEmployee?.name}</span>
+                <span className="font-bold text-slate-900 text-sm">{selectedEmployee?.name}</span>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-400 border-t border-red-900/20 pt-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200 pt-2">
                 <span>Employee ID / Code:</span>
-                <span className="font-mono font-bold text-[#EF4444] text-xs bg-red-950/80 px-2 py-0.5 rounded border border-red-800/40">
+                <span className="font-mono font-bold text-violet-700 text-xs bg-violet-100 px-2 py-0.5 rounded border border-violet-200">
                   {selectedEmployee?.code || selectedEmployee?.id}
                 </span>
               </div>
-              <div className="mt-1 pt-2.5 border-t border-red-900/30 text-xs text-red-300 font-semibold flex items-center gap-1.5">
-                <AlertCircle size={15} className="text-[#EF4444] shrink-0" />
+              <div className="mt-1 pt-2.5 border-t border-danger-200 text-xs text-danger-700 font-semibold flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-danger-600 shrink-0" />
                 <span>Warning: once confirmed, this employee's data cannot be recovered</span>
               </div>
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-red-900/20">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setSelectedEmployee(null);
                 }}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1E293B] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteSubmit}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-red-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] text-white font-bold text-sm shadow-lg shadow-danger-600/40 transition-all uppercase tracking-wide flex items-center gap-2"
               >
                 <Trash2 size={16} />
                 <span>Confirm Delete</span>
@@ -1330,15 +1333,15 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
 
       {/* STATUS TOGGLE CONFIRMATION MODAL */}
       {statusToggleTarget && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#141722] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-red-900/40 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[70] bg-slate-900/50 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
             {/* Header Icon & Title */}
-            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-red-900/30">
+            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-slate-200">
               <div
                 className={`p-3 rounded-2xl border flex-shrink-0 ${
                   statusToggleTarget.nextStatus === 'Inactive'
-                    ? 'bg-amber-950/90 text-amber-400 border-amber-700/60 shadow-lg shadow-amber-950/40'
-                    : 'bg-emerald-950/90 text-emerald-400 border-emerald-700/60 shadow-lg shadow-emerald-950/40'
+                    ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-lg shadow-slate-300'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-lg shadow-slate-300'
                 }`}
               >
                 {statusToggleTarget.nextStatus === 'Inactive' ? (
@@ -1348,19 +1351,19 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                 )}
               </div>
               <div>
-                <h3 className="text-lg font-black text-white uppercase tracking-wide">
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">
                   {statusToggleTarget.nextStatus === 'Inactive'
                     ? 'Confirm deactivation (Inactive)?'
                     : 'Confirm account activation (Active)?'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Change the employee's system access status
                 </p>
               </div>
             </div>
 
             {/* Employee Info Card */}
-            <div className="bg-[#0B0D13] rounded-2xl p-4 border border-red-900/30 mb-5 space-y-3">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-5 space-y-3">
               <div className="flex items-center gap-3">
                 <img
                   src={
@@ -1370,37 +1373,37 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                       : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120')
                   }
                   alt={statusToggleTarget.emp.name}
-                  className="w-12 h-12 rounded-full object-cover border border-red-900/40"
+                  className="w-12 h-12 rounded-full object-cover border border-slate-200"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-white text-sm truncate">
+                  <div className="font-bold text-slate-900 text-sm truncate">
                     {statusToggleTarget.emp.name}
                   </div>
-                  <div className="text-xs text-slate-400 font-mono">
+                  <div className="text-xs text-slate-500 font-mono">
                     {statusToggleTarget.emp.code} • {statusToggleTarget.emp.email}
                   </div>
                 </div>
               </div>
 
               {/* Status Transition Display */}
-              <div className="flex items-center justify-between pt-2 border-t border-red-900/20 text-xs font-bold">
-                <span className="text-slate-400">Current status:</span>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs font-bold">
+                <span className="text-slate-500">Current status:</span>
                 <span
                   className={`px-2.5 py-0.5 rounded-full ${
                     statusToggleTarget.emp.status === 'Active'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-700/50'
-                      : 'bg-slate-900 text-slate-400 border border-slate-700'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-500 border border-slate-300'
                   }`}
                 >
                   ● {statusToggleTarget.emp.status}
                 </span>
                 <span className="text-slate-500">➜</span>
-                <span className="text-slate-400">New status:</span>
+                <span className="text-slate-500">New status:</span>
                 <span
                   className={`px-2.5 py-0.5 rounded-full ${
                     statusToggleTarget.nextStatus === 'Active'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-sm'
-                      : 'bg-amber-950 text-amber-400 border border-amber-600/70 shadow-sm'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-500 shadow-sm'
+                      : 'bg-amber-50 text-amber-600 border border-amber-300 shadow-sm'
                   }`}
                 >
                   ● {statusToggleTarget.nextStatus}
@@ -1409,19 +1412,19 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
             </div>
 
             {/* Warning / Notice Text */}
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+            <p className="text-xs text-slate-700 leading-relaxed mb-6">
               {statusToggleTarget.nextStatus === 'Inactive'
                 ? '⚠️ Once set to Inactive, the employee cannot sign in to the WellX989 Mobile App until the account is reactivated.'
                 : '✅ Once set to Active, the employee can sign in to the WellX989 Mobile App and clock in as normal.'}
             </p>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-900/30">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 disabled={isUpdatingStatus}
                 onClick={() => setStatusToggleTarget(null)}
-                className="px-5 py-2.5 rounded-xl border border-slate-700/60 bg-[#1E293B] hover:bg-slate-800 text-slate-300 font-bold text-sm transition-all"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all"
               >
                 Cancel
               </button>

@@ -14,6 +14,8 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -23,6 +25,88 @@ import { attendanceStorage } from '../services/attendanceStorage';
 import { authService } from '../services/authService';
 import { openLeaveAttachment } from '../services/attachmentService';
 
+// same list as the server's requireApprover (backend/src/middlewares/authMiddleware.js)
+const APPROVER_ROLES = new Set([
+  'admin', 'super admin', 'superadmin', 'hr admin', 'system admin', 'sys admin',
+  'hr', 'manager', 'boss', 'superboss', 'super boss', 'supervisor', 'head', 'ceo', 'director',
+]);
+const isApproverRole = (role) => APPROVER_ROLES.has(String(role || '').trim().toLowerCase().replace(/[\s_-]+/g, ' '));
+
+const dash = (v) => (v && String(v).trim() && String(v).trim() !== '-' ? String(v).trim() : '--:--');
+
+// "2026-10-22 – 2026-10-22" -> "2026-10-22" when it is a single day
+const dateRange = (a, b) => (!b || a === b ? a || '-' : `${a} – ${b}`);
+
+const isBossRole = (item) => item.requesterRole === 'Boss' || item.role === 'Boss' || item.requesterRole === 'Manager';
+
+// One labelled line of a request card: icon | label | value
+function InfoRow({ icon, label, children }) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIconBg}>
+        <Ionicons name={icon} size={15} color="#6D28D9" />
+      </View>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <View style={styles.infoValueWrap}>{children}</View>
+    </View>
+  );
+}
+
+// What the request is about (leave dates / time change), the reason and the attachment. Same layout for pending and history.
+function RequestDetails({ item, reqType, reasonLabel }) {
+  return (
+    <View style={styles.cardBody}>
+      {reqType === 'leave' && (
+        <InfoRow icon="calendar-outline" label="วันที่ลา">
+          <Text style={styles.infoValue}>{dateRange(item.startDate, item.endDate)}</Text>
+          <View style={styles.daysPill}>
+            <Text style={styles.daysPillText}>{item.totalDays || item.days || 1} วัน</Text>
+          </View>
+        </InfoRow>
+      )}
+
+      {reqType === 'time-correction' && !!item.dateIso && (
+        <InfoRow icon="calendar-outline" label="วันที่แก้">
+          <Text style={styles.infoValue}>{String(item.dateIso).slice(0, 10)}</Text>
+        </InfoRow>
+      )}
+
+      {reqType === 'time-correction' && (
+        <View style={styles.compareRow}>
+          <View style={styles.compareCol}>
+            <Text style={styles.compareLabel}>เวลาเดิม</Text>
+            <Text style={styles.compareValue}>{dash(item.oldCheckIn)} - {dash(item.oldCheckOut)}</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
+          <View style={[styles.compareCol, styles.compareColNew]}>
+            <Text style={[styles.compareLabel, { color: '#7C3AED' }]}>ขอปรับเป็น</Text>
+            <Text style={[styles.compareValue, { color: '#5B21B6' }]}>{dash(item.newCheckIn)} - {dash(item.newCheckOut)}</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.reasonBox}>
+        <Text style={styles.reasonLabel}>{reasonLabel}</Text>
+        <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ไม่มีระบุ'}</Text>
+      </View>
+
+      {!!item.attachmentUrl && (
+        <TouchableOpacity
+          style={styles.attachmentChip}
+          onPress={() =>
+            openLeaveAttachment(item.attachmentUrl).catch((e) =>
+              Alert.alert('เปิดไฟล์แนบไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง')
+            )
+          }
+        >
+          <Ionicons name="attach" size={14} color="#0369A1" />
+          <Text style={styles.attachmentText}>ดูเอกสารแนบ</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 export default function ManagerApprovalScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'leave' | 'time-correction'
   const [approvalMode, setApprovalMode] = useState('pending'); // 'pending' | 'history'
@@ -31,9 +115,11 @@ export default function ManagerApprovalScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const currentUser = authService.getUser();
+  const canApprove = isApproverRole(currentUser?.role);
 
   // Modal State for Reject Remark
   const [rejectModal, setRejectModal] = useState({ visible: false, request: null, remark: '' });
+  const [remarkFocused, setRemarkFocused] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -169,6 +255,21 @@ export default function ManagerApprovalScreen({ navigation }) {
     return true;
   });
 
+  if (!canApprove) {
+    return (
+      <SafeAreaView testID="screen-manager-approval" style={styles.safeArea}>
+        <TopNavbar navigation={navigation} title="อนุมัติคำขอพนักงาน" showBack={true} />
+        <View style={[styles.container, styles.emptyContainer, { flex: 1, justifyContent: 'center' }]}>
+          <View style={[styles.emptyIconBg, { backgroundColor: '#F5F3FF' }]}>
+            <Ionicons name="lock-closed-outline" size={40} color="#7C3AED" />
+          </View>
+          <Text style={styles.emptyTitle}>หน้านี้สำหรับผู้อนุมัติเท่านั้น</Text>
+          <Text style={styles.emptySubtitle}>ดูผลคำขอของคุณได้ที่ "สถานะคำขอ" ในแท็บ HR</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView testID="screen-manager-approval" style={styles.safeArea}>
       <TopNavbar
@@ -194,7 +295,7 @@ export default function ManagerApprovalScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <Text style={[styles.modeToggleText, approvalMode === 'pending' && styles.modeToggleTextActive]}>
-              ⏳ รออนุมัติ ({pendingRequests.length})
+            รออนุมัติ 
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -204,7 +305,7 @@ export default function ManagerApprovalScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <Text style={[styles.modeToggleText, approvalMode === 'history' && styles.modeToggleTextActive]}>
-              📜 ประวัติที่อนุมัติแล้ว ({approvalHistory.length})
+              ประวัติ
             </Text>
           </TouchableOpacity>
         </View>
@@ -268,25 +369,21 @@ export default function ManagerApprovalScreen({ navigation }) {
 
                 return (
                   <View key={item.id || index} style={styles.requestCard}>
-                    {/* Card Header */}
+                    {/* Card Header: person on the left, request type on the right */}
                     <View style={styles.cardHeader}>
+                      <View style={styles.avatarCircle}>
+                        <Text style={styles.avatarText}>{(item.employeeName || 'EM')[0]}</Text>
+                      </View>
                       <View style={styles.userInfo}>
-                        <View style={styles.avatarCircle}>
-                          <Text style={styles.avatarText}>
-                            {(item.employeeName || 'EM')[0]}
-                          </Text>
+                        <View style={styles.nameRow}>
+                          <Text style={styles.userName} numberOfLines={1}>{item.employeeName || 'พนักงานในแผนก'}</Text>
+                          {isBossRole(item) && (
+                            <View style={styles.roleBadge}>
+                              <Text style={styles.roleBadgeText}>Boss</Text>
+                            </View>
+                          )}
                         </View>
-                        <View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.userName}>{item.employeeName || 'พนักงานในแผนก'}</Text>
-                            {(item.requesterRole === 'Boss' || item.role === 'Boss' || item.requesterRole === 'Manager') && (
-                              <View style={{ backgroundColor: '#F3E8FF', borderColor: '#C084FC', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
-                                <Text style={{ color: '#7E22CE', fontSize: 10, fontWeight: '700' }}>👔 Role Boss</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.userDept}>{item.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'}</Text>
-                        </View>
+                        <Text style={styles.userDept} numberOfLines={1}>{item.department || 'ฝ่ายเทคโนโลยีสารสนเทศ (IT)'}</Text>
                       </View>
                       <View style={[styles.typeTag, { backgroundColor: typeBadge.bg }]}>
                         <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
@@ -294,46 +391,7 @@ export default function ManagerApprovalScreen({ navigation }) {
                       </View>
                     </View>
 
-                    {/* Card Details */}
-                    <View style={styles.cardBody}>
-                      {reqType === 'leave' && (
-                        <View style={styles.detailRow}>
-                          <Ionicons name="calendar-outline" size={16} color="#64748B" />
-                          <Text style={styles.detailText}>
-                            วันที่: <Text style={styles.boldText}>{item.startDate} – {item.endDate}</Text> ({item.totalDays || 1} วัน)
-                          </Text>
-                        </View>
-                      )}
-
-
-                      {reqType === 'time-correction' && (
-                        <View style={styles.detailRow}>
-                          <Ionicons name="time-outline" size={16} color="#64748B" />
-                          <Text style={styles.detailText}>
-                            เวลาเดิม: {item.oldCheckIn || '--:--'} - {item.oldCheckOut || '--:--'} ➔ ขอปรับเป็น: <Text style={styles.boldText}>{item.newCheckIn || '08:00 น.'} - {item.newCheckOut || '17:00 น.'}</Text>
-                          </Text>
-                        </View>
-                      )}
-
-                      <View style={styles.reasonBox}>
-                        <Text style={styles.reasonLabel}>เหตุผล / รายละเอียดงาน:</Text>
-                        <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ขออนุมัติตามขั้นตอนบริษัท'}</Text>
-                      </View>
-
-                      {item.attachmentUrl && (
-                        <TouchableOpacity
-                          style={styles.attachmentChip}
-                          onPress={() =>
-                            openLeaveAttachment(item.attachmentUrl).catch((e) =>
-                              Alert.alert('เปิดไฟล์แนบไม่สำเร็จ', e.message || 'กรุณาลองใหม่อีกครั้ง')
-                            )
-                          }
-                        >
-                          <Ionicons name="attach" size={14} color="#0EA5E9" />
-                          <Text style={styles.attachmentText}>ดูเอกสารแนบ</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                    <RequestDetails item={item} reqType={reqType} reasonLabel="เหตุผล / รายละเอียดงาน" />
 
                     {/* Action Buttons */}
                     <View style={styles.cardActions}>
@@ -369,6 +427,7 @@ export default function ManagerApprovalScreen({ navigation }) {
             filteredHistory.map((item, index) => {
               const reqType = item.requestType || (item.leaveType ? 'leave' : 'time-correction');
               const isApproved = item.status === 'อนุมัติแล้ว' || item.status === 'approved';
+              const isForwarded = String(item.status || '').startsWith('รออนุมัติ');
               let typeBadge = { label: 'คำร้อง', bg: '#EFF6FF', text: '#3B82F6', icon: 'document-text-outline' };
               if (reqType === 'leave') {
                 typeBadge = { label: item.leaveType || 'ขอลางาน', bg: '#FEF3C7', text: '#D97706', icon: 'umbrella-outline' };
@@ -380,78 +439,39 @@ export default function ManagerApprovalScreen({ navigation }) {
                 <View key={item.id || `hist-${index}`} style={styles.requestCard}>
                   {/* History Card Header */}
                   <View style={styles.cardHeader}>
-                    <View style={styles.userInfo}>
-                      <View style={[styles.avatarCircle, { backgroundColor: '#64748B' }]}>
-                        <Text style={styles.avatarText}>
-                          {(item.employeeName || 'EM')[0]}
-                        </Text>
-                      </View>
-                      <View>
-                        <Text style={styles.userName}>{item.employeeName || 'พนักงาน'}</Text>
-                        <Text style={styles.userDept}>{item.department || item.employeeCode || 'ฝ่ายงาน'}</Text>
-                      </View>
+                    <View style={[styles.avatarCircle, { backgroundColor: '#64748B' }]}>
+                      <Text style={styles.avatarText}>{(item.employeeName || 'EM')[0]}</Text>
                     </View>
-                    <View
-                      style={[
-                        styles.historyBadge,
-                        isApproved ? styles.historyBadgeSuccess : styles.historyBadgeDanger,
-                      ]}
-                    >
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName} numberOfLines={1}>{item.employeeName || 'พนักงาน'}</Text>
+                      <Text style={styles.userDept} numberOfLines={1}>{item.department || item.employeeCode || 'ฝ่ายงาน'}</Text>
+                    </View>
+                    <View style={[styles.historyBadge, isForwarded ? styles.historyBadgeForwarded : isApproved ? styles.historyBadgeSuccess : styles.historyBadgeDanger]}>
                       <Ionicons
-                        name={isApproved ? 'checkmark-circle' : 'close-circle'}
+                        name={isForwarded ? 'arrow-redo-circle' : isApproved ? 'checkmark-circle' : 'close-circle'}
                         size={14}
-                        color={isApproved ? '#16A34A' : '#DC2626'}
+                        color={isForwarded ? '#B45309' : isApproved ? '#16A34A' : '#DC2626'}
                         style={{ marginRight: 4 }}
                       />
-                      <Text
-                        style={[
-                          styles.historyBadgeText,
-                          isApproved ? styles.historyBadgeTextSuccess : styles.historyBadgeTextDanger,
-                        ]}
-                      >
-                        {item.status || (isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ')}
+                      <Text style={[styles.historyBadgeText, isForwarded ? styles.historyBadgeTextForwarded : isApproved ? styles.historyBadgeTextSuccess : styles.historyBadgeTextDanger]}>
+                        {isForwarded ? 'ส่งต่อ Superboss แล้ว' : item.status || (isApproved ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ')}
                       </Text>
                     </View>
                   </View>
 
-                  {/* History Card Details */}
-                  <View style={styles.cardBody}>
-                    <View style={[styles.typeTag, { backgroundColor: typeBadge.bg, marginBottom: 8, alignSelf: 'flex-start' }]}>
-                      <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
-                      <Text style={[styles.typeTagText, { color: typeBadge.text }]}>{typeBadge.label}</Text>
-                    </View>
-
-                    {reqType === 'leave' && (
-                      <View style={styles.detailRow}>
-                        <Ionicons name="calendar-outline" size={16} color="#64748B" />
-                        <Text style={styles.detailText}>
-                          วันที่: <Text style={styles.boldText}>{item.startDate} – {item.endDate}</Text> ({item.days || item.totalDays || 1} วัน)
-                        </Text>
-                      </View>
-                    )}
-
-
-                    {reqType === 'time-correction' && (
-                      <View style={styles.detailRow}>
-                        <Ionicons name="time-outline" size={16} color="#64748B" />
-                        <Text style={styles.detailText}>
-                          เวลาเดิม: {item.oldCheckIn || '--:--'} ➔ ปรับเป็น: <Text style={styles.boldText}>{item.newCheckIn || '08:00 น.'} - {item.newCheckOut || '17:00 น.'}</Text>
-                        </Text>
-                      </View>
-                    )}
-
-                    <View style={styles.reasonBox}>
-                      <Text style={styles.reasonLabel}>เหตุผลคำขอ:</Text>
-                      <Text style={styles.reasonText}>{item.reason || item.taskDescription || 'ไม่มีระบุ'}</Text>
-                    </View>
-
-                    {item.rejectReason && (
-                      <View style={[styles.reasonBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, marginTop: 6 }]}>
-                        <Text style={[styles.reasonLabel, { color: '#DC2626' }]}>เหตุผลการไม่อนุมัติ:</Text>
-                        <Text style={[styles.reasonText, { color: '#B91C1C' }]}>{item.rejectReason}</Text>
-                      </View>
-                    )}
+                  <View style={[styles.typeTag, { backgroundColor: typeBadge.bg, marginBottom: 12, alignSelf: 'flex-start' }]}>
+                    <Ionicons name={typeBadge.icon} size={14} color={typeBadge.text} style={{ marginRight: 4 }} />
+                    <Text style={[styles.typeTagText, { color: typeBadge.text }]}>{typeBadge.label}</Text>
                   </View>
+
+                  <RequestDetails item={item} reqType={reqType} reasonLabel="เหตุผลคำขอ" />
+
+                  {!!item.rejectReason && (
+                    <View style={[styles.reasonBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, marginBottom: 12 }]}>
+                      <Text style={[styles.reasonLabel, { color: '#DC2626' }]}>เหตุผลการไม่อนุมัติ</Text>
+                      <Text style={[styles.reasonText, { color: '#B91C1C' }]}>{item.rejectReason}</Text>
+                    </View>
+                  )}
 
                   {/* History Footer */}
                   <View style={styles.historyFooter}>
@@ -473,41 +493,63 @@ export default function ManagerApprovalScreen({ navigation }) {
       </View>
 
       {/* Reject Modal */}
-      <Modal visible={rejectModal.visible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={rejectModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRejectModal({ visible: false, request: null, remark: '' })}
+      >
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="alert-circle" size={28} color="#EF4444" />
-              <Text style={styles.modalTitle}>ระบุเหตุผลการไม่อนุมัติ</Text>
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="close" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalSubtitle}>
-              คำขอของ: {rejectModal.request?.employeeName || 'พนักงาน'}
+            <Text style={styles.modalTitle}>ไม่อนุมัติคำขอนี้</Text>
+            <Text style={styles.modalSubtitle}>ระบุเหตุผลเพื่อแจ้งให้ผู้ยื่นคำขอทราบ</Text>
+
+            <View style={styles.modalRequester}>
+              <View style={styles.modalRequesterAvatar}>
+                <Text style={styles.modalRequesterAvatarText}>{(rejectModal.request?.employeeName || 'พ')[0]}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalRequesterName} numberOfLines={1}>{rejectModal.request?.employeeName || 'พนักงาน'}</Text>
+                <Text style={styles.modalRequesterDept} numberOfLines={1}>{rejectModal.request?.department || '-'}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.modalFieldLabel}>
+              เหตุผลการไม่อนุมัติ <Text style={styles.modalFieldHint}>(ไม่บังคับ)</Text>
             </Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="ป้อนเหตุผลหรือข้อเสนอแนะ..."
+              style={[styles.modalInput, remarkFocused && styles.modalInputFocused]}
+              placeholder="เช่น ช่วงนั้นมีงานเร่งด่วน กรุณาเลือกวันอื่น"
+              placeholderTextColor="#94A3B8"
               value={rejectModal.remark}
               onChangeText={(txt) => setRejectModal((prev) => ({ ...prev, remark: txt }))}
+              onFocus={() => setRemarkFocused(true)}
+              onBlur={() => setRemarkFocused(false)}
+              maxLength={300}
               multiline
               numberOfLines={3}
             />
+            <Text style={styles.modalCounter}>{rejectModal.remark.length}/300</Text>
+
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
                 onPress={() => setRejectModal({ visible: false, request: null, remark: '' })}
+                activeOpacity={0.8}
               >
                 <Text style={styles.modalCancelText}>ยกเลิก</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                onPress={handleRejectSubmit}
-              >
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleRejectSubmit} activeOpacity={0.85}>
+                <Ionicons name="close-circle" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.modalConfirmText}>ยืนยันไม่อนุมัติ</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -553,6 +595,7 @@ const styles = StyleSheet.create({
   historyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -562,6 +605,12 @@ const styles = StyleSheet.create({
   },
   historyBadgeDanger: {
     backgroundColor: '#FEE2E2',
+  },
+  historyBadgeForwarded: {
+    backgroundColor: '#FEF3C7',
+  },
+  historyBadgeTextForwarded: {
+    color: '#B45309',
   },
   historyBadgeText: {
     fontSize: 12,
@@ -635,7 +684,7 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     paddingVertical: 48,
   },
   emptyIconBg: {
@@ -644,7 +693,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: '#D1FAE5',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   emptyTitle: {
@@ -673,15 +722,105 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'space-between',
-    marginBottom: 12,
-    paddingBottom: 12,
+    marginBottom: 14,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   userInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+  },
+  roleBadge: {
+    backgroundColor: '#F3E8FF',
+    borderColor: '#C084FC',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  roleBadgeText: {
+    color: '#7E22CE',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  infoIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  infoLabel: {
+    width: 56,
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  infoValueWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  daysPill: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  daysPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6D28D9',
+  },
+  compareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  compareCol: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  compareColNew: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+  },
+  compareLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  compareValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   avatarCircle: {
     width: 40,
@@ -689,7 +828,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: colors.primary,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginRight: 10,
   },
   avatarText: {
@@ -712,6 +851,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 0,
   },
   typeTagText: {
     fontSize: 12,
@@ -736,9 +876,9 @@ const styles = StyleSheet.create({
   },
   reasonBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 2,
   },
   reasonLabel: {
     fontSize: 11,
@@ -768,14 +908,15 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     gap: 10,
   },
   rejectBtn: {
     flex: 1,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
@@ -788,10 +929,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   approveBtn: {
-    flex: 2,
+    flex: 1.4,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: 10,
     paddingVertical: 10,
@@ -803,67 +945,148 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 24,
     width: '100%',
-    padding: 20,
+    maxWidth: 380,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  modalHeader: {
-    flexDirection: 'row',
+  modalIconCircle: {
+    alignSelf: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: '#FECACA',
     alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#0F172A',
-    marginLeft: 8,
+    textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 13,
     color: '#64748B',
-    marginBottom: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  modalRequester: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 16,
+  },
+  modalRequesterAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  modalRequesterAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  modalRequesterName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modalRequesterDept: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  modalFieldLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  modalFieldHint: {
+    fontWeight: '500',
+    color: '#94A3B8',
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 14,
     color: '#0F172A',
     textAlignVertical: 'top',
+    minHeight: 96,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}), // web: use our violet focus border, not the browser outline
+  },
+  modalInputFocused: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFFFFF',
+  },
+  modalCounter: {
+    alignSelf: 'flex-end',
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 4,
     marginBottom: 16,
-    minHeight: 80,
   },
   modalActions: {
     flexDirection: 'row',
-    justify: 'flex-end',
     gap: 10,
   },
   modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
     backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalCancelText: {
-    color: '#64748B',
-    fontWeight: '600',
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 14,
   },
   modalConfirmBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    flex: 1.5,
+    minHeight: 46,
+    borderRadius: 12,
     backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalConfirmText: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 14,
   },
 });

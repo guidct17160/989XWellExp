@@ -162,8 +162,11 @@ router.get('/leaderboard', requireAuth, rewardController.getLeaderboard);
 // 12. Announcements & News Routes (GET is public for visibility)
 // -------------------------------------------------------------
 router.get('/announcements', announcementController.getAnnouncements);
+router.get('/announcements/all', requireAdmin, announcementController.getAllAnnouncements);
+router.get('/announcements/:id/image', announcementController.getAnnouncementImage);
 router.get('/announcements/:id', announcementController.getAnnouncementById);
 router.post('/announcements', requireAdmin, announcementController.createAnnouncement);
+router.put('/announcements/:id', requireAdmin, announcementController.updateAnnouncement);
 router.delete('/announcements/:id', requireAdmin, announcementController.deleteAnnouncement);
 
 // -------------------------------------------------------------
@@ -183,6 +186,8 @@ router.get('/hr/reports/attendance', requireApprover, hrController.getAttendance
 // -------------------------------------------------------------
 // 15. System Settings
 // -------------------------------------------------------------
+router.get('/settings/work-time', requireAuth, settingsController.getWorkTime);
+router.put('/settings/work-time', requireAdmin, settingsController.updateWorkTime);
 router.get('/settings', requireAuth, settingsController.getSettings);
 router.put('/settings', requireAdmin, settingsController.updateSettings);
 

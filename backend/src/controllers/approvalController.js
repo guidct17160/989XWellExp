@@ -25,7 +25,8 @@ exports.getPendingApprovals = async (req, res) => {
 // GET /api/approvals/history (Real DB)
 exports.getApprovalHistory = async (req, res) => {
   try {
-    const historyList = await dbStore.getApprovalHistory();
+    // SECURITY: the viewer comes from the verified token; the list only holds what this account decided
+    const historyList = await dbStore.getApprovalHistory({ id: req.user?.id, name: req.user?.name });
     return res.status(200).json({
       success: true,
       total: historyList.length,

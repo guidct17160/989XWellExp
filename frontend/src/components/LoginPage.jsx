@@ -78,18 +78,18 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
 
   return (
     <AuthLayout>
-      <h1 className="text-2xl font-black text-white mb-2 tracking-wide uppercase">Welcome to WellX989</h1>
-      <p className="text-xs text-slate-400 mb-7">Enter your credentials to sign in to the management system (Admin Suite)</p>
+      <h1 className="text-2xl font-black text-slate-900 mb-2 tracking-wide uppercase">Welcome to WellX989</h1>
+      <p className="text-xs text-slate-500 mb-7">Enter your credentials to sign in to the management system (Admin Suite)</p>
 
       {initialNotice && (
-        <div className="bg-amber-950/90 border border-amber-500/60 text-amber-200 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2 shadow-lg shadow-amber-950/40">
-          <span className="text-amber-400">⏰</span>
+        <div className="bg-amber-50 border border-amber-500/60 text-amber-800 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2 shadow-lg shadow-slate-300">
+          <span className="text-amber-600">⏰</span>
           <span>{initialNotice}</span>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-950/80 border border-red-600/50 text-red-300 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2">
+        <div className="bg-danger-50 border border-danger-300 text-danger-700 px-4 py-3 rounded-xl text-sm font-semibold mb-5 flex items-center gap-2">
           <span>⚠️</span>
           <span>{error}</span>
         </div>
@@ -98,7 +98,7 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
       <form onSubmit={handleSubmit} className="flex flex-col">
         {/* Username Field */}
         <div className="flex flex-col mb-5">
-          <label htmlFor="username" className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+          <label htmlFor="username" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
             Username (email)
           </label>
           <input
@@ -108,13 +108,13 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter email "
             autoComplete="username"
-            className="w-full h-12 px-4 rounded-xl border border-red-900/40 bg-[#0B0D13] text-white font-medium placeholder:text-slate-500 focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 outline-none transition-all"
+            className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-medium placeholder:text-slate-500 focus:border-violet-500 focus:ring-4 focus:ring-violet-200 outline-none transition-all"
           />
         </div>
 
         {/* Password Field */}
         <div className="flex flex-col mb-2">
-          <label htmlFor="password" className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+          <label htmlFor="password" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
             Password
           </label>
           <div className="relative w-full">
@@ -125,13 +125,13 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
               autoComplete="current-password"
-              className="w-full h-12 pl-4 pr-11 rounded-xl border border-red-900/40 bg-[#0B0D13] text-white font-medium focus:border-[#EF4444] focus:ring-4 focus:ring-[#EF4444]/20 outline-none transition-all"
+              className="w-full h-12 pl-4 pr-11 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-violet-500 focus:ring-4 focus:ring-violet-200 outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-red-950/50 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-violet-100 transition-colors"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -143,7 +143,7 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
           <button
             type="button"
             onClick={openForgot}
-            className="text-xs font-semibold text-slate-400 hover:text-[#EF4444] transition-colors cursor-pointer"
+            className="text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer"
           >
             Forgot Password?
           </button>
@@ -153,7 +153,7 @@ export default function LoginPage({ onLoginSuccess, initialNotice, onNavigate })
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-gradient-to-r from-[#DC2626] to-[#991B1B] hover:from-[#EF4444] hover:to-[#B91C1C] active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl text-base shadow-lg shadow-red-600/30 transition-all flex items-center justify-center gap-2 uppercase tracking-wide"
+          className="w-full h-12 bg-gradient-to-r from-[#7C3AED] to-[#4C1D95] hover:from-[#A78BFA] hover:to-[#6D28D9] active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl text-base shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2 uppercase tracking-wide"
         >
           {loading ? <span>Verifying credentials...</span> : <span>Login</span>}
         </button>

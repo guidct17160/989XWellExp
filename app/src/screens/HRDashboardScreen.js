@@ -22,9 +22,9 @@ import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window');
 
 const hrMenuItems = [
-  { icon: 'shield-checkmark-outline', labelKey: 'approval', label: 'อนุมัติคำขอ', color: '#3B82F6', screen: 'ManagerApproval', badge: 'อนุมัติ' },
+  { icon: 'shield-checkmark-outline', labelKey: 'approval', label: 'อนุมัติคำขอ', color: '#3B82F6', screen: 'ManagerApproval' },
   { icon: 'checkmark-circle-outline', labelKey: 'requestStatus', label: 'สถานะคำขอ', color: '#F5A623', screen: 'RequestStatus' },
-  { icon: 'people-outline', labelKey: 'team', label: 'สมุดรายชื่อทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory', badge: 'ใหม่' },
+  { icon: 'people-outline', labelKey: 'team', label: 'สมุดรายชื่อทีมงาน', color: '#7C3AED', screen: 'EmployeeDirectory' },
   { icon: 'calendar-outline', labelKey: 'leave', label: 'ลางาน', color: '#27AE60', screen: 'LeaveRequest' },
   { icon: 'sync-outline', labelKey: 'timeCorrection', label: 'ปรับปรุงเวลา', color: '#27AE60', screen: 'TimeCorrection' },
 ];
@@ -34,7 +34,7 @@ const APPROVER_ROLES = new Set([
   'admin', 'super admin', 'superadmin', 'hr admin', 'system admin', 'sys admin',
   'hr', 'manager', 'boss', 'superboss', 'super boss', 'supervisor', 'head', 'ceo', 'director',
 ]);
-const isApprover = (role) => APPROVER_ROLES.has(String(role || '').trim().toLowerCase().replace(/[s_-]+/g, ' '));
+const isApprover = (role) => APPROVER_ROLES.has(String(role || '').trim().toLowerCase().replace(/[\s_-]+/g, ' '));
 
 export default function HRDashboardScreen({ navigation }) {
   const scrollViewRef = useRef(null);
@@ -98,11 +98,6 @@ export default function HRDashboardScreen({ navigation }) {
               >
                 <View style={[styles.menuIconBg, { backgroundColor: item.color + '15' }]} className="w-16 h-16 rounded-2xl items-center justify-center mb-3">
                   <Ionicons name={item.icon} size={32} color={item.color} />
-                  {item.badge && (
-                    <View style={styles.menuBadge} className="absolute -top-1 -right-1 bg-pink px-1.5 py-0.5 rounded-full">
-                      <Text style={styles.menuBadgeText} className="text-[10px] font-bold text-white">{item.badge}</Text>
-                    </View>
-                  )}
                 </View>
                 <Text style={[styles.menuLabel, { color: theme.text }]} className="text-sm font-bold text-center">
                   {t(item.labelKey, item.label)}

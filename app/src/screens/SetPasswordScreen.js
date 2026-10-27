@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { tryFetchApi } from '../services/apiClient';
 import { navigationHistory } from '../services/navigationHistory';
+import { authService } from '../services/authService';
 
 export default function SetPasswordScreen({ navigation, route }) {
   const [email, setEmail] = useState('');
@@ -162,6 +163,14 @@ export default function SetPasswordScreen({ navigation, route }) {
     }
   };
 
+  // The Login screen sends anyone who is still signed in on this device to that person's PIN lock. When a new user has just
+  // set a password (often on a device where someone else, e.g. another employee, is signed in), sign that session out first
+  // so the Login screen really opens for the new user.
+  const goToLogin = () => {
+    if (authService.isLoggedIn()) authService.logout();
+    navigation.navigate('Login');
+  };
+
   const RequirementItem = ({ isMet, label }) => (
     <View style={styles.checkItemRow}>
       <Ionicons
@@ -216,7 +225,7 @@ export default function SetPasswordScreen({ navigation, route }) {
 
                 <TouchableOpacity
                   style={styles.primaryButton}
-                  onPress={() => navigation.navigate('Login')}
+                  onPress={goToLogin}
                 >
                   <Text style={styles.primaryButtonText}>ไปที่หน้าเข้าสู่ระบบ</Text>
                   <Ionicons name="log-in-outline" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />

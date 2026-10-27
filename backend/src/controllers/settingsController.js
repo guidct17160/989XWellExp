@@ -1,6 +1,8 @@
 const dbStore = require('../services/dbStore');
 const { comparePassword, hashPassword } = require('../utils/security');
 const getEmployeeId = require('../helpers/getEmployeeId');
+const workRules = require('../utils/workRules');
+const { logAudit } = require('../utils/auditLogger');
 
 // GET /api/settings
 exports.getSettings = async (req, res) => {
@@ -20,6 +22,29 @@ exports.updateSettings = async (req, res) => {
     }
     const updated = await dbStore.updateSettings(req.body);
     res.json({ success: true, message: 'Settings updated successfully', settings: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/settings/work-time  (every signed-in user: the app needs the rules to show late / hours correctly)
+exports.getWorkTime = async (req, res) => {
+  try {
+    const rules = workRules.fromSettings(await dbStore.getSettings());
+    res.json({ success: true, rules });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// PUT /api/settings/work-time  (admins): start time, count-from time, required hours, on-time points
+exports.updateWorkTime = async (req, res) => {
+  try {
+    const { rules, error } = workRules.validate(req.body || {});
+    if (error) return res.status(400).json({ success: false, message: error });
+    const updated = await dbStore.updateSettings(workRules.toSettings(rules));
+    logAudit(req, { action: 'UPDATE_WORK_TIME_SETTINGS', resourceType: 'settings', resourceId: 'work-time', details: rules }).catch(() => {});
+    res.json({ success: true, message: 'Work time settings saved', rules: workRules.fromSettings(updated) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

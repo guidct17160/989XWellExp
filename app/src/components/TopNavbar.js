@@ -153,6 +153,8 @@ export default function TopNavbar({
                   });
                 } else if (targetScreen === 'TimeAttendance') {
                   navigation.navigate('MainTabs', { screen: 'TimeAttendance' });
+                } else if (targetScreen === 'Announcements') {
+                  navigation.navigate('Announcements', { selectedAnnouncement: bannerNotif.announcement || null, openTimestamp: Date.now(), fromNotifications: true });
                 } else {
                   navigation.navigate(targetScreen);
                 }

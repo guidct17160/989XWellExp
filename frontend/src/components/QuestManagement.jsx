@@ -7,9 +7,9 @@ import useDetailRoute from './useDetailRoute';
 import QuestWizard from './QuestWizard';
 
 const STATUS_STYLE = {
-  Active: 'bg-emerald-950/90 text-emerald-300 border-emerald-600/70',
-  Scheduled: 'bg-amber-950/80 text-amber-300 border-amber-700/60',
-  Expired: 'bg-slate-900 text-slate-400 border-slate-700',
+  Active: 'bg-emerald-50 text-emerald-700 border-emerald-300',
+  Scheduled: 'bg-amber-50 text-amber-700 border-amber-200',
+  Expired: 'bg-slate-100 text-slate-500 border-slate-300',
 };
 
 function ProgressBar({ done, total }) {
@@ -20,7 +20,7 @@ function ProgressBar({ done, total }) {
       <div className="h-2.5 w-20 rounded-full bg-slate-700/40 overflow-hidden">
         <div className={`h-full rounded-full transition-all ${complete ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className={`text-[11px] font-semibold ${complete ? 'text-emerald-300' : 'text-indigo-300'}`}>
+      <span className={`text-[11px] font-semibold ${complete ? 'text-emerald-700' : 'text-indigo-700'}`}>
         {complete ? 'Completed' : 'Incomplete'} {done}/{total}
       </span>
     </div>
@@ -113,8 +113,8 @@ export default function QuestManagement() {
     <div
       className={`fixed top-5 right-5 z-[60] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl text-sm font-bold border ${
         notification.type === 'error'
-          ? 'bg-red-950/95 text-red-200 border-red-700/60'
-          : 'bg-emerald-950/95 text-emerald-200 border-emerald-700/60'
+          ? 'bg-danger-50 text-danger-800 border-danger-200'
+          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
       }`}
     >
       {notification.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle size={16} />}
@@ -131,7 +131,7 @@ export default function QuestManagement() {
       return (
         <div className="flex flex-col gap-6">
           {toast}
-          <div className="bg-[#141722] rounded-2xl border border-red-900/30 p-8 text-center text-slate-500 font-mono">Loading...</div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 font-mono">Loading...</div>
         </div>
       );
     }
@@ -156,19 +156,19 @@ export default function QuestManagement() {
     <div className="flex flex-col gap-6">
       {toast}
 
-      <div className="bg-[#141722] rounded-2xl p-6 border border-red-900/30 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-red-950/80 text-[#EF4444] border border-red-800/40">
+          <div className="p-2.5 rounded-xl bg-violet-100 text-violet-700 border border-violet-200">
             <Target size={24} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-white uppercase tracking-wide">Quest Management</h1>
-            <p className="text-xs text-slate-400 mt-0.5">{quests.length} Total</p>
+            <h1 className="text-xl font-black text-slate-900 uppercase tracking-wide">Quest Management</h1>
+            <p className="text-xs text-slate-500 mt-0.5">{quests.length} Total</p>
           </div>
         </div>
         <button
           onClick={fetchQuests}
-          className="p-2.5 rounded-xl border border-red-900/40 bg-[#0B0D13] hover:bg-red-950/40 text-slate-300 transition-colors cursor-pointer"
+          className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 text-slate-700 transition-colors cursor-pointer"
           title="Refresh"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -201,7 +201,7 @@ export default function QuestManagement() {
         right={
           <button
             onClick={() => detailRoute.open('new')}
-            className="flex items-center gap-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
+            className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition-all uppercase tracking-wide whitespace-nowrap md:ml-auto cursor-pointer"
           >
             <Plus size={16} />
             <span>Create New Quest</span>
@@ -209,14 +209,14 @@ export default function QuestManagement() {
         }
       />
 
-      <div className="bg-[#141722] rounded-2xl border border-red-900/30 shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0B0D13] border-b border-red-900/30 text-[11px] text-slate-400 whitespace-nowrap">
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500 whitespace-nowrap">
                 <th className="py-3 px-2.5 uppercase font-extrabold tracking-wider">Code</th>
                 <th className="py-3 px-2.5 w-full">
-                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-white cursor-pointer">
+                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-slate-900 cursor-pointer">
                     Task List
                     {sort.key === 'title' ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="opacity-60" />}
                   </button>
@@ -227,19 +227,19 @@ export default function QuestManagement() {
                 <th className="py-3 px-2.5 text-right uppercase font-extrabold tracking-wider">Point</th>
                 <th className="py-3 px-2.5 uppercase font-extrabold tracking-wider">Create By</th>
                 <th className="py-3 px-2.5 ">
-                  <button type="button" onClick={() => toggleSort('created')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-white cursor-pointer">
+                  <button type="button" onClick={() => toggleSort('created')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-slate-900 cursor-pointer">
                     Create Date
                     {sort.key === 'created' ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="opacity-60" />}
                   </button>
                 </th>
                 <th className="py-3 px-2.5 ">
-                  <button type="button" onClick={() => toggleSort('start')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-white cursor-pointer">
+                  <button type="button" onClick={() => toggleSort('start')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-slate-900 cursor-pointer">
                     Start Date
                     {sort.key === 'start' ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="opacity-60" />}
                   </button>
                 </th>
                 <th className="py-3 px-2.5 ">
-                  <button type="button" onClick={() => toggleSort('end')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-white cursor-pointer">
+                  <button type="button" onClick={() => toggleSort('end')} className="inline-flex items-center gap-1 text-left uppercase font-extrabold tracking-wider hover:text-slate-900 cursor-pointer">
                     Expire Date
                     {sort.key === 'end' ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="opacity-60" />}
                   </button>
@@ -247,7 +247,7 @@ export default function QuestManagement() {
                 <th className="py-3 px-2.5 text-center uppercase font-extrabold tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-900/20 text-sm font-medium text-slate-200">
+            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan="11" className="py-12 text-center text-slate-500 font-mono">Loading quests...</td>
@@ -260,26 +260,25 @@ export default function QuestManagement() {
                 </tr>
               ) : (
                 filtered.map((q) => (
-                  <tr key={q.id} className="hover:bg-red-950/20 transition-colors align-middle">
+                  <tr key={q.id} className="hover:bg-violet-50 transition-colors align-middle">
                     <td className="py-4 px-2.5 whitespace-nowrap">
-                      <span className="font-mono text-xs font-bold text-red-300 bg-red-950/60 border border-red-800/40 px-2 py-1 rounded-lg">{q.code || q.id}</span>
+                      <span className="font-mono text-xs font-bold text-violet-700 bg-violet-100 border border-violet-200 px-2 py-1 rounded-lg">{q.code || q.id}</span>
                     </td>
                     <td className="py-4 px-2.5 min-w-[10rem]">
                       <div className="flex items-center gap-2 whitespace-nowrap">
-                        <button onClick={() => detailRoute.open(q.code || q.id)} className="font-bold text-white hover:text-[#EF4444] text-left cursor-pointer max-w-[10rem] truncate" title={q.id}>
+                        <button onClick={() => detailRoute.open(q.code || q.id)} className="font-bold text-slate-900 hover:text-violet-700 text-left cursor-pointer max-w-[10rem] truncate" title={q.id}>
                           {q.title}
                         </button>
                         {q.rewardTitle && (
-                          <span className="inline-flex items-center gap-1 max-w-[8rem] truncate px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-950/70 text-violet-300 border border-violet-700/50" title={`Free reward: ${q.rewardTitle}`}>
+                          <span className="inline-flex items-center gap-1 max-w-[8rem] truncate px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-300" title={`Free reward: ${q.rewardTitle}`}>
                             🎁 {q.rewardTitle}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="py-4 px-2.5 text-center whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 text-slate-200" title={`${q.sectionCount} quiz section(s), ${q.questionCount} questions, pass ${q.passCount > 0 ? q.passCount : q.questionCount}`}>
-                        <HelpCircle size={18} className="text-slate-400" />
-                        <span className="font-bold">{q.sectionCount}</span>
+                      <div className="inline-flex items-center gap-1.5 text-slate-800" title={`${q.sectionCount} quiz section(s), ${q.questionCount} questions, pass ${q.passCount > 0 ? q.passCount : q.questionCount}`}>
+                        <HelpCircle size={18} className="text-slate-500" />
                       </div>
                     </td>
                     <td className="py-4 px-2.5">
@@ -290,18 +289,18 @@ export default function QuestManagement() {
                         <ProgressBar done={q.completedCount} total={q.assignedCount} />
                       </div>
                     </td>
-                    <td className="py-4 px-2.5 whitespace-nowrap text-[11px] font-bold text-emerald-300">Auto approve</td>
-                    <td className="py-4 px-2.5 text-right whitespace-nowrap font-mono font-extrabold text-amber-300 text-base">{q.totalPoints}</td>
-                    <td className="py-4 px-2.5 text-slate-300 text-[13px] max-w-[7rem] truncate">{q.createdByName || '-'}</td>
-                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">{q.createdDate || '-'} <span className="text-slate-500">{q.createdTime || ''}</span></td>
-                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">{q.startDate || '-'} <span className="text-slate-500">{q.startTime || ''}</span></td>
-                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">{q.endDate || '-'} <span className="text-slate-500">{q.endTime || ''}</span></td>
+                    <td className="py-4 px-2.5 whitespace-nowrap text-[11px] font-bold text-emerald-700">Auto approve</td>
+                    <td className="py-4 px-2.5 text-right whitespace-nowrap font-mono font-extrabold text-amber-700 text-base">{q.totalPoints}</td>
+                    <td className="py-4 px-2.5 text-slate-700 text-[13px] max-w-[7rem] truncate">{q.createdByName || '-'}</td>
+                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-700 whitespace-nowrap">{q.createdDate || '-'} <span className="text-slate-500">{q.createdTime || ''}</span></td>
+                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-700 whitespace-nowrap">{q.startDate || '-'} <span className="text-slate-500">{q.startTime || ''}</span></td>
+                    <td className="py-4 px-2.5 font-mono text-[11px] text-slate-700 whitespace-nowrap">{q.endDate || '-'} <span className="text-slate-500">{q.endTime || ''}</span></td>
                     <td className="py-4 px-2.5">
                       <div className="flex items-center justify-center gap-0.5">
-                        <button onClick={() => detailRoute.open(q.code || q.id)} className="p-1.5 text-slate-400 hover:text-white hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer" title="Edit quest">
+                        <button onClick={() => detailRoute.open(q.code || q.id)} className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-violet-50 rounded-lg transition-colors cursor-pointer" title="Edit quest">
                           <Edit size={16} />
                         </button>
-                        <button onClick={() => setDeleteTarget(q)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/60 rounded-lg transition-colors cursor-pointer" title="Delete quest">
+                        <button onClick={() => setDeleteTarget(q)} className="p-1.5 text-slate-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors cursor-pointer" title="Delete quest">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -315,22 +314,22 @@ export default function QuestManagement() {
       </div>
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#141722] border border-red-900/40 rounded-2xl shadow-2xl p-6">
-            <h3 className="text-base font-extrabold text-white uppercase tracking-wide mb-2">Delete quest?</h3>
-            <p className="text-sm text-slate-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6">
+            <h3 className="text-base font-extrabold text-slate-900 uppercase tracking-wide mb-2">Delete quest?</h3>
+            <p className="text-sm text-slate-700">
               "{deleteTarget.title}" and all of its quizzes, questions and progress will be permanently deleted.
             </p>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl border border-red-900/40 bg-[#0B0D13] text-slate-300 hover:bg-red-950/40 font-bold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-danger-200 bg-slate-50 text-slate-700 hover:bg-danger-50 font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="px-5 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs uppercase tracking-wide cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs uppercase tracking-wide cursor-pointer"
               >
                 Delete
               </button>

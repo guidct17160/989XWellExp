@@ -244,11 +244,11 @@ export default function DatePicker({
       <div
         id={id}
         onClick={handleToggleOpen}
-        className={`w-full px-3.5 py-2.5 rounded-xl bg-[#0B0D13] border border-red-900/40 text-sm font-medium text-white outline-none flex items-center justify-between cursor-pointer transition-all select-none group ${
-          isOpen ? 'border-[#EF4444] ring-4 ring-[#EF4444]/20' : 'hover:border-red-700/60'
+        className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-900 outline-none flex items-center justify-between cursor-pointer transition-all select-none group ${
+          isOpen ? 'border-violet-500 ring-4 ring-violet-200' : 'hover:border-violet-300'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className={value ? 'text-white font-mono tracking-wide' : 'text-slate-500 font-mono'}>
+        <span className={value ? 'text-slate-900 font-mono tracking-wide' : 'text-slate-500 font-mono'}>
           {value || placeholder}
         </span>
 
@@ -257,7 +257,7 @@ export default function DatePicker({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 text-slate-500 hover:text-red-400 rounded-md transition-colors"
+              className="p-1 text-slate-500 hover:text-violet-600 rounded-md transition-colors"
               title="Clear date"
             >
               <X size={14} />
@@ -266,7 +266,7 @@ export default function DatePicker({
           <CalendarIcon
             size={18}
             className={`transition-colors ${
-              isOpen ? 'text-[#EF4444]' : 'text-slate-400 group-hover:text-slate-200'
+              isOpen ? 'text-violet-700' : 'text-slate-500 group-hover:text-slate-800'
             }`}
           />
         </div>
@@ -295,8 +295,8 @@ export default function DatePicker({
               disabled={isPrevMonthDisabled()}
               className={`p-1.5 rounded-lg transition-colors ${
                 isPrevMonthDisabled()
-                  ? 'text-slate-300 opacity-30 cursor-not-allowed'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'text-slate-700 opacity-30 cursor-not-allowed'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
               }`}
               title="Previous month"
             >
@@ -310,7 +310,7 @@ export default function DatePicker({
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
               title="Next month"
             >
               <ChevronRight size={18} />
@@ -324,9 +324,9 @@ export default function DatePicker({
                 key={d}
                 className={`text-xs font-bold py-1 ${
                   index === 0
-                    ? 'text-red-500'
+                    ? 'text-violet-600'
                     : index === 6
-                    ? 'text-blue-500'
+                    ? 'text-blue-600'
                     : 'text-slate-500'
                 }`}
               >
@@ -348,7 +348,7 @@ export default function DatePicker({
                     key={`${cell.year}-${cell.month}-${cell.day}-${idx}`}
                     type="button"
                     disabled={true}
-                    className="h-9 w-9 mx-auto flex items-center justify-center text-sm font-medium rounded-xl text-slate-300 opacity-30 cursor-not-allowed select-none bg-slate-50/50"
+                    className="h-9 w-9 mx-auto flex items-center justify-center text-sm font-medium rounded-xl text-slate-700 opacity-30 cursor-not-allowed select-none bg-slate-50/50"
                     title="Dates before today cannot be selected"
                   >
                     {cell.day}
@@ -366,7 +366,7 @@ export default function DatePicker({
                       ? 'border-2 border-blue-500 text-blue-600 font-bold bg-blue-50/60 shadow-sm'
                       : cell.isCurrentMonth
                       ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-900 cursor-pointer'
-                      : 'text-slate-300 hover:bg-slate-50 hover:text-slate-400 cursor-pointer'
+                      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-500 cursor-pointer'
                   } ${today && !selected ? 'ring-1 ring-blue-300 font-bold text-blue-600' : ''}`}
                 >
                   {cell.day}
@@ -388,7 +388,7 @@ export default function DatePicker({
               <button
                 type="button"
                 onClick={handleClear}
-                className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                className="text-slate-500 hover:text-violet-600 transition-colors cursor-pointer"
               >
                 Clear
               </button>
