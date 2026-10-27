@@ -79,10 +79,8 @@ test.describe('แลกของรางวัล', () => {
     await expect(page.getByTestId('top-navbar-points-text')).toHaveText('100');
   });
 
-  // บั๊กจริงใน app/src/screens/RewardsScreen.js: ป๊อปอัป "คะแนนสะสมไม่เพียงพอ" ถูกวาดเป็น overlay ที่ root ของหน้า
-  // แต่หน้ารายละเอียดรางวัลเป็น <Modal> เต็มจอที่ยังเปิดอยู่ (selectedReward ไม่ถูกล้าง) ป๊อปอัปจึงอยู่ "หลัง" Modal
-  // ผู้ใช้มองไม่เห็นและกด "ตกลง" ไม่ได้ (ป๊อปอัปยืนยัน/สำเร็จไม่เป็นปัญหา เพราะวาดในหรือหลังปิด Modal แล้ว)
-  test.fixme('TC-APP-REWARD-02b @critical แต้มไม่พอ: ป๊อปอัป "คะแนนสะสมไม่เพียงพอ" ต้องอยู่หน้าสุดและกด "ตกลง" ได้', async ({ page }) => {
+  // ป๊อปอัป "คะแนนสะสมไม่เพียงพอ" ต้องวาดในหรือหลังปิด Modal รายละเอียดรางวัล ไม่งั้นถูก Modal บังและกด "ตกลง" ไม่ได้
+  test('TC-APP-REWARD-02b @critical แต้มไม่พอ: ป๊อปอัป "คะแนนสะสมไม่เพียงพอ" ต้องอยู่หน้าสุดและกด "ตกลง" ได้', async ({ page }) => {
     await rewardsSetup(page, { points: 100 });
     await openRewards(page, 100);
     await page.getByTestId('rewards-item-card-rew-001').click();

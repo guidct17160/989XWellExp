@@ -56,7 +56,8 @@ export default function AuditTrailLogsPage() {
       actorStr.includes(search) ||
       actionStr.includes(search) ||
       detailsStr.toLowerCase().includes(search) ||
-      resourceStr.includes(search);
+      resourceStr.includes(search) ||
+      String(log.ipAddress || '').toLowerCase().includes(search);
 
     // Backend actions are compound codes (LOGIN_SUCCESS, CREATE_EMPLOYEE, DELETE_ADMIN, APPROVE_REQUEST...), so match by keyword
     const matchFilter = filterAction === 'ALL' || String(log.action || '').toUpperCase().includes(filterAction);

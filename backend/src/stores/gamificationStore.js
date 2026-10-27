@@ -268,7 +268,7 @@ module.exports = function createGamificationStore(storeRef) {
         const r = await db.query("SELECT COALESCE(MAX(SUBSTRING(id FROM '^rew-([0-9]{1,6})$')::int), 0) AS n FROM rewards");
         max = r.rows[0].n;
       } else {
-        memoryStore.memoryRewards.forEach((x) => { const m = /^rew-(d{1,6})$/.exec(x.id); if (m) max = Math.max(max, Number(m[1])); });
+        memoryStore.memoryRewards.forEach((x) => { const m = /^rew-(\d{1,6})$/.exec(x.id); if (m) max = Math.max(max, Number(m[1])); });
       }
       return `rew-${String(max + 1).padStart(3, '0')}`;
     },

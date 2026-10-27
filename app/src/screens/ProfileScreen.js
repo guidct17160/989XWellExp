@@ -233,34 +233,34 @@ export default function ProfileScreen({ navigation }) {
 
   const profileMenuItems = [
     {
-      section: t('personalInfo') || 'ข้อมูลส่วนตัวและองค์กร (จัดการโดย Web Admin)',
+      section: t('personalInfo', 'ข้อมูลส่วนตัวและองค์กร (จัดการโดย Web Admin)'),
       items: [
-        { icon: 'call-outline', label: t('phone') || 'เบอร์โทรศัพท์', value: profile.phone || '-' },
-        { icon: 'mail-outline', label: t('email') || 'อีเมลองค์กร', value: profile.email },
-        { icon: 'business-outline', label: t('department') || 'สังกัดฝ่าย/แผนก', value: profile.department },
-        { icon: 'shield-checkmark-outline', label: t('role') || 'บทบาทและสิทธิ์', value: profile.role || 'Employee' },
-        { icon: 'calendar-outline', label: t('startDate') || 'วันที่เริ่มงาน', value: profile.startDate || '15 ม.ค. 2567' },
+        { icon: 'call-outline', label: t('phone', 'เบอร์โทรศัพท์'), value: profile.phone || '-' },
+        { icon: 'mail-outline', label: t('email', 'อีเมลองค์กร'), value: profile.email },
+        { icon: 'business-outline', label: t('department', 'สังกัดฝ่าย/แผนก'), value: profile.department },
+        { icon: 'shield-checkmark-outline', label: t('role', 'บทบาทและสิทธิ์'), value: profile.role || 'Employee' },
+        { icon: 'calendar-outline', label: t('startDate', 'วันที่เริ่มงาน'), value: profile.startDate || '15 ม.ค. 2567' },
       ],
     },
     {
-      section: t('appPreferences') || 'การใช้งานบัญชี',
+      section: t('appPreferences', 'การใช้งานบัญชี'),
       items: [
         {
           icon: 'settings-outline',
-          label: t('settings') || 'การตั้งค่าระบบและแอปพลิเคชัน',
+          label: t('settings', 'การตั้งค่าระบบและแอปพลิเคชัน'),
           chevron: true,
           onPress: () => navigation.navigate('Settings'),
         },
         {
           icon: 'log-out-outline',
-          label: t('logout') || 'ออกจากระบบ',
+          label: t('logout', 'ออกจากระบบ'),
           isLogout: true,
           chevron: true,
           onPress: () => {
-            Alert.alert(t('logout') || 'ออกจากระบบ', 'คุณต้องการออกจากระบบใช่หรือไม่?', [
-              { text: t('cancel') || 'ยกเลิก', style: 'cancel' },
+            Alert.alert(t('logout', 'ออกจากระบบ'), 'คุณต้องการออกจากระบบใช่หรือไม่?', [
+              { text: t('cancel', 'ยกเลิก'), style: 'cancel' },
               {
-                text: t('logout') || 'ออกจากระบบ',
+                text: t('logout', 'ออกจากระบบ'),
                 style: 'destructive',
                 onPress: () => {
                   authService.logout();

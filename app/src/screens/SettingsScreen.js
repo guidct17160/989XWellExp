@@ -51,20 +51,20 @@ export default function SettingsScreen({ navigation }) {
 
   const handleRemovePin = () => {
     Alert.alert(
-      t('disablePin') || 'ปิดการใช้งาน PIN',
-      t('disablePinConfirm') || 'คุณต้องการปิดการใช้งานรหัส PIN สำหรับบัญชีนี้ใช่หรือไม่? หลังจากปิดแล้วจะเข้าสู่ระบบด้วยรหัสผ่านตามปกติ',
+      t('disablePin', 'ปิดการใช้งาน PIN'),
+      t('disablePinConfirm', 'คุณต้องการปิดการใช้งานรหัส PIN สำหรับบัญชีนี้ใช่หรือไม่? หลังจากปิดแล้วจะเข้าสู่ระบบด้วยรหัสผ่านตามปกติ'),
       [
-        { text: t('cancel'), style: 'cancel' },
+        { text: t('cancel', 'ยกเลิก'), style: 'cancel' },
         {
-          text: t('disablePin') || 'ปิดการใช้งาน',
+          text: t('disablePin', 'ปิดการใช้งาน'),
           style: 'destructive',
           onPress: async () => {
             try {
               await pinService.removePin();
               setHasPin(false);
-              Alert.alert(t('success') || 'สำเร็จ', 'ปิดการใช้งานรหัส PIN เรียบร้อยแล้ว');
+              Alert.alert(t('success', 'สำเร็จ'), 'ปิดการใช้งานรหัส PIN เรียบร้อยแล้ว');
             } catch (e) {
-              Alert.alert(t('error') || 'เกิดข้อผิดพลาด', e.message || 'ไม่สามารถปิดการใช้งาน PIN ได้');
+              Alert.alert(t('error', 'เกิดข้อผิดพลาด'), e.message || 'ไม่สามารถปิดการใช้งาน PIN ได้');
             }
           },
         },
@@ -78,12 +78,12 @@ export default function SettingsScreen({ navigation }) {
 
   const handleLogout = () => {
     Alert.alert(
-      t('logout') || 'ออกจากระบบ',
+      t('logout', 'ออกจากระบบ'),
       'คุณต้องการออกจากระบบใช่หรือไม่?',
       [
-        { text: t('cancel'), style: 'cancel' },
+        { text: t('cancel', 'ยกเลิก'), style: 'cancel' },
         {
-          text: t('logout'),
+          text: t('logout', 'ออกจากระบบ'),
           style: 'destructive',
           onPress: () => {
             authService.logout();
@@ -104,11 +104,11 @@ export default function SettingsScreen({ navigation }) {
 
   const settingsSections = [
     {
-      title: t('accountSecurity') || 'บัญชีและการรักษาความปลอดภัย',
+      title: t('accountSecurity', 'บัญชีและการรักษาความปลอดภัย'),
       items: [
         {
           icon: 'keypad-outline',
-          label: t('pinSettings') || 'รหัส PIN เข้าใช้งาน (6 หลัก)',
+          label: t('pinSettings', 'รหัส PIN เข้าใช้งาน (6 หลัก)'),
           type: 'value',
           value: hasPin ? (language === 'en' ? 'Enabled' : 'เปิดใช้งานแล้ว') : (language === 'en' ? 'Not Set' : 'ยังไม่ได้ตั้งค่า'),
           valueColor: hasPin ? '#10B981' : '#F59E0B',
@@ -117,10 +117,10 @@ export default function SettingsScreen({ navigation }) {
               navigation.navigate('SetPin', { mode: 'setup' });
             } else {
               Alert.alert(
-                t('pinSettings') || 'การจัดการรหัส PIN 6 หลัก',
+                t('pinSettings', 'การจัดการรหัส PIN 6 หลัก'),
                 'เลือกการดำเนินการที่ต้องการสำหรับรหัส PIN ของบัญชีนี้',
                 [
-                  { text: t('cancel'), style: 'cancel' },
+                  { text: t('cancel', 'ยกเลิก'), style: 'cancel' },
                   {
                     text: 'เปลี่ยนรหัส PIN',
                     onPress: () => navigation.navigate('SetPin', { mode: 'change' }),
@@ -138,18 +138,18 @@ export default function SettingsScreen({ navigation }) {
       ],
     },
     {
-      title: t('notifications') || 'การแจ้งเตือน',
+      title: t('notifications', 'การแจ้งเตือน'),
       items: [
         { icon: 'notifications-outline', label: 'การแจ้งเตือนทั่วไป', type: 'toggle', key: 'general' },
         { icon: 'chatbubble-outline', label: 'แจ้งเตือนข้อความและข่าวสาร', type: 'toggle', key: 'news' },
       ],
     },
     {
-      title: t('appPreferences') || 'การใช้งานและภาษา',
+      title: t('appPreferences', 'การใช้งานและภาษา'),
       items: [
         {
           icon: 'language-outline',
-          label: t('language') || 'ภาษา (Language)',
+          label: t('language', 'ภาษา (Language)'),
           type: 'value',
           value: language === 'en' ? 'English' : 'ไทย',
           onPress: () => setShowLanguageModal(true),
@@ -157,11 +157,11 @@ export default function SettingsScreen({ navigation }) {
       ],
     },
     {
-      title: t('aboutApp') || 'เกี่ยวกับระบบ',
+      title: t('aboutApp', 'เกี่ยวกับระบบ'),
       items: [
         {
           icon: 'information-circle-outline',
-          label: t('aboutApp') || 'เกี่ยวกับ WellX989',
+          label: t('aboutApp', 'เกี่ยวกับ WellX989'),
           type: 'nav',
           onPress: () => setShowAboutModal(true),
         },
@@ -180,7 +180,7 @@ export default function SettingsScreen({ navigation }) {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBackground} />
 
       {/* Top Navbar */}
-      <TopNavbar navigation={navigation} title={t('settings') || 'การตั้งค่าระบบ'} showBack />
+      <TopNavbar navigation={navigation} title={t('settings', 'การตั้งค่าระบบ')} showBack />
 
       <Animated.View style={[styles.flex, { opacity: fadeAnim }]}>
         <ScrollView
@@ -269,7 +269,7 @@ export default function SettingsScreen({ navigation }) {
           {/* Logout Button */}
           <TouchableOpacity testID="settings-logout-btn" style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={colors.error} style={{ marginRight: 8 }} />
-            <Text style={styles.logoutText}>{t('logout') || 'ออกจากระบบ'}</Text>
+            <Text style={styles.logoutText}>{t('logout', 'ออกจากระบบ')}</Text>
           </TouchableOpacity>
 
           <Text style={[styles.footerText, { color: theme.textSecondary }]}>
@@ -284,7 +284,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {t('selectLanguage') || 'เลือกภาษา (Language)'}
+                {t('selectLanguage', 'เลือกภาษา (Language)')}
               </Text>
               <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
                 <Ionicons name="close" size={24} color={theme.textSecondary} />
@@ -329,7 +329,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {t('aboutApp') || 'เกี่ยวกับ WellX989'}
+                {t('aboutApp', 'เกี่ยวกับ WellX989')}
               </Text>
               <TouchableOpacity onPress={() => setShowAboutModal(false)}>
                 <Ionicons name="close" size={24} color={theme.textSecondary} />
@@ -353,7 +353,7 @@ export default function SettingsScreen({ navigation }) {
             </Text>
 
             <TouchableOpacity style={styles.saveBtn} onPress={() => setShowAboutModal(false)}>
-              <Text style={styles.saveBtnText}>{t('close') || 'ตกลง'}</Text>
+              <Text style={styles.saveBtnText}>{t('close', 'ตกลง')}</Text>
             </TouchableOpacity>
           </View>
         </View>

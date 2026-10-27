@@ -278,8 +278,8 @@ export const leaveStorage = {
     let isoDate = todayIsoBkk();
     if (rawDate && typeof rawDate === 'string') {
       const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-      const thaiMatch = rawDate.trim().match(/^(d{1,2})s+(S+?).?s+(d{4})$/);
-      if (/^d{4}-d{2}-d{2}/.test(rawDate)) {
+      const thaiMatch = rawDate.trim().match(/^(\d{1,2})\s+(\S+?)\.?\s+(\d{4})$/);
+      if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
         isoDate = rawDate.slice(0, 10);
       } else if (rawDate.includes('/') && rawDate.split('/').length === 3) {
         const parts = rawDate.split('/');

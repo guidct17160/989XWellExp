@@ -875,6 +875,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                     name="startDate"
                     value={formData.startDate}
                     onChange={handleInputChange}
+                    disablePast={false}
                   />
                 </div>
 
@@ -1179,6 +1180,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                             resignDate: e.target.value,
                           }));
                         }}
+                        disablePast={false}
                       />
                     </>
                   ) : (
@@ -1188,6 +1190,7 @@ export default function EmployeeManagement({ initialTab = 'all-employee' }) {
                         name="startDate"
                         value={formData.startDate}
                         onChange={handleInputChange}
+                        disablePast={false}
                       />
                     </>
                   )}

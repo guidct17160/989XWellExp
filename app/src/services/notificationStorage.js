@@ -168,7 +168,7 @@ const syncWithBackend = async () => {
     const fromBackend = [...serverNotifs, ...annoNotifs].sort((x, y) => (y.sortAt || 0) - (x.sortAt || 0));
     globalState.notifications = [...localOnly, ...fromBackend];
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
 
     // Pop the banner for an announcement that arrived while the app was already in use (not the first load on this device)
     const seededKey = getStorageKey('announcement_seeded');
@@ -221,7 +221,7 @@ export const notificationStorage = {
         window.localStorage.setItem(getStorageKey('notification_prefs'), JSON.stringify(next));
       }
     } catch (e) {}
-    listeners.forEach((l) => l(globalState)); // the bell counter recounts
+    listeners.forEach((l) => l({ ...globalState })); // the bell counter recounts
     return next;
   },
   toggleRead(id) {
@@ -234,13 +234,13 @@ export const notificationStorage = {
     );
     globalState = { notifications: updated };
     saveState();
-    listeners.forEach(l => l(globalState));
+    listeners.forEach(l => l({ ...globalState }));
   },
   markAllRead() {
     const updated = globalState.notifications.map(n => ({ ...n, unread: false }));
     globalState = { notifications: updated };
     saveState();
-    listeners.forEach(l => l(globalState));
+    listeners.forEach(l => l({ ...globalState }));
     try {
       tryFetchApi('/notifications/read-all', { method: 'PATCH' }).catch(() => {});
     } catch (e) {}
@@ -259,7 +259,7 @@ export const notificationStorage = {
     const updated = [item, ...globalState.notifications];
     globalState = { notifications: updated };
     saveState();
-    listeners.forEach(l => l(globalState));
+    listeners.forEach(l => l({ ...globalState }));
     if (isCategoryOn(item)) bannerListeners.forEach(l => l(item));
     return item;
   },
@@ -270,12 +270,12 @@ export const notificationStorage = {
   async clearAndSync() {
     loadLocalState();
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
     await syncWithBackend();
   },
   subscribe(listener) {
     listeners.add(listener);
-    listener(globalState);
+    listener({ ...globalState });
     return () => listeners.delete(listener);
   },
   subscribeBanner(listener) {

@@ -1,7 +1,8 @@
 import React from 'react';
 import './src/utils/alertPolyfill';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
+import { authService } from './src/services/authService';
 import { AlertProvider } from './src/context/AlertContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import WebResponsiveWrapper from './src/components/WebResponsiveWrapper';
@@ -14,6 +15,21 @@ function getActiveRouteName(state) {
     return getActiveRouteName(route.state);
   }
   return route.name;
+}
+
+const navigationRef = createNavigationContainerRef();
+
+// Screens that can be opened before the PIN is entered
+const PIN_FREE_SCREENS = ['Splash', 'Onboarding', 'Login', 'ForgotPassword', 'SetPassword', 'PinLock'];
+
+// A deep link (e.g. /main/profile on web) skips Splash, which is where the PIN is normally asked for
+function enforcePinLock() {
+  if (!navigationRef.isReady()) return;
+  const current = getActiveRouteName(navigationRef.getRootState());
+  if (!current || PIN_FREE_SCREENS.includes(current)) return;
+  if (authService.isPinLocked()) {
+    navigationRef.reset({ index: 0, routes: [{ name: 'PinLock' }] });
+  }
 }
 
 const linking = {
@@ -83,13 +99,16 @@ export default function App() {
       <AlertProvider>
         <WebResponsiveWrapper>
           <NavigationContainer
+            ref={navigationRef}
             linking={linking}
+            onReady={enforcePinLock}
             onStateChange={(state) => {
               if (!state) return;
               const currentRoute = getActiveRouteName(state);
               if (currentRoute) {
                 navigationHistory.setCurrentScreen(currentRoute);
               }
+              enforcePinLock();
             }}
           >
             <AppNavigator />

@@ -90,6 +90,7 @@ export default function PinLockScreen({ navigation }) {
     try {
       const username = user?.username || user?.code || user?.id;
       await pinService.verifyPin(pinValue, username);
+      authService.unlockPin();
       setLoading(false);
       // PIN verified successfully! Unlock and go to MainTabs
       navigation.replace('MainTabs');

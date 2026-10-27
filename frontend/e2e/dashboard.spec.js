@@ -75,8 +75,7 @@ test.describe('Dashboard Overview', () => {
   });
 
   // ถ้าโหลดข้อมูลพนักงานไม่สำเร็จ ควรบอกผู้ใช้ ไม่ใช่แสดง 0 เหมือนไม่มีพนักงาน
-  // BUG ของสินค้า: DashboardPage.jsx จับ error แล้วแค่ console.log จึงไม่มีข้อความผิดพลาดบนหน้า (ขัดกับกฎ "แสดงความล้มเหลวให้ผู้ใช้เห็น")
-  test.fixme('[High] TC-DASH-004 a failed employees request shows an error instead of zeros', { tag: '@high' }, async ({ page }) => {
+  test('[High] TC-DASH-004 a failed employees request shows an error instead of zeros', { tag: '@high' }, async ({ page }) => {
     await openDashboard(page, { employeesResponse: { status: 500, body: { success: false, message: 'Employee data is unavailable' } } });
     await expect(page.getByText(/unable to load|employee data is unavailable/i)).toBeVisible();
   });

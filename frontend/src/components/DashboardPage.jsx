@@ -135,13 +135,19 @@ export default function DashboardPage({ user, onLogout }) {
     passedProbation: 0,
   });
   const [employeesList, setEmployeesList] = useState([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     // Fetch live employee total from backend API (100% Real DB Data)
     fetch(`${API_BASE}/employees`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.employees)) {
+      .then((res) => res.json().catch(() => null).then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        if (!res.ok || !data || !data.success) {
+          setLoadError((data && data.message) || 'Unable to load employee data');
+          return;
+        }
+        setLoadError('');
+        if (Array.isArray(data.employees)) {
           setEmployeesList(data.employees);
           const emps = data.employees;
           const now = new Date();
@@ -193,7 +199,10 @@ export default function DashboardPage({ user, onLogout }) {
           });
         }
       })
-      .catch((err) => console.log('Backend sync offline', err));
+      .catch((err) => {
+        console.log('Backend sync offline', err);
+        setLoadError('Unable to load employee data');
+      });
   }, [activeMenu]);
 
   // Bar Chart Data (Jan - Dec) dynamically computed from real employee startDate and resignDate
@@ -479,6 +488,11 @@ export default function DashboardPage({ user, onLogout }) {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <h1 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-wide">Dashboard Overview</h1>
               </div>
+              {loadError && (
+                <div role="alert" className="mb-5 px-4 py-3 rounded-xl border border-danger-200 bg-danger-50 text-danger-700 text-sm font-semibold">
+                  {loadError}
+                </div>
+              )}
 
               {/* Row 1: 4 Stat Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-7">

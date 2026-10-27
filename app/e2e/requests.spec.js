@@ -195,7 +195,7 @@ test.describe('ปรับปรุงเวลา', () => {
 
     await expect.poll(() => api.callsTo('POST', '/attendance/corrections').length).toBe(1);
     const posts = api.callsTo('POST', '/attendance/corrections');
-    // (วันที่ของคำขอ dateIso ตรวจในเคส fixme TC-APP-TCORR-01b ด้านล่าง เพราะพบบั๊ก)
+    // (วันที่ของคำขอ dateIso ตรวจในเคส TC-APP-TCORR-01b ด้านล่าง)
     expect(posts[0].body).toMatchObject({
       oldCheckIn: '-',
       newCheckIn: '08:00 น.',
@@ -208,11 +208,8 @@ test.describe('ปรับปรุงเวลา', () => {
     await expect(text(page, 'ข้อมูลเวลาเข้าออกงานของเดือนนี้สมบูรณ์เรียบร้อย')).toBeVisible();
   });
 
-  // บั๊กจริงใน app/src/services/leaveStorage.js (addTimeCorrectionRequest): regex ตรวจรูปแบบวันที่เขียนว่า
-  //   /^d{4}-d{2}-d{2}/ (ขาดเครื่องหมาย backslash หน้า d ทุกตัว ต้องเป็น /^\d{4}-\d{2}-\d{2}/) จึงไม่เคยจับคู่ 'YYYY-MM-DD'
-  // ผล: คำขอปรับปรุงเวลาที่เลือกจากรายการ "ยื่นปรับปรุงเวลา" (ส่ง dateIso แบบ ISO) ถูกส่งไป server ด้วยวันที่ "วันนี้"
-  //   แทนวันที่เลือก (ทางลัดจากปฏิทินส่ง dd/mm/yyyy ซึ่งผ่านเพราะมี '/') regex ซ้ำใน pointsStorage.js (วันที่ในประวัติแต้มไม่แปลงเป็นวันไทย)
-  test.fixme('TC-APP-TCORR-01b @critical คำขอปรับปรุงเวลาที่เลือกจากรายการต้องส่งวันที่ของวันที่เลือก (ไม่ใช่วันนี้)', async ({ page }) => {
+  // วันที่ของคำขอที่เลือกจากรายการต้องเป็นวันที่เลือก (ไม่ใช่วันนี้): regex วันที่ใน leaveStorage.js เคยขาด backslash จึงไม่เคยจับคู่ YYYY-MM-DD
+  test('TC-APP-TCORR-01b @critical คำขอปรับปรุงเวลาที่เลือกจากรายการต้องส่งวันที่ของวันที่เลือก (ไม่ใช่วันนี้)', async ({ page }) => {
     const api = await setup(page, { user: USERS.employee, data: { history: [staleOpenRow()] } });
     await openApp(page, '/main');
     await expect.poll(() => page.evaluate(() => localStorage.getItem('attendance_state_EMP-001') || '')).toContain('att-old');
@@ -224,11 +221,8 @@ test.describe('ปรับปรุงเวลา', () => {
     expect(api.callsTo('POST', '/attendance/corrections')[0].body.dateIso).toBe(daysAgoIsoBkk(3));
   });
 
-  // พบจากการเขียนเทส: เปิด /time-correction ตรงๆ (รีเฟรชเว็บที่หน้านี้) ขณะที่ประวัติยังโหลดไม่เสร็จ
-  // รายการ "วันที่ต้องแก้ไข" จะว่างค้าง เพราะ attendanceStorage แก้ globalState ในที่เดิมแล้วส่ง reference เดิมให้ setAttendance
-  // (React ไม่ re-render) และหน้านี้ไม่มีตัวจับเวลาให้ re-render เอง จึงเห็นข้อมูลก็ต่อเมื่อเข้าหน้าหลังโหลดเสร็จแล้ว
-  // ไม่กระทบแอปมือถือที่ผ่าน Splash/Home ก่อน แต่เกิดกับเว็บ/ลิงก์ลึก -> ปิดไว้เป็น fixme รอแก้ที่ app/src
-  test.fixme('TC-APP-TCORR-00 เปิด /time-correction ตรงๆ แล้วต้องเห็นวันที่ลืมกดออกงานเมื่อประวัติโหลดเสร็จ', async ({ page }) => {
+  // เปิด /time-correction ตรงๆ (รีเฟรชเว็บ) ต้องเห็นรายการเมื่อประวัติโหลดเสร็จ: storage ต้องส่งสำเนา state ให้ listener ไม่ใช่ reference เดิม
+  test('TC-APP-TCORR-00 เปิด /time-correction ตรงๆ แล้วต้องเห็นวันที่ลืมกดออกงานเมื่อประวัติโหลดเสร็จ', async ({ page }) => {
     await setup(page, { user: USERS.employee, data: { history: [staleOpenRow()] } });
     await openApp(page, '/time-correction');
     await expect(text(page, 'ปรับปรุง').first()).toBeVisible();

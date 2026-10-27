@@ -205,9 +205,8 @@ test.describe('Attendance - admin report', () => {
     expect(downloaded).toBe(false);
   });
 
-  // [สาเหตุ: ปฏิทินของหน้านี้ใช้ DatePicker ค่าเริ่มต้นที่ห้ามเลือกวันก่อนวันนี้ (disablePast) เลยย้อนดูรายงานของวันที่ผ่านมาไม่ได้]
-  test.fixme('[High] TC-ATT-012 a past date can be picked to review an earlier day', { tag: '@high' }, async ({ page }) => {
-    // BUG จริงของ product: AttendanceManagement ไม่ส่ง disablePast={false} ให้ DatePicker
+  // ปฏิทินของหน้านี้ต้องเลือกวันที่ผ่านมาได้ (disablePast={false}) เพื่อย้อนดูรายงาน
+  test('[High] TC-ATT-012 a past date can be picked to review an earlier day', { tag: '@high' }, async ({ page }) => {
     await page.setViewportSize({ width: 700, height: 1000 }); // จอแคบ เพื่อให้ปฏิทินไม่ถูกแถบหัวเว็บบัง
     const { dates } = await openAttendance(page);
     await expect(rowOf(page, /Somchai/)).toBeVisible();
@@ -220,17 +219,15 @@ test.describe('Attendance - admin report', () => {
     expect(dates[dates.length - 1] < todayLocal()).toBe(true);
   });
 
-  // [สาเหตุ: บนจอ 1280x720 ปฏิทินเปิดขึ้นด้านบนแล้วแถบเดือน (ปุ่ม Next/Previous month) ถูกแถบหัวเว็บบัง กดไม่ได้]
-  test.fixme('[High] TC-ATT-014 the calendar month buttons are not covered by the top bar', { tag: '@high' }, async ({ page }) => {
-    // BUG จริงของ product: DatePicker placement="top" ของหน้า Attendance ชนแถบหัวเว็บ (z-index) บนจอเดสก์ท็อปปกติ
+  // บนจอ 1280x720 ปุ่ม Next/Previous month ต้องไม่ถูกแถบหัวเว็บบัง (ปฏิทินเปิดลงด้านล่าง)
+  test('[High] TC-ATT-014 the calendar month buttons are not covered by the top bar', { tag: '@high' }, async ({ page }) => {
     await openAttendance(page);
     await page.getByText(todayLocal(), { exact: true }).click();
     await page.getByTitle('Next month').click({ trial: true, timeout: 3000 });
   });
 
-  // [สาเหตุ: ป้ายการ์ด "Incomplete Hours (under 9 hrs)" ฮาร์ดโค้ด 9 ชม. ทั้งที่ requiredHours มาจาก Work Time Settings]
-  test.fixme('[High] TC-ATT-013 the Incomplete Hours card shows the configured required hours', { tag: '@high' }, async ({ page }) => {
-    // BUG จริงของ product: ขัดกับกฎ "ห้ามฮาร์ดโค้ด 9 ชม." ใน CLAUDE.md
+  // ป้ายการ์ด Incomplete Hours ต้องใช้ requiredHours จาก Work Time Settings (ห้ามฮาร์ดโค้ด 9 ชม.)
+  test('[High] TC-ATT-013 the Incomplete Hours card shows the configured required hours', { tag: '@high' }, async ({ page }) => {
     await openAttendance(page, { rules: { ...RULES, requiredHours: 8 } });
     await expect(page.getByText('Incomplete Hours (under 8 hrs)')).toBeVisible();
   });

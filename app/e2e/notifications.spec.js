@@ -110,11 +110,8 @@ test.describe('กระดิ่งแจ้งเตือนและปร�
     await expect.poll(() => api.callsTo('PATCH', '/notifications/n-1/read').length).toBe(1);
   });
 
-  // พบจากการเขียนเทส: เปิด /notifications ตรงๆ (รีเฟรชเว็บที่หน้านี้) รายการว่างค้าง ทั้งที่ server มีแจ้งเตือน
-  // สาเหตุ: notificationStorage.subscribe() ส่ง globalState ตัวจริงให้ setNotifState ตั้งแต่ตอน mount แล้วการซิงก์แก้ค่าในที่เดิม
-  // (globalState.notifications = [...]) ส่ง reference เดิมกลับมา React จึงไม่ re-render (ปัญหาเดียวกับ TC-APP-TCORR-00)
-  // ผลคือประกาศ/แจ้งเตือนที่เข้ามาขณะเปิดหน้านี้อยู่ก็ไม่โผล่จนกว่าจะออกแล้วเข้าใหม่
-  test.fixme('TC-APP-NOTIF-03b เปิด /notifications ตรงๆ แล้วต้องเห็นรายการแจ้งเตือนที่ server ส่งมา', async ({ page }) => {
+  // เปิด /notifications ตรงๆ (รีเฟรชเว็บ) ต้องเห็นรายการที่ server ส่งมา: notificationStorage ต้องส่งสำเนา state ให้ listener
+  test('TC-APP-NOTIF-03b เปิด /notifications ตรงๆ แล้วต้องเห็นรายการแจ้งเตือนที่ server ส่งมา', async ({ page }) => {
     await setup(page, { user: USERS.employee, data: { notifications: [SERVER_NOTIF] } });
     await openApp(page, '/notifications');
     await expectScreen(page, 'notifications');

@@ -38,11 +38,8 @@ test.describe('โปรไฟล์', () => {
     expect(api.callsTo('GET', '/employees/EMP-001').length).toBeGreaterThan(0);
   });
 
-  // บั๊กจริงใน app/src/screens/ProfileScreen.js และ SettingsScreen.js: เขียน t('phone') || 'เบอร์โทรศัพท์'
-  // แต่ t() ใน ThemeContext คืน "ชื่อคีย์" เมื่อไม่มีคำแปล (dict[key] || fallback || key เมื่อไม่ส่ง fallback) ทำให้ ||
-  // ไม่เคยใช้ข้อความไทยสำรอง หน้าจอจึงแสดงคีย์ดิบ: PERSONALINFO, phone, email, department, role, startDate, APPPREFERENCES
-  // (โปรไฟล์) และ pinSettings, language, appPreferences, ป๊อปอัปปิด PIN ที่แสดง disablePin / disablePinConfirm (ตั้งค่า) -> UI ไทยต้องแสดงข้อความไทย
-  test.fixme('TC-APP-PROFILE-02 @critical หน้าโปรไฟล์แสดงป้ายกำกับภาษาไทย (ไม่ใช่คีย์ดิบ phone/email/department/role/startDate)', async ({ page }) => {
+  // ป้ายกำกับของหน้าโปรไฟล์/ตั้งค่าต้องเป็นภาษาไทย: ใช้ t(key, fallback) เพราะ t() คืนชื่อคีย์เมื่อไม่มีคำแปล (ห้ามเขียน t(key) || fallback)
+  test('TC-APP-PROFILE-02 @critical หน้าโปรไฟล์แสดงป้ายกำกับภาษาไทย (ไม่ใช่คีย์ดิบ phone/email/department/role/startDate)', async ({ page }) => {
     await setup(page, { user: USERS.employee });
     await openApp(page, '/main/profile');
     const profile = page.getByTestId('screen-profile');
@@ -52,7 +49,7 @@ test.describe('โปรไฟล์', () => {
     expect(await profile.innerText()).not.toMatch(/\b(phone|email|department|role|startDate)\b/);
   });
 
-  test.fixme('TC-APP-SETTINGS-00 @critical หน้าตั้งค่าแสดงป้ายกำกับภาษาไทย (ไม่ใช่คีย์ดิบ pinSettings/language)', async ({ page }) => {
+  test('TC-APP-SETTINGS-00 @critical หน้าตั้งค่าแสดงป้ายกำกับภาษาไทย (ไม่ใช่คีย์ดิบ pinSettings/language)', async ({ page }) => {
     await setup(page, { user: USERS.employee });
     await openSettingsFromProfile(page);
     const settings = visible(page.getByTestId('screen-settings'));

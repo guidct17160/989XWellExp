@@ -34,6 +34,9 @@ let currentToken = null;
 let currentRefreshToken = null;
 let accessTokenIssuedAt = Date.now();
 let refreshTokenIssuedAt = Date.now();
+// A session restored from storage at app start must be unlocked with the PIN (if it has one) before any screen
+// other than the public ones opens. Opening a deep URL on web skips the Splash screen that normally asks for it.
+let pinLocked = false;
 
 // Restore session from localStorage on module load
 try {
@@ -58,7 +61,8 @@ try {
           currentToken = parsed.token || parsed.accessToken || null;
           currentRefreshToken = parsed.refreshToken || null;
           refreshTokenIssuedAt = refIssued;
-          
+          pinLocked = true;
+
           // Auto-refresh Access Token if older than 15 minutes
           const accIssued = parsed.accessTokenIssuedAt || now;
           if (now - accIssued >= ACCESS_TOKEN_EXPIRY_MS) {
@@ -208,9 +212,19 @@ export const authService = {
     return false;
   },
 
+  // True while a restored session still has to be unlocked with its PIN
+  isPinLocked() {
+    return pinLocked && this.isLoggedIn() && this.hasPin();
+  },
+
+  unlockPin() {
+    pinLocked = false;
+  },
+
   logout() {
     const prevUserId = currentUser?.id || currentUser?.code || currentUser?.username;
     const token = currentToken;
+    pinLocked = false;
 
     // 1. Notify backend to clear pinHash on database
     if (prevUserId) {
@@ -290,6 +304,7 @@ export const authService = {
         const data = await response.json();
         if (response.ok && data.success && data.user) {
           this.setUser(data.user, data.token || data.accessToken, data.refreshToken);
+          pinLocked = false; // the password was just entered
           return data;
         } else {
           // Backend responded with an error (e.g. Wrong Password, User Not Found, Admin Restriction)

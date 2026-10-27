@@ -89,6 +89,8 @@ export const pinService = {
           authService.setUser(updated);
           this.setLocalPinStatus(user.id || user.code || user.username, true);
         }
+        // The server accepted it: either there was no PIN yet, or the old PIN / password was just confirmed
+        authService.unlockPin();
         return data;
       } else if (response) {
         const errorData = await response.json().catch(() => ({}));

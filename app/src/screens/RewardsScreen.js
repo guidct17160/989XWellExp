@@ -242,6 +242,32 @@ export default function RewardsScreen({ navigation, route }) {
     );
   };
 
+  // Insufficient-points popup. Drawn inside the reward detail Modal while it is open (a Modal covers anything
+  // rendered behind it), and at the screen root otherwise.
+  const renderInsufficientPopup = () => (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, backgroundColor: 'rgba(15, 23, 42, 0.65)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' }}>
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+          <Ionicons name="alert-circle" size={44} color="#EF4444" />
+        </View>
+
+        <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 6 }}>
+          คะแนนสะสมไม่เพียงพอ
+        </Text>
+        <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
+          คุณต้องใช้ {insufficientPopup.required.toLocaleString()} คะแนนเพื่อแลก "{insufficientPopup.rewardTitle}" (ปัจจุบันมี {insufficientPopup.current.toLocaleString()} คะแนน)
+        </Text>
+
+        <TouchableOpacity
+          style={{ backgroundColor: '#1F4C9C', borderRadius: 14, paddingVertical: 12, width: '100%', alignItems: 'center' }}
+          onPress={() => setInsufficientPopup({ visible: false, required: 0, current: 0, rewardTitle: '' })}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>ตกลง</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   // Shared coupon detail content renderer (used in both overlay & standalone modal)
   const renderCouponDetailContent = () => {
     if (!selectedRedeemedCoupon) return null;
@@ -1524,6 +1550,8 @@ export default function RewardsScreen({ navigation, route }) {
                   );
                 })()}
 
+                {insufficientPopup.visible && renderInsufficientPopup()}
+
                 {/* Instant Confirmation Popup Overlay inside detail screen */}
                 {confirmRedeemPopup.visible && (
                   <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, backgroundColor: 'rgba(15, 23, 42, 0.65)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -1714,6 +1742,8 @@ export default function RewardsScreen({ navigation, route }) {
                 </View>
               );
             })()}
+
+            {insufficientPopup.visible && renderInsufficientPopup()}
 
             {/* Instant Confirmation Popup Overlay inside detail screen */}
             {confirmRedeemPopup.visible && (
@@ -2186,29 +2216,7 @@ export default function RewardsScreen({ navigation, route }) {
       )}
 
       {/* 3. TOP-LEVEL INSUFFICIENT POINTS OVERLAY */}
-      {insufficientPopup.visible && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, backgroundColor: 'rgba(15, 23, 42, 0.65)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <Ionicons name="alert-circle" size={44} color="#EF4444" />
-            </View>
-
-            <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 6 }}>
-              คะแนนสะสมไม่เพียงพอ
-            </Text>
-            <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
-              คุณต้องใช้ {insufficientPopup.required.toLocaleString()} คะแนนเพื่อแลก "{insufficientPopup.rewardTitle}" (ปัจจุบันมี {insufficientPopup.current.toLocaleString()} คะแนน)
-            </Text>
-
-            <TouchableOpacity
-              style={{ backgroundColor: '#1F4C9C', borderRadius: 14, paddingVertical: 12, width: '100%', alignItems: 'center' }}
-              onPress={() => setInsufficientPopup({ visible: false, required: 0, current: 0, rewardTitle: '' })}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>ตกลง</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      {insufficientPopup.visible && !selectedReward && renderInsufficientPopup()}
 
     </SafeAreaView>
   );

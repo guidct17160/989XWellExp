@@ -84,8 +84,7 @@ test.describe('Audit Logs - Super Admin page', () => {
   });
 
   // ช่องค้นหามี placeholder ว่า "Search actor, IP, action or details..." จึงควรค้นด้วย IP ได้
-  // BUG ของสินค้า: AuditTrailLogsPage.jsx กรองจาก actor / action / details / resource เท่านั้น ไม่รวม ipAddress
-  test.fixme('[High] TC-AUD-009 search by IP address finds the matching rows', { tag: '@high' }, async ({ page }) => {
+  test('[High] TC-AUD-009 search by IP address finds the matching rows', { tag: '@high' }, async ({ page }) => {
     await openAuditLogs(page);
     await page.getByPlaceholder('Search actor, IP, action or details...').fill('203.0.113.20');
     await expect(page.getByRole('row', { name: /CREATE_EMPLOYEE/ })).toBeVisible();

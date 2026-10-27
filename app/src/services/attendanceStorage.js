@@ -69,7 +69,7 @@ const syncPreviousDayState = () => {
         checkOutTime: null,
       };
       saveState();
-      listeners.forEach((l) => l(globalState));
+      listeners.forEach((l) => l({ ...globalState }));
       syncWithBackend();
       return;
     }
@@ -88,7 +88,7 @@ const syncPreviousDayState = () => {
       try {
         // not defined yet while the module is still loading (loadLocalState runs first): the next read saves it
         saveState();
-        listeners.forEach((l) => l(globalState));
+        listeners.forEach((l) => l({ ...globalState }));
       } catch (e) { /* module still initialising */ }
     }
   }
@@ -218,7 +218,7 @@ const syncWithBackend = async () => {
 
         syncPreviousDayState();
         saveState();
-        listeners.forEach((l) => l(globalState));
+        listeners.forEach((l) => l({ ...globalState }));
       }
     }
   } catch (e) {
@@ -329,12 +329,12 @@ export const attendanceStorage = {
   setState(newState) {
     globalState = { ...globalState, ...newState };
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
   },
   async clearAndSync() {
     loadLocalState();
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
     await syncWithBackend();
   },
   async clockIn(latitude, longitude, locationName) {
@@ -464,7 +464,7 @@ export const attendanceStorage = {
       history: updatedHistory,
     };
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
   },
 
   approveCorrection(dateMatchStr, newCheckIn = '08:00 น.', newCheckOut = '17:00 น.') {
@@ -504,7 +504,7 @@ export const attendanceStorage = {
       history: updatedHistory,
     };
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
   },
   addPunchLog(type, timeStr, dateStr, location = 'อาคารสำนักงานใหญ่ (HQ)') {
     const newPunch = {
@@ -522,7 +522,7 @@ export const attendanceStorage = {
       punchLogs: updatedPunchLogs,
     };
     saveState();
-    listeners.forEach((l) => l(globalState));
+    listeners.forEach((l) => l({ ...globalState }));
     return updatedPunchLogs;
   },
   getPunchLogsForDate(date) {
@@ -552,7 +552,7 @@ export const attendanceStorage = {
   },
   subscribe(listener) {
     listeners.add(listener);
-    listener(globalState);
+    listener({ ...globalState });
     return () => listeners.delete(listener);
   },
 };

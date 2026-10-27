@@ -73,21 +73,13 @@ test('ตัวอย่าง', async ({ page }) => {
 ```
 
 ข้อควรรู้
-- เปิด URL ตรงๆ ข้ามหน้าหลักได้ แต่หน้าที่อ่านข้อมูลจาก singleton ตอน mount (รายการปรับปรุงเวลา, แจ้งเตือน) ควรเข้าผ่านหน้าหลักก่อนเหมือนผู้ใช้จริง (ดูบั๊กในหัวข้อถัดไป)
+- เปิด URL ตรงๆ ข้ามหน้าหลักได้ แต่หน้าที่อ่านข้อมูลจาก singleton ตอน mount (รายการปรับปรุงเวลา, แจ้งเตือน) ควรเข้าผ่านหน้าหลักก่อนเหมือนผู้ใช้จริง
 - บนเว็บ หน้าที่เปิดแล้วยังค้างอยู่ใน stack/แท็บ ทำให้ `testID` ซ้ำ ให้จำกัดขอบเขต (`screen-home` ...) หรือใช้ `visible(locator)` จาก `helpers.js`
 - `setup()` เตือนในคอนโซลเมื่อแอปเรียก endpoint ที่ยังไม่ได้ mock (`[e2e] ไม่ได้ mock: ...`) ให้เพิ่ม handler ใน `helpers.js`
 
-## เคสที่ปิดไว้เป็น `test.fixme` (บั๊กจริงของแอป พบจากการเขียนเทส)
+## เคสที่ปิดไว้เป็น `test.fixme`
 
-เทสพวกนี้จะ "ข้าม" ไปก่อน เมื่อแก้บั๊กแล้วให้เปลี่ยน `test.fixme` เป็น `test`
-
-| เคส | บั๊ก | ไฟล์ที่ต้องแก้ |
-|---|---|---|
-| `TC-APP-TCORR-01b` | วันที่ของคำขอปรับปรุงเวลาที่เลือกจากรายการถูกส่งเป็น "วันนี้" แทนวันที่ที่เลือก เพราะ regex `/^d{4}-d{2}-d{2}/` ขาด `\` (ต้องเป็น `\d`) | `app/src/services/leaveStorage.js` (และ `pointsStorage.js` บรรทัดเดียวกัน) |
-| `TC-APP-REWARD-02b` | ป๊อปอัป "คะแนนสะสมไม่เพียงพอ" อยู่หลัง Modal รายละเอียดรางวัล ผู้ใช้มองไม่เห็นและกดตกลงไม่ได้ | `app/src/screens/RewardsScreen.js` |
-| `TC-APP-PROFILE-02`, `TC-APP-SETTINGS-00` | หน้าโปรไฟล์/ตั้งค่าแสดงคีย์ดิบ (`phone`, `email`, `department`, `role`, `startDate`, `PERSONALINFO`, `pinSettings`, `language`, `disablePin` ...) เพราะ `t(key) \|\| 'ข้อความไทย'` ไม่เคยใช้ข้อความสำรอง (`t()` คืนชื่อคีย์เมื่อไม่มีคำแปล) | `app/src/context/ThemeContext.js` / `ProfileScreen.js` / `SettingsScreen.js` |
-| `TC-APP-TCORR-00`, `TC-APP-NOTIF-03b` | เปิด/รีเฟรชที่ `/time-correction` หรือ `/notifications` โดยตรง รายการว่างค้าง เพราะ storage แก้ state ในที่เดิมแล้วส่ง reference เดิมให้ `setState` (React ไม่ re-render) | `app/src/services/attendanceStorage.js`, `notificationStorage.js` |
-| `TC-APP-SESSION-03` | ข้อสังเกตความปลอดภัยเบา: เปิดที่ URL ลึก (เช่น `/main/profile`) ขณะ session มี PIN จะไม่ถูกถาม PIN | `App.js` / `AppNavigator.js` |
+ไม่มีแล้ว บั๊กที่เคยพบจากการเขียนเทสแก้ครบ (regex วันที่ใน `leaveStorage.js`/`pointsStorage.js`, ป๊อปอัปแต้มไม่พอใน `RewardsScreen.js`, ป้ายกำกับ `t(key, 'ไทย')`, storage ส่งสำเนา state, การบังคับ PIN เมื่อเปิด URL ลึกใน `App.js`) ถ้าพบบั๊กใหม่ที่ยังไม่แก้ ให้เขียนเคสแล้วปิดด้วย `test.fixme` พร้อมคอมเมนต์สาเหตุ
 
 ## สิ่งที่เทสชุดนี้ไม่ครอบคลุม
 

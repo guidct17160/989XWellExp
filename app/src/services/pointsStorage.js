@@ -59,7 +59,7 @@ const normalizeBackendTxn = (t) => {
   const rawPoints = Number(t.points) || 0;
   const isOut = t.type === 'spend' || t.type === 'out' || t.type === 'redeem' || rawPoints < 0;
   let dateLabel = t.date;
-  if (typeof t.date === 'string' && /^d{4}-d{2}-d{2}/.test(t.date)) {
+  if (typeof t.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(t.date)) {
     const [y, m, d] = t.date.slice(0, 10).split('-').map(Number);
     dateLabel = new Date(y, m - 1, d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
   }

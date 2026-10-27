@@ -214,9 +214,8 @@ test.describe('PIN lock และการกู้ session', () => {
     await expect(page.getByTestId('screen-login')).toHaveCount(0);
   });
 
-  // ข้อสังเกตด้านความปลอดภัย (เบา): การล็อกด้วย PIN บังคับผ่านหน้า Splash เท่านั้น ถ้าเปิด/รีเฟรชที่ URL ลึกบนเว็บ (เช่น /main/profile)
-  // ขณะที่ session มี PIN จะเข้าหน้านั้นได้เลยโดยไม่ถูกถาม PIN (บนมือถือเริ่มที่ Splash เสมอจึงไม่กระทบ) -> ปิดไว้เป็น fixme ให้ทีมตัดสินใจ
-  test.fixme('TC-APP-SESSION-03 session ที่มี PIN เปิดที่ URL ลึก (/main/profile) ต้องถูกถาม PIN ก่อน', async ({ page }) => {
+  // การล็อกด้วย PIN ต้องใช้ได้เมื่อเปิด/รีเฟรชที่ URL ลึกบนเว็บ (เช่น /main/profile) ซึ่งข้ามหน้า Splash: App.js บังคับไป PinLock
+  test('TC-APP-SESSION-03 session ที่มี PIN เปิดที่ URL ลึก (/main/profile) ต้องถูกถาม PIN ก่อน', async ({ page }) => {
     await setup(page, { user: pinUser });
     await openApp(page, '/main/profile');
     await expectScreen(page, 'pin-lock');

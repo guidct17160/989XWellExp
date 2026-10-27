@@ -259,7 +259,7 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
             <Clock size={24} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Incomplete Hours (under 9 hrs)</p>
+            <p className="text-xs text-slate-500 font-medium">Incomplete Hours (under {rules.requiredHours} hrs)</p>
             <h3 className="text-2xl font-black text-amber-600 font-mono">{incompleteCount} staff</h3>
           </div>
         </div>
@@ -288,6 +288,8 @@ export default function AttendanceManagement({ initialTab = 'attendance' }) {
           <DatePicker
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
+            disablePast={false}
+            placement="bottom"
           />
         </div>
       </FilterBar>
