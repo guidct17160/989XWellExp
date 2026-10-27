@@ -44,6 +44,17 @@ test.describe('Web admin routing', () => {
     await expect(page).toHaveURL(/\/employees$/);
   });
 
+  // เส้นทางเก่าของหน้าที่ย้ายเข้า Settings ต้องพาไปที่ใหม่ (รวมรหัสรายละเอียด)
+  test('[High] TC-ROUTE-006 old addresses of pages moved into Settings redirect to the new ones', { tag: '@high' }, async ({ page }) => {
+    await signedIn(page);
+    await page.goto('/attendance/work-locations');
+    await expect(page).toHaveURL(/\/settings\/work-locations$/);
+    await page.goto('/attendance/settings');
+    await expect(page).toHaveURL(/\/settings\/work-time$/);
+    await page.goto('/leave-policies');
+    await expect(page).toHaveURL(/\/settings\/leave-policies$/);
+  });
+
   // เส้นทางที่ไม่มีอยู่ ต้องพากลับ Dashboard ไม่ใช่หน้าว่าง
   test('[High] TC-ROUTE-004 an unknown path falls back to the Dashboard', { tag: '@high' }, async ({ page }) => {
     await signedIn(page);

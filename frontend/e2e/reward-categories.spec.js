@@ -38,7 +38,8 @@ test.describe('Reward Categories - admin page', () => {
     await openCategories(page);
     const row = page.getByRole('row', { name: /Food & Drink/ });
     await expect(row).toContainText('CAT-002');
-    await expect(row).toContainText('1 items');
+    // the Rewards column shows just the number of rewards in the category
+    await expect(row.getByRole('cell').nth(2)).toHaveText('1');
   });
 
   // กดที่ไหนก็ได้ของแถว → เปิดเป็นหน้าใหม่ (URL เปลี่ยน มี id) และเห็น Reward ในหมวด

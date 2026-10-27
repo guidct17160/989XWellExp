@@ -1,0 +1,4 @@
+# ผลลัพธ์ของเทส E2E (สร้างใหม่ทุกครั้งที่รัน)
+test-results/
+playwright-report/
+.export/

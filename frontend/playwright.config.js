@@ -15,6 +15,8 @@ export default defineConfig({
   expect: { timeout: 7_000 },
   // รันเคสต่างๆ พร้อมกันเพื่อให้เร็วขึ้น
   fullyParallel: true,
+  // ใช้ 2 worker: เว็บทดสอบรันบน Vite dev server ตัวเดียว ถ้าขนานมากกว่านี้ page.goto จะช้าจนหมดเวลา (เคสสุ่มล้ม)
+  workers: 2,
   // บน CI: ห้ามเหลือ test.only ค้างไว้ และให้ลองใหม่ 1 ครั้งถ้าล้มเหลว
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

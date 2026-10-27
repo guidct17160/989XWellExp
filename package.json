@@ -8,10 +8,13 @@
     "start:frontend": "npm --prefix frontend run dev",
     "start:app": "npm --prefix app start",
     "dev:app": "npm --prefix app run web",
-    "dev:all": "concurrently -k -i --default-input-target app -n backend,web,app -c blue,green,magenta \"npm:dev:backend\" \"npm:start:frontend\" \"npm:start:app\"",
+    "dev:all": "concurrently -i --default-input-target app --restart-tries 5 --restart-after 2000 -n backend,web,app -c blue,green,magenta \"npm:dev:backend\" \"npm:start:frontend\" \"npm:start:app\"",
     "dev": "npm run dev:all",
     "test:e2e": "npm --prefix frontend run test:e2e",
-    "test:e2e:critical": "npm --prefix frontend run test:e2e:critical"
+    "test:e2e:critical": "npm --prefix frontend run test:e2e:critical",
+    "test:e2e:app": "npm --prefix app run test:e2e",
+    "test:backend": "npm --prefix backend test",
+    "test:backend:db": "npm --prefix backend run test:db"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

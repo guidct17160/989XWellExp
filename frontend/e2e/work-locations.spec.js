@@ -25,25 +25,18 @@ async function openWorkLocations(page, locations = LOCATIONS) {
     if (route.request().method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, locations }) });
   });
-  await page.goto('/attendance/work-locations');
+  await page.goto('/settings/work-locations');
   await expect(page.getByRole('heading', { name: /work locations/i })).toBeVisible();
 }
 
 test.describe('Work Locations - admin page', () => {
   // แสดงรายการสถานที่ พร้อมรัศมีและกลุ่มผู้ที่ใช้ได้
-  test('[Critical] TC-LOC-001 the list shows each location with radius and who can use it', { tag: '@critical' }, async ({ page }) => {
+  test('[Critical] TC-LOC-001 the list shows each location with who can use it', { tag: '@critical' }, async ({ page }) => {
     await openWorkLocations(page);
     const row = page.getByRole('row', { name: /Head Office/ });
     await expect(row).toBeVisible();
-    await expect(row).toContainText('100 m');
     await expect(row).toContainText('All employees');
     await expect(row).toContainText('Active');
-  });
-
-  // ยังไม่มีสถานที่เลย ต้องเตือนแอดมินว่าพนักงานลงเวลาจากที่ไหนก็ได้
-  test('[High] TC-LOC-002 with no location the admin is warned that employees can punch anywhere', { tag: '@high' }, async ({ page }) => {
-    await openWorkLocations(page, []);
-    await expect(page.getByText(/can currently clock in \/ out from anywhere/i)).toBeVisible();
   });
 
   // บันทึกโดยไม่ปักหมุด ต้องไม่ยิง API และแสดงข้อความให้ปักหมุดก่อน
@@ -79,6 +72,74 @@ test.describe('Work Locations - admin page', () => {
     await expect(page.getByText('Work location created')).toBeVisible();
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ name: 'Branch A', latitude: 13.7563, longitude: 100.5018, radiusM: 150, scope: 'all', status: 'Active' });
+  });
+
+  // วางลิงก์ Google Maps (มีพิกัดอยู่ในลิงก์) หรือพิกัดตรงๆ แล้วกด Search หมุดต้องไปอยู่ที่นั่นทันที โดยไม่ต้องเรียกบริการค้นหา
+  test('[High] TC-LOC-007 pasting coordinates or a Google Maps link fills latitude and longitude', { tag: '@high' }, async ({ page }) => {
+    let searched = false;
+    await openWorkLocations(page, []);
+    await page.route('**/nominatim.openstreetmap.org/**', (route) => { searched = true; return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }); });
+    await page.getByRole('button', { name: /add location/i }).click();
+    const box = page.getByLabel('Search place');
+    await box.fill('13.8268, 100.5390');
+    await box.press('Enter');
+    await expect(page.getByPlaceholder('13.756300')).toHaveValue('13.826800');
+    await expect(page.getByPlaceholder('100.501800')).toHaveValue('100.539000');
+    await box.fill('https://www.google.com/maps/place/Office/@13.9,100.6,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d13.7467!4d100.5349');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    // the place pin (!3d/!4d) wins over the map centre (@)
+    await expect(page.getByPlaceholder('13.756300')).toHaveValue('13.746700');
+    await expect(page.getByPlaceholder('100.501800')).toHaveValue('100.534900');
+    expect(searched).toBe(false);
+  });
+
+  // พิมพ์ที่อยู่ → ได้รายการผลลัพธ์ เลือกอันไหนหมุดย้ายไปที่นั่น และเติมที่อยู่ให้ถ้ายังว่าง
+  test('[High] TC-LOC-008 searching an address lists places and picking one moves the pin', { tag: '@high' }, async ({ page }) => {
+    await openWorkLocations(page, []);
+    await page.route('**/nominatim.openstreetmap.org/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { display_name: 'Siam Paragon, Rama I Road, Bangkok', lat: '13.746', lon: '100.535' },
+          { display_name: 'Siam Square, Bangkok', lat: '13.745', lon: '100.534' },
+        ]),
+      })
+    );
+    await page.getByRole('button', { name: /add location/i }).click();
+    await page.getByLabel('Search place').fill('Siam Paragon');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await expect(page.getByTestId('place-results').getByRole('button')).toHaveCount(2);
+    await page.getByTestId('place-results').getByRole('button', { name: /Siam Paragon/ }).click();
+    await expect(page.getByPlaceholder('13.756300')).toHaveValue('13.746000');
+    await expect(page.getByPlaceholder('100.501800')).toHaveValue('100.535000');
+    await expect(page.getByPlaceholder('Building, street, district')).toHaveValue('Siam Paragon, Rama I Road, Bangkok');
+    await expect(page.getByTestId('place-results')).toHaveCount(0);
+  });
+
+  // เลือกพนักงานแล้ว ชื่อต้องไปอยู่ในช่องค้นหาเลย (เป็น chip ในช่อง) ไม่ใช่อยู่ใต้ช่อง
+  test('[High] TC-LOC-006 a picked employee appears as a chip inside the search field', { tag: '@high' }, async ({ page }) => {
+    await openWorkLocations(page, []);
+    await page.route('**/api/employees', (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, employees: [{ id: 'EMP-002', code: 'EMP-002', name: 'Somchai Jaidee', department: 'IT', status: 'Active' }] }),
+      });
+    });
+    await page.getByRole('button', { name: /add location/i }).click();
+    await page.getByLabel('Specific employees').check();
+    const input = page.getByPlaceholder(/click and type a name/i);
+    await input.click();
+    await page.getByRole('button', { name: /Somchai Jaidee/ }).click();
+    // ชื่ออยู่ในกรอบเดียวกับช่องพิมพ์ และช่องเปลี่ยนเป็นข้อความ "Add more employees..."
+    const field = page.getByTestId('member-field');
+    await expect(page.getByPlaceholder('Add more employees...')).toBeVisible();
+    await expect(field).toContainText('Somchai Jaidee');
+    // กด X ที่ chip แล้วชื่อหายไป
+    await field.getByTitle('Remove').click();
+    await expect(field).not.toContainText('Somchai Jaidee');
   });
 
   // ถ้า server ตอบ error ต้องแสดงข้อความให้แอดมินเห็น

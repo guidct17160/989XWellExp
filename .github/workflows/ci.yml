@@ -1,0 +1,106 @@
+# CI: รันเทสอัตโนมัติทุกครั้งที่ push / เปิด pull request
+#  - backend : เทส API กับ PostgreSQL ที่เปิดใน CI (ฐาน wellx989_test)  -> backend/tests
+#  - web     : Playwright เว็บแอดมิน (mock API ทั้งหมด)                    -> frontend/e2e
+#  - app     : Playwright แอปพนักงาน (export Expo เป็นเว็บ + mock API)      -> app/e2e
+# หมายเหตุ: ไฟล์นี้ยังไม่เคยรันบน GitHub จริง ตรวจได้แค่รูปแบบ รอบแรกอาจต้องปรับเล็กน้อย
+name: tests
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wellx989_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # เทสรันใน Google Chrome ที่ติดตั้งในเครื่อง (channel: chrome) runner ของ GitHub มี Chrome อยู่แล้ว
+      - run: npx playwright test --reporter=line
+        working-directory: frontend
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            frontend/package-lock.json
+      # แอปใช้ @playwright/test ของ frontend (ดู app/e2e/pw.js) จึงต้องติดตั้งทั้งสองโฟลเดอร์
+      - run: npm ci
+        working-directory: frontend
+      - run: npm ci
+        working-directory: app
+      - run: npm run test:e2e
+        working-directory: app
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: app-playwright-report
+          path: |
+            app/e2e/playwright-report
+            app/e2e/test-results
+          retention-days: 7
