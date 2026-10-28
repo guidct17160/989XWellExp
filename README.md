@@ -38,6 +38,7 @@ npm run dev:all
 
 เมื่อรันแล้ว:
 - **Backend:** http://localhost:5000 (API ที่ `/api`) สร้าง/ปรับตารางในฐานข้อมูลให้เองตอนเริ่ม
+- **เอกสาร API (Swagger):** http://localhost:5000/api-docs (ดูหัวข้อ "เอกสาร API" ด้านล่าง)
 - **เว็บแอดมิน:** http://localhost:3008
 - **แอป:** Metro รันในหน้าต่างเดียวกัน สแกน QR ด้วย Expo Go บนมือถือ หรือกด `w` เปิดเว็บ, `a` เปิด Android emulator
 
@@ -60,10 +61,24 @@ npm run dev:all
 | `DATABASE_URL` หรือ `PG*` | การเชื่อมต่อ PostgreSQL |
 | `JWT_SECRET` | คีย์เซ็น JWT (เปลี่ยนเมื่อใช้งานจริง) |
 | `PORT` | พอร์ต backend (ค่าเริ่มต้น 5000) |
+| `DISABLE_API_DOCS` | ตั้งเป็น `true` เพื่อปิดหน้า Swagger (`/api-docs`) ควรปิดเมื่อขึ้นระบบจริง |
 | SMTP | ส่งอีเมลลิงก์ตั้งรหัสผ่าน |
 
 ฝั่งเว็บเรียก API ผ่าน `API_BASE` ใน `frontend/src/config.js` (ค่าเริ่มต้น `/api`, Vite proxy ไปที่ `localhost:5000`)
 ฝั่งแอปหา IP ของเครื่องที่รัน backend จาก Expo เอง (`app/.env.example` มีแค่ `BROWSER=none`)
+
+## เอกสาร API (Swagger)
+
+เปิดที่ **http://localhost:5000/api-docs** (ต้องรัน backend ก่อน) ไฟล์ OpenAPI แบบ JSON อยู่ที่ `/api-docs.json` นำเข้า Postman ได้ หน้านี้เปิดได้โดยไม่ต้องล็อกอิน
+
+ลองเรียก API จากหน้าเดียว:
+1. เปิดกลุ่ม **การยืนยันตัวตน** → `POST /auth/login` → **Try it out** ใส่ `username`, `password` และ `portal` (`web` = แอดมิน, `app` = พนักงาน) แล้ว **Execute**
+2. คัดลอก `token` จากคำตอบ → กดปุ่ม **Authorize** มุมขวาบน → วาง token (ไม่ต้องพิมพ์ Bearer)
+3. เปิด API ที่ต้องการ → **Try it out** → **Execute** (token พนักงานหมดอายุใน 15 นาที ถ้าได้ 401 ให้ล็อกอินใหม่)
+
+> Try it out ยิงเข้า backend ตัวจริง ถ้าต่อฐานจริงอยู่ `POST` / `PUT` / `DELETE` จะแก้ข้อมูลจริง
+
+เอกสารสร้างจากเส้นทางจริงใน `routes/api.js` ตอน backend เริ่ม (แก้เส้นทางแล้วต้องรีสตาร์ต) ส่วนคำอธิบายภาษาไทยอยู่ที่ [`backend/src/docs/apiMeta.js`](backend/src/docs/apiMeta.js) (ชื่อกลุ่ม/สรุปสั้น) และ [`backend/src/docs/details/`](backend/src/docs/details) (ฟิลด์ ตัวอย่าง รหัสผิดพลาด) **เพิ่ม/แก้ route แล้วให้แก้ทั้งสองที่ด้วย**
 
 ## เส้นทางของเว็บแอดมิน
 
@@ -115,9 +130,19 @@ npm run dev:all
 ## เทสต์ และ ตรวจ build
 
 ```bash
-# E2E เว็บแอดมิน (Playwright + Chrome ในเครื่อง, mock API ทั้งหมด ไม่ต้องมี backend/DB)
+# รันทั้ง 3 ชุดต่อกัน (backend → เว็บ → แอป หยุดทันทีที่ชุดใดล้ม) แนะนำรันก่อน push
+npm run test:all
+
+# API backend (node:test, 111 เคส ราว 1 นาที) ใช้ฐานทดสอบแยก wellx989_test ไม่แตะฐานจริง
+npm run test:backend:db       # ครั้งแรก: สร้างฐานทดสอบ
+npm run test:backend
+
+# E2E เว็บแอดมิน (Playwright + Chrome ในเครื่อง, 173 เคส, mock API ทั้งหมด ไม่ต้องมี backend/DB)
 npm run test:e2e
 npm run test:e2e:critical     # เฉพาะเคส Critical
+
+# E2E แอปพนักงาน (Playwright บน Expo เวอร์ชันเว็บ, 104 เคส, mock API ทั้งหมด)
+npm run test:e2e:app
 
 # build เว็บ
 cd frontend && npx vite build
@@ -129,7 +154,9 @@ node --check backend/src/<ไฟล์>.js
 cd app && npx expo export --platform android --output-dir <โฟลเดอร์ชั่วคราว>
 ```
 
-เทสต์อยู่ใน [`frontend/e2e/`](frontend/e2e) ครอบคลุม Login / Forgot / Set password, Work Locations, Reward Categories, เส้นทาง (routing) และ Reset password รายการเทสต์ Login ทั้งหมดอยู่ที่ [`docs/Login-TestCases.md`](docs/Login-TestCases.md) (ออโต้เฉพาะระดับ Critical/High)
+เทสต์อยู่ใน [`backend/tests/`](backend/tests) (API), [`frontend/e2e/`](frontend/e2e) (เว็บแอดมิน ครอบคลุมทุกเมนู) และ [`app/e2e/`](app/e2e) (แอปพนักงาน อ่าน [`app/e2e/README.md`](app/e2e/README.md)) รายการเทสต์ Login ทั้งหมดอยู่ที่ [`docs/Login-TestCases.md`](docs/Login-TestCases.md) E2E ออโต้เฉพาะระดับ Critical/High ส่วน Medium/Low ทดสอบมือ
+
+CI (`.github/workflows/ci.yml`) รันทั้ง 3 ชุดทุกครั้งที่ push / pull request
 
 > แอปใช้ native module (`expo-location`, `expo-image-picker`, AsyncStorage ฯลฯ) บางตัวใช้ Expo Go ได้ไม่ครบ ถ้าจำเป็นให้ใช้ dev build (`npx expo run:android`) หรือ EAS
 
