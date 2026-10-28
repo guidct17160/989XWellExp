@@ -39,6 +39,18 @@ pool.on('error', (err) => {
 app.use('/api', apiRoutes);
 app.use('/api/v1', apiRoutes);
 
+// Swagger UI: API docs built from the live router (set DISABLE_API_DOCS=true to switch it off)
+if (process.env.DISABLE_API_DOCS !== 'true') {
+  const swaggerUi = require('swagger-ui-express');
+  const { buildOpenApiSpec } = require('./docs/openapi');
+  const openApiSpec = buildOpenApiSpec();
+  app.get('/api-docs.json', (req, res) => res.json(openApiSpec));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'WellX989 API Docs',
+    swaggerOptions: { persistAuthorization: true },
+  }));
+}
+
 // Root Endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to WellX989 API Service' });
