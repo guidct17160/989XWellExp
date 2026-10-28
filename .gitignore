@@ -32,6 +32,9 @@ backend/backups/
 # Expo
 .expo/
 
+# Office lock files (created while a .docx is open in Word)
+~$*
+
 # Test reports & artifacts
 frontend/playwright-report/
 frontend/test-results/
