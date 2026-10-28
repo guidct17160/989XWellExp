@@ -568,11 +568,17 @@ export default function TimeAttendanceScreen({ navigation }) {
     });
   };
 
+  // server ส่งสถานะเต็มข้อความ (อนุมัติแล้ว, รออนุมัติระดับ 1 (Boss) ...) จึงจับด้วยคำขึ้นต้น ไม่รวม ไม่อนุมัติ / ยกเลิก
+  const isLeaveShownOnCalendar = (status) => {
+    const s = String(status || '').trim();
+    return s.startsWith('อนุมัติ') || s.startsWith('รออนุมัติ');
+  };
+
   const getLeaveForDate = (date) => {
     if (!date) return null;
     return leaveHistory.find(leave => {
       if (leave.typeId === 'time_correction' || leave.categoryKey === 'correction' || leave.type?.includes('ปรับปรุง')) return false;
-      if (leave.status !== 'อนุมัติ' && leave.status !== 'รออนุมัติ') return false;
+      if (!isLeaveShownOnCalendar(leave.status)) return false;
       const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
       const startParts = leave.start.split('-');

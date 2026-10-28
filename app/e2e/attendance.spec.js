@@ -271,4 +271,39 @@ test.describe('สถานะในปฏิทิน (กฎเวลาทำ
     await expect(text(page, 'ลงเวลาเข้า-ออกครบถ้วน').first()).toBeVisible();
     await expect(page.getByText(/เข้างานสาย/)).toHaveCount(0);
   });
+
+  // server ส่งสถานะเต็มข้อความ (อนุมัติแล้ว, รออนุมัติระดับ 1 (Boss) ...) ปฏิทินต้องจับด้วยคำขึ้นต้น ไม่ใช่เทียบตรงตัว
+  test('TC-APP-WORKRULE-04 @critical ใบลาที่อนุมัติแล้วและรออนุมัติขึ้นสีส้มในปฏิทิน ส่วนไม่อนุมัติ/ยกเลิกไม่ขึ้น', async ({ page }) => {
+    const today = todayIsoBkk();
+    // วันที่ 1-5 ของเดือนนี้ ยกเว้นวันนี้ (วันที่เลือกอยู่เป็นสีม่วง)
+    const [approved, waiting, rejected, cancelled] = [1, 2, 3, 4, 5].filter((n) => n !== Number(today.slice(8, 10)));
+    const iso = (n) => `${today.slice(0, 8)}${String(n).padStart(2, '0')}`;
+    const leave = (id, day, status) => ({ id, leaveType: 'ลาป่วย', startDate: iso(day), endDate: iso(day), totalDays: 1, status, reason: 'ไม่สบาย', approver: null, remark: null });
+    await setup(page, {
+      user: USERS.employee,
+      data: {
+        myLeaves: [
+          leave('lv-ok', approved, 'อนุมัติแล้ว'),
+          leave('lv-wait', waiting, 'รออนุมัติระดับ 1 (Boss)'),
+          leave('lv-no', rejected, 'ไม่อนุมัติ'),
+          leave('lv-cancel', cancelled, 'ยกเลิก'),
+        ],
+      },
+    });
+    await openApp(page, '/main/time-attendance');
+    await expectScreen(page, 'time-attendance');
+
+    const cell = (n) => page.getByTestId(`time-attendance-day-cell-${n}`);
+    const ORANGE = 'rgb(245, 166, 35)';
+    await expect(cell(approved)).toHaveCSS('background-color', ORANGE);
+    await expect(cell(waiting)).toHaveCSS('background-color', ORANGE);
+    await expect(cell(rejected)).not.toHaveCSS('background-color', ORANGE);
+    await expect(cell(cancelled)).not.toHaveCSS('background-color', ORANGE);
+
+    // กดวันที่ลา ต้องเห็นการ์ดรายละเอียดพร้อมสถานะ
+    await cell(approved).click();
+    await expect(text(page, 'อนุมัติแล้ว').first()).toBeVisible();
+    await cell(waiting).click();
+    await expect(text(page, 'รออนุมัติระดับ 1 (Boss)').first()).toBeVisible();
+  });
 });
